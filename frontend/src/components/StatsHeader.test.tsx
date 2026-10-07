@@ -25,4 +25,10 @@ describe("StatsHeader", () => {
     expect(screen.getByText("~$2,842.40")).toBeTruthy();
     expect(screen.getByText("Orphaned resources, per month")).toBeTruthy();
   });
+
+  it("shows the four headline numbers with their labels", () => {
+    render(<StatsHeader stats={stats} meta={meta} />);
+    for (const label of ["Matching", "Orphaned", "Waste", "Blocked · deletable"]) expect(screen.getByText(label)).toBeTruthy();
+    expect(screen.getByText("23 · 15")).toBeTruthy();
+  });
 });

@@ -1,83 +1,61 @@
-import BarChart from "@cloudscape-design/components/bar-chart";
-import Box, { type BoxProps } from "@cloudscape-design/components/box";
-import ColumnLayout from "@cloudscape-design/components/column-layout";
-import Container from "@cloudscape-design/components/container";
-import Header from "@cloudscape-design/components/header";
-import PieChart from "@cloudscape-design/components/pie-chart";
-import SpaceBetween from "@cloudscape-design/components/space-between";
-import type { Bucket, Meta, Stats, Status } from "../api";
-import { STATUS_COLORS } from "../colors";
+import type { ReactNode } from "react";
+import { CircleDollarSign, Layers, ShieldCheck, TriangleAlert, type LucideIcon } from "lucide-react";
+import type { Meta, Stats } from "../api";
+import BarList from "../charts/BarList";
+import StatusDonut from "../charts/StatusDonut";
 import { accountName, formatGiB, formatMoney } from "../format";
+import { Card, CardBody, CardHeader } from "../ui/card";
+import { cn } from "../ui/cn";
 
-function Metric({ label, value, detail, color }: { label: string; value: string; detail: string; color?: BoxProps.Color }) {
+export function Kpi({ label, value, detail, icon: Icon, tone = "neutral" }: { label: string; value: ReactNode; detail: string; icon: LucideIcon; tone?: "neutral" | "danger" | "warning" | "accent" }) {
+  const tones = {
+    neutral: "bg-subtle text-muted",
+    danger: "bg-red-500/10 text-red-600 dark:text-red-400",
+    warning: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    accent: "bg-accent-soft text-accent",
+  };
   return (
-    <div>
-      <Box variant="awsui-key-label">{label}</Box>
-      <Box variant="awsui-value-large" color={color}>
-        {value}
-      </Box>
-      <Box color="text-body-secondary" fontSize="body-s">
-        {detail}
-      </Box>
-    </div>
-  );
-}
-
-function Bars({ title, buckets, label }: { title: string; buckets: Bucket[]; label: (key: string) => string }) {
-  return (
-    <div>
-      <Box variant="h4">{title}</Box>
-      <BarChart
-        series={[{ title: "Resources", type: "bar", data: buckets.map((b) => ({ x: label(b.key), y: b.count })) }]}
-        xScaleType="categorical"
-        horizontalBars
-        hideFilter
-        hideLegend
-        height={150}
-        ariaLabel={title}
-        empty={<Box textAlign="center" color="inherit">No data</Box>}
-      />
-    </div>
+    <Card className="p-5">
+      <div className="flex items-center justify-between">
+        <span className="text-[13px] font-medium text-muted">{label}</span>
+        <span className={cn("flex size-8 items-center justify-center rounded-lg", tones[tone])}>
+          <Icon className="size-4" aria-hidden />
+        </span>
+      </div>
+      <div className="mt-3 text-[28px] leading-none font-semibold tracking-tight tabular-nums">{value}</div>
+      <div className="mt-2 text-[13px] text-muted">{detail}</div>
+    </Card>
   );
 }
 
 /** Headline numbers and breakdowns for the resources that match the current filters. */
 export default function StatsHeader({ stats, meta }: { stats: Stats; meta: Meta }) {
-  const statusLabel = (key: string) => meta.definitions.statuses[key as Status]?.label ?? key;
   return (
-    <Container
-      header={
-        <Header variant="h2" description="For the resources that match your filters. Costs are monthly estimates.">
-          Stats
-        </Header>
-      }
-    >
-      <SpaceBetween size="l">
-        <ColumnLayout columns={4} variant="text-grid">
-          <Metric label="Matching" value={stats.total.toLocaleString()} detail={formatGiB(stats.size_gib)} />
-          <Metric label="Orphaned" value={stats.orphaned.toLocaleString()} detail={formatGiB(stats.orphaned_gib)} color="text-status-error" />
-          <Metric label="Waste" value={stats.orphaned_usd == null ? "—" : `~${formatMoney(stats.orphaned_usd)}`} detail="Orphaned resources, per month" color="text-status-warning" />
-          <Metric label="Blocked · deletable" value={`${stats.blocked.toLocaleString()} · ${stats.deletable.toLocaleString()}`} detail="By the delete rules" />
-        </ColumnLayout>
-        <ColumnLayout columns={4}>
-          <div>
-            <Box variant="h4">By status</Box>
-            <PieChart
-              data={stats.by_status.map((b) => ({ title: statusLabel(b.key), value: b.count, color: STATUS_COLORS[b.key] }))}
-              variant="donut"
-              size="small"
-              hideFilter
-              ariaLabel="Resources by status"
-              innerMetricValue={stats.total.toLocaleString()}
-              innerMetricDescription="total"
-              empty={<Box textAlign="center" color="inherit">No data</Box>}
-            />
+    <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Kpi label="Matching" value={stats.total.toLocaleString()} detail={formatGiB(stats.size_gib)} icon={Layers} />
+        <Kpi label="Orphaned" value={stats.orphaned.toLocaleString()} detail={formatGiB(stats.orphaned_gib)} icon={TriangleAlert} tone="danger" />
+        <Kpi
+          label="Waste"
+          value={stats.orphaned_usd == null ? "—" : `~${formatMoney(stats.orphaned_usd)}`}
+          detail="Orphaned resources, per month"
+          icon={CircleDollarSign}
+          tone="warning"
+        />
+        <Kpi label="Blocked · deletable" value={`${stats.blocked.toLocaleString()} · ${stats.deletable.toLocaleString()}`} detail="By the delete rules" icon={ShieldCheck} tone="accent" />
+      </div>
+      <Card>
+        <CardHeader title="Breakdown" description="For the resources that match your filters. Costs are monthly estimates." />
+        <CardBody className="grid gap-8 md:grid-cols-2 xl:grid-cols-4">
+          <div className="min-w-0">
+            <h3 className="mb-3 text-[13px] font-medium text-muted">By status</h3>
+            <StatusDonut buckets={stats.by_status} meta={meta} total={stats.total} />
           </div>
-          <Bars title="By account" buckets={stats.by_account} label={(key) => accountName(meta, key)} />
-          <Bars title="By region" buckets={stats.by_region} label={(key) => key} />
-          <Bars title="By age" buckets={stats.by_age} label={(key) => key} />
-        </ColumnLayout>
-      </SpaceBetween>
-    </Container>
+          <BarList title="By account" buckets={stats.by_account} label={(key) => accountName(meta, key)} />
+          <BarList title="By region" buckets={stats.by_region} label={(key) => key} />
+          <BarList title="By age" buckets={stats.by_age} label={(key) => key} />
+        </CardBody>
+      </Card>
+    </div>
   );
 }
