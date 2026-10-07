@@ -1,59 +1,64 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Route, Routes, useLocation, useNavigate } from "react-router";
-import Alert from "@cloudscape-design/components/alert";
-import AppLayout from "@cloudscape-design/components/app-layout";
-import Box from "@cloudscape-design/components/box";
-import Flashbar, { type FlashbarProps } from "@cloudscape-design/components/flashbar";
-import SideNavigation, { type SideNavigationProps } from "@cloudscape-design/components/side-navigation";
-import Spinner from "@cloudscape-design/components/spinner";
-import SplitPanel from "@cloudscape-design/components/split-panel";
+import { Route, Routes, useLocation } from "react-router";
 import { api, runScan, type Meta } from "./api";
 import ResourcePanel from "./components/ResourcePanel";
+import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
 import { DetailContext, type DetailApi } from "./detail";
-import { TYPE_PAGES, type Notify } from "./nav";
+import { TYPE_PAGES } from "./nav";
 import Audit from "./pages/Audit";
 import HowItWorks from "./pages/HowItWorks";
 import Overview from "./pages/Overview";
 import Resources from "./pages/Resources";
 import { applyTheme, savedTheme, type Theme } from "./theme";
+import { Card, CardBody } from "./ui/card";
+import { Sheet } from "./ui/sheet";
+import { Spinner } from "./ui/spinner";
+import { useToast } from "./ui/toast";
 
-const NAV_ITEMS: SideNavigationProps.Item[] = [
-  { type: "link", text: "Overview", href: "/" },
-  {
-    type: "section",
-    text: "Resources",
-    items: TYPE_PAGES.map((p) => ({ type: "link" as const, text: p.title, href: p.path })),
-  },
-  { type: "divider" },
-  { type: "link", text: "Audit", href: "/audit" },
-  { type: "link", text: "How Janitor decides", href: "/how-it-works" },
-];
+const TITLES: Record<string, string> = {
+  "/": "Overview",
+  "/audit": "Audit",
+  "/how-it-works": "How Janitor decides",
+  ...Object.fromEntries(TYPE_PAGES.map((p) => [p.path, p.title])),
+};
+
+function savedCollapsed(): boolean {
+  try {
+    return localStorage.getItem("janitor:sidebar") === "collapsed";
+  } catch {
+    return false;
+  }
+}
 
 export default function App() {
-  const navigate = useNavigate();
   const location = useLocation();
+  const notify = useToast();
   const [meta, setMeta] = useState<Meta | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [flash, setFlash] = useState<FlashbarProps.MessageDefinition[]>([]);
   const [theme, setTheme] = useState<Theme>(savedTheme);
+  const [collapsed, setCollapsed] = useState(savedCollapsed);
   const [scanning, setScanning] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [panelSize, setPanelSize] = useState(560);
-
-  const notify: Notify = useCallback((type, content) => {
-    const id = `${Date.now()}-${Math.random()}`;
-    const dismiss = () => setFlash((items) => items.filter((i) => i.id !== id));
-    setFlash((items) => [...items, { id, type, content, dismissible: true, onDismiss: dismiss }]);
-  }, []);
 
   useEffect(() => {
     api.meta().then(setMeta).catch((e: Error) => setError(e.message));
   }, []);
   useEffect(() => applyTheme(theme), [theme]);
-  // A panel belongs to the page it was opened on.
+  // A drawer belongs to the page it was opened on.
   useEffect(() => setSelectedId(null), [location.pathname]);
+
+  const toggleSidebar = useCallback(() => {
+    setCollapsed((c) => {
+      try {
+        localStorage.setItem("janitor:sidebar", c ? "open" : "collapsed");
+      } catch {
+        // not remembered
+      }
+      return !c;
+    });
+  }, []);
 
   const detailApi: DetailApi = useMemo(
     () => ({ selectedId, open: setSelectedId, close: () => setSelectedId(null) }),
@@ -76,73 +81,48 @@ export default function App() {
   let content;
   if (error) {
     content = (
-      <Alert type="error" header="Janitor can't reach its server">
-        {error} Start the backend with make dev, then reload the page.
-      </Alert>
+      <Card className="border-red-500/30">
+        <CardBody>
+          <div className="font-semibold">Janitor can't reach its server</div>
+          <p className="mt-1 text-muted">{error} Start the backend with make dev, then reload the page.</p>
+        </CardBody>
+      </Card>
     );
   } else if (!meta) {
-    content = <Spinner size="large" />;
+    content = <Spinner label="Loading Janitor" className="py-24 justify-center" />;
   } else {
     content = (
       <Routes key={refreshKey}>
         <Route path="/" element={<Overview meta={meta} notify={notify} />} />
         {TYPE_PAGES.map((p) => (
-          <Route
-            key={p.type}
-            path={p.path}
-            element={<Resources key={p.type} meta={meta} notify={notify} type={p.type} title={p.title} />}
-          />
+          <Route key={p.type} path={p.path} element={<Resources key={p.type} meta={meta} notify={notify} type={p.type} title={p.title} />} />
         ))}
         <Route path="/audit" element={<Audit meta={meta} notify={notify} />} />
         <Route path="/how-it-works" element={<HowItWorks meta={meta} notify={notify} />} />
-        <Route path="*" element={<Box>This page doesn't exist. Choose a page from the navigation.</Box>} />
+        <Route path="*" element={<p className="text-muted">This page doesn't exist. Choose a page from the navigation.</p>} />
       </Routes>
     );
   }
 
   return (
     <DetailContext.Provider value={detailApi}>
-      <div id="top-nav" style={{ position: "sticky", top: 0, zIndex: 1002 }}>
-        <TopBar
-          meta={meta}
-          theme={theme}
-          scanning={scanning}
-          onScan={scan}
-          onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-        />
-      </div>
-      <AppLayout
-        headerSelector="#top-nav"
-        navigation={
-          <SideNavigation
-            header={{ text: "Resources and audit", href: "/" }}
-            activeHref={location.pathname}
-            items={NAV_ITEMS}
-            onFollow={(event) => {
-              if (!event.detail.external) {
-                event.preventDefault();
-                navigate(event.detail.href);
-              }
-            }}
+      <div className="flex h-full">
+        <Sidebar collapsed={collapsed} onToggle={toggleSidebar} />
+        <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+          <TopBar
+            meta={meta}
+            title={TITLES[location.pathname] ?? "Janitor"}
+            theme={theme}
+            scanning={scanning}
+            onScan={scan}
+            onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
           />
-        }
-        notifications={<Flashbar items={flash} />}
-        toolsHide
-        content={content}
-        splitPanel={
-          selectedId && meta ? (
-            <SplitPanel header="Resource details" closeBehavior="hide">
-              <ResourcePanel id={selectedId} meta={meta} dark={theme === "dark"} onSelect={setSelectedId} />
-            </SplitPanel>
-          ) : undefined
-        }
-        splitPanelOpen={Boolean(selectedId)}
-        onSplitPanelToggle={({ detail }) => {
-          if (!detail.open) setSelectedId(null);
-        }}
-        splitPanelSize={panelSize}
-        onSplitPanelResize={({ detail }) => setPanelSize(detail.size)}
-      />
+          <main className="mx-auto w-full max-w-[1400px] flex-1 px-8 py-6">{content}</main>
+        </div>
+      </div>
+      <Sheet open={Boolean(selectedId && meta)} onClose={() => setSelectedId(null)} title="Resource details">
+        {selectedId && meta && <ResourcePanel id={selectedId} meta={meta} dark={theme === "dark"} onSelect={setSelectedId} />}
+      </Sheet>
     </DetailContext.Provider>
   );
 }
