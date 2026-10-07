@@ -1,14 +1,10 @@
-import { useState } from "react";
-import Alert from "@cloudscape-design/components/alert";
-import Box from "@cloudscape-design/components/box";
-import Button from "@cloudscape-design/components/button";
-import ExpandableSection from "@cloudscape-design/components/expandable-section";
-import FormField from "@cloudscape-design/components/form-field";
-import Input from "@cloudscape-design/components/input";
-import Modal from "@cloudscape-design/components/modal";
-import SpaceBetween from "@cloudscape-design/components/space-between";
+import { useState, type ReactNode } from "react";
+import { Info, TriangleAlert } from "lucide-react";
 import { api, type Meta, type Plan, type PlanItem, type SimulateResult } from "../api";
 import { formatGiB, formatUsd, plural } from "../format";
+import { Button } from "../ui/button";
+import { Dialog } from "../ui/dialog";
+import { Input } from "../ui/input";
 
 interface Props {
   plan: Plan;
@@ -17,22 +13,43 @@ interface Props {
   onSimulated: (result: SimulateResult) => void;
 }
 
+function Callout({ tone, children }: { tone: "info" | "warning" | "error"; children: ReactNode }) {
+  const styles = {
+    info: "border-accent/30 bg-accent-soft text-ink",
+    warning: "border-amber-500/30 bg-amber-500/10 text-ink",
+    error: "border-red-500/30 bg-red-500/10 text-ink",
+  };
+  const Icon = tone === "info" ? Info : TriangleAlert;
+  return (
+    <div className={`flex gap-2.5 rounded-xl border px-3.5 py-3 text-[13px] ${styles[tone]}`}>
+      <Icon className="mt-0.5 size-4 shrink-0 opacity-70" aria-hidden />
+      <div>{children}</div>
+    </div>
+  );
+}
+
 function ItemList({ title, items, blocked }: { title: string; items: PlanItem[]; blocked: boolean }) {
   return (
-    <ExpandableSection headerText={`${title} (${items.length})`} defaultExpanded={items.length <= 10}>
-      <ul>
+    <details open={items.length <= 10} className="group rounded-xl border border-line">
+      <summary className="cursor-pointer list-none px-4 py-2.5 text-[13px] font-medium select-none">
+        {`${title} (${items.length})`}
+      </summary>
+      <ul className="divide-y divide-line border-t border-line">
         {items.map((item) => {
           const notes = item.rules.filter((r) => r.outcome === (blocked ? "block" : "warn")).map((r) => r.message);
           return (
-            <li key={item.id}>
-              <strong>{item.name || item.id}</strong> · {item.region}
-              {item.parent && ` · backing snapshot of ${item.parent}`}
-              {notes.length > 0 && <Box color={blocked ? "text-status-error" : "text-status-warning"}>{notes.join(" ")}</Box>}
+            <li key={item.id} className="px-4 py-2.5 text-[13px]">
+              <span className="font-medium">{item.name || item.id}</span>
+              <span className="text-muted"> · {item.region}</span>
+              {item.parent && <span className="text-muted">{` · backing snapshot of ${item.parent}`}</span>}
+              {notes.length > 0 && (
+                <div className={blocked ? "mt-0.5 text-red-600 dark:text-red-400" : "mt-0.5 text-amber-700 dark:text-amber-400"}>{notes.join(" ")}</div>
+              )}
             </li>
           );
         })}
       </ul>
-    </ExpandableSection>
+    </details>
   );
 }
 
@@ -74,66 +91,60 @@ export default function DeleteModal({ plan, meta, onClose, onSimulated }: Props)
   }
 
   return (
-    <Modal
-      visible
-      onDismiss={onClose}
-      closeAriaLabel="Close dialog"
-      header="Simulation — nothing will be deleted."
-      size="large"
+    <Dialog
+      open
+      onClose={onClose}
+      size="lg"
+      title="Simulation — nothing will be deleted."
       footer={
-        <Box float="right">
-          <SpaceBetween direction="horizontal" size="xs">
-            {plan.variant === "all_blocked" ? (
-              <Button variant="primary" onClick={onClose}>
-                Close
-              </Button>
-            ) : (
-              <>
-                <Button variant="link" onClick={onClose}>
-                  Cancel
-                </Button>
-                <Button variant="primary" disabled={!canSimulate} loading={busy} onClick={simulate}>
-                  {plan.variant === "mixed" ? `Simulate ${topDeletable.toLocaleString()}` : "Simulate"}
-                </Button>
-              </>
-            )}
-          </SpaceBetween>
-        </Box>
+        plan.variant === "all_blocked" ? (
+          <Button variant="primary" onClick={onClose}>
+            Close
+          </Button>
+        ) : (
+          <>
+            <Button variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button variant="primary" disabled={!canSimulate} loading={busy} onClick={simulate}>
+              {plan.variant === "mixed" ? `Simulate ${topDeletable.toLocaleString()}` : "Simulate"}
+            </Button>
+          </>
+        )
       }
     >
-      <SpaceBetween size="m">
-        <Box variant="h3">{title}</Box>
-        {plan.missing.length > 0 && <Alert type="warning">{missingMessage(plan.missing.length)}</Alert>}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
+        {plan.missing.length > 0 && <Callout tone="warning">{missingMessage(plan.missing.length)}</Callout>}
         {plan.blocked.length > 0 && <ItemList title="Blocked" items={plan.blocked} blocked />}
-        {plan.variant === "mixed" && <Box>Simulate deleting the other {what}?</Box>}
+        {plan.variant === "mixed" && <p className="font-medium">Simulate deleting the other {what}?</p>}
         {plan.deletable.length > 0 && (
           <>
             <ItemList title="Would be deleted" items={plan.deletable} blocked={false} />
-            <Box>
-              Total: {plural(plan.totals.count, "resource")}, {formatGiB(plan.totals.size_gib)},{" "}
-              {formatUsd(plan.totals.est_monthly_usd)} (estimate)
-            </Box>
+            <p className="text-[13px] text-muted">
+              Total: {plural(plan.totals.count, "resource")}, {formatGiB(plan.totals.size_gib)}, {formatUsd(plan.totals.est_monthly_usd)} (estimate)
+            </p>
             {plan.share_impact.map((impact) => (
-              <Alert key={impact.ami_id} type="info" header={`Share impact for ${impact.ami_id}`}>
-                {impact.accounts.length > 0 &&
-                  `Deregistering removes it in ${impact.region} for ${impact.accounts.map((a) => a.name).join(", ")}. `}
-                {impact.copies.length > 0 &&
-                  `Its copies in ${impact.copies.map((c) => c.region).join(", ")} are separate and stay.`}
+              <Callout key={impact.ami_id} tone="info">
+                <div className="font-medium">Share impact for {impact.ami_id}</div>
+                {impact.accounts.length > 0 && `Deregistering removes it in ${impact.region} for ${impact.accounts.map((a) => a.name).join(", ")}. `}
+                {impact.copies.length > 0 && `Its copies in ${impact.copies.map((c) => c.region).join(", ")} are separate and stay.`}
                 {impact.accounts.length === 0 && impact.copies.length === 0 && "It isn't shared or copied."}
-              </Alert>
+              </Callout>
             ))}
             {needsTyping && (
-              <FormField
-                label="Type delete to confirm"
-                description={`Required for ${meta.policy.typed_confirm_min_items.toLocaleString()} or more items, any warning, or anything tagged env=prod.`}
-              >
-                <Input value={typed} onChange={({ detail }) => setTyped(detail.value)} placeholder="delete" />
-              </FormField>
+              <label className="block space-y-1.5">
+                <span className="text-[13px] font-medium">Type delete to confirm</span>
+                <span className="block text-xs text-muted">
+                  {`Required for ${meta.policy.typed_confirm_min_items.toLocaleString()} or more items, any warning, or anything tagged env=prod.`}
+                </span>
+                <Input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="delete" />
+              </label>
             )}
           </>
         )}
-        {error && <Alert type="error">{error}</Alert>}
-      </SpaceBetween>
-    </Modal>
+        {error && <Callout tone="error">{error}</Callout>}
+      </div>
+    </Dialog>
   );
 }

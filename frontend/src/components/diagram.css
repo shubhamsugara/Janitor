@@ -1,7 +1,9 @@
 .janitor-diagram {
   height: 460px;
-  border-radius: 12px;
+  border-radius: 14px;
   overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--card);
 }
 
 .janitor-node {
@@ -10,13 +12,13 @@
   align-items: center;
   width: 236px;
   padding: 10px 12px;
-  border-radius: 10px;
-  background: #ffffff;
-  color: #000716;
-  border: 1px solid #c6c6cd;
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--border);
   border-left: 6px solid #8c8c94;
   box-shadow: 0 1px 3px rgba(0, 7, 22, 0.12);
-  font-family: "Open Sans", "Helvetica Neue", Roboto, Arial, sans-serif;
+  font-family: var(--font-sans);
   transition: box-shadow 0.15s ease, transform 0.15s ease;
 }
 
@@ -30,9 +32,9 @@
 }
 
 .janitor-node.root {
-  border: 2px solid #006ce0;
+  border: 2px solid var(--accent);
   border-left-width: 6px;
-  box-shadow: 0 0 0 4px rgba(0, 108, 224, 0.2);
+  box-shadow: 0 0 0 4px var(--ring);
 }
 
 .janitor-node.status-in_use { border-left-color: #00802f; }
@@ -46,7 +48,7 @@
 .janitor-node-text { min-width: 0; }
 .janitor-node-label { font-weight: 700; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .janitor-node-meta,
-.janitor-node-state { font-size: 11px; color: #5f6b7a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.janitor-node-state { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .janitor-node.active .janitor-node-state { color: #00802f; font-weight: 600; }
 
 .react-flow__edge.edge-used_by .react-flow__edge-path { stroke: #00802f; stroke-width: 2; }
@@ -57,9 +59,15 @@
 .react-flow__edge.edge-shared_with .react-flow__edge-path { stroke: #e7157b; stroke-dasharray: 2 4; }
 
 /* Cloudscape marks dark mode with this class on <body>. */
-.awsui-dark-mode .janitor-node { background: #161d26; color: #e9ebed; border-color: #424650; }
-.awsui-dark-mode .janitor-node-meta,
-.awsui-dark-mode .janitor-node-state { color: #a4a4ad; }
+.dark .janitor-node.active .janitor-node-state { color: #34d399; }
+.janitor-diagram .react-flow {
+  --xy-background-color: var(--card);
+  --xy-edge-label-background-color: var(--card);
+  --xy-edge-label-color: var(--muted);
+  --xy-controls-button-background-color: var(--card);
+  --xy-controls-button-color: var(--ink);
+  --xy-controls-button-border-color: var(--border);
+}
 
 .janitor-legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; }
 .janitor-legend span::before { content: ""; display: inline-block; width: 22px; margin-right: 6px; vertical-align: middle; border-top: 3px solid var(--legend-color); }

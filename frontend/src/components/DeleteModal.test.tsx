@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Meta, Plan, PlanItem } from "../api";
 import DeleteModal from "./DeleteModal";
 
@@ -88,5 +88,12 @@ describe("DeleteModal", () => {
         "1 selected resource isn't in the latest scan, so it was left out. Reload the list to see the current resources.",
       ),
     ).toBeTruthy();
+  });
+
+  it("closes on Cancel without simulating", () => {
+    const onClose = vi.fn();
+    render(<DeleteModal plan={plan({ deletable: [item("ami-1")] })} meta={meta} onClose={onClose} onSimulated={noop} />);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
