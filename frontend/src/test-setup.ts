@@ -18,8 +18,8 @@ if (!window.matchMedia) {
     }) as MediaQueryList;
 }
 
-if (!("ResizeObserver" in window)) {
-  window.ResizeObserver = class {
+if (typeof globalThis.ResizeObserver === "undefined") {
+  globalThis.ResizeObserver = class {
     observe() {}
     unobserve() {}
     disconnect() {}
