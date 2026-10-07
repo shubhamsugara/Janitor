@@ -74,3 +74,7 @@ def test_explanations_use_live_config_values(config):
     assert "older than 90 days" in defs["statuses"]["orphaned"]["meaning"]
     assert set(defs["by_type"]) == {"ami", "snapshot", "volume", "rds_snapshot"}
     assert [r["id"] for r in defs["rules"]] == ["R1", "R2", "R3", "R4", "R5", "W4"]
+
+
+def test_r4_protected_tag_key_is_case_insensitive():
+    assert ids(res(tags={"Owner": "me", "Retain": "true"})) == {("R4", "block")}

@@ -11,7 +11,10 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-ACCOUNT_ID = re.compile(r"(?<![0-9A-Za-z])\d{12}(?![0-9A-Za-z])")
+# 12 digits, or the console's display format: three groups of 4 digits split by - or a space.
+ACCOUNT_ID = re.compile(
+    r"(?<![0-9A-Za-z])(?:\d{12}|\d{4}[- ]\d{4}[- ]\d{4})(?![0-9A-Za-z])"
+)
 
 
 def is_fake(number: str) -> bool:
@@ -48,7 +51,7 @@ def check(paths: list[Path], terms: list[str]) -> list[str]:
             continue
         for lineno, line in enumerate(text.splitlines(), 1):
             for match in ACCOUNT_ID.finditer(line):
-                if not is_fake(match.group()):
+                if not is_fake(re.sub(r"[- ]", "", match.group())):
                     problems.append(
                         f"{path}:{lineno}: 12-digit number that isn't a fake account ID"
                     )

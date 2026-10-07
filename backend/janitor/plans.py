@@ -1,9 +1,11 @@
 """Plan and simulate deletes. Janitor never deletes; simulate only records what would happen."""
 
+import hashlib
 import uuid
 from datetime import datetime
 
 from janitor.config import Config
+from janitor.linker import MANAGED_REASONS
 from janitor.models import Resource, RuleResult
 from janitor.rules import RULES_BY_ID, evaluate, strictest
 from janitor.store import Store
@@ -61,11 +63,19 @@ def _totals(items: list[dict]) -> dict:
     }
 
 
+def _config_hash(config: Config) -> str:
+    return hashlib.sha256(config.model_dump_json().encode()).hexdigest()
+
+
 def _needs_typing(deletable: list[dict], config: Config) -> bool:
     return (
         len(deletable) >= config.policy.typed_confirm_min_items
         or any(rule["outcome"] == "warn" for i in deletable for rule in i["rules"])
-        or any(str(i["tags"].get("env", "")).lower() == "prod" for i in deletable)
+        or any(
+            key.lower() == "env" and str(value).lower() == "prod"
+            for i in deletable
+            for key, value in i["tags"].items()
+        )
     )
 
 
@@ -95,12 +105,13 @@ def _backing_snapshots(
             if users - deleting:
                 continue  # another registered AMI still needs it
             taken.add(snap_id)
-            # It is in use only because of the AMI being deleted, so R1 doesn't apply.
-            out.append(
-                _item(
-                    snap, evaluate(snap, config.policy, now, skip=frozenset({"R1"})), parent=ami.id
-                )
-            )
+            # It is in use only because of the AMI being deleted, so R1 doesn't apply. Its stored
+            # status (in_use) outranks managed, so R3 has to be checked here.
+            hits = evaluate(snap, config.policy, now, skip=frozenset({"R1"}))
+            if snap.managed_by:
+                reason = MANAGED_REASONS.get(snap.managed_by, "Created by an AWS-managed service.")
+                hits.insert(0, RuleResult(snap.id, "R3", "block", reason))
+            out.append(_item(snap, hits, parent=ami.id))
     return out
 
 
@@ -160,6 +171,7 @@ def make_plan(store: Store, config: Config, ids: list[str], now: datetime) -> di
     plan = {
         "plan_id": uuid.uuid4().hex,
         "scan_id": scan_id,
+        "config_hash": _config_hash(config),
         "variant": variant,
         "blocked": blocked,
         "deletable": deletable,
@@ -184,7 +196,7 @@ def make_plan(store: Store, config: Config, ids: list[str], now: datetime) -> di
     return plan
 
 
-def simulate(store: Store, plan_id: str, confirmation: str) -> dict:
+def simulate(store: Store, config: Config, plan_id: str, confirmation: str) -> dict:
     saved = store.get_plan(plan_id)
     if saved is None:
         raise PlanError(404, "That plan doesn't exist. Plan the delete again.")
@@ -192,6 +204,11 @@ def simulate(store: Store, plan_id: str, confirmation: str) -> dict:
     scan = store.latest_scan()
     if scan is None or scan["id"] != plan["scan_id"]:
         raise PlanError(409, "The data changed since this plan was made. Plan the delete again.")
+    if plan.get("config_hash") != _config_hash(config):
+        # Rules, protected tags, and the typed-confirmation threshold may all differ now.
+        raise PlanError(
+            409, "Janitor's settings changed since this plan was made. Plan the delete again."
+        )
     if plan["requires_typed_confirmation"] and confirmation.strip().lower() != "delete":
         raise PlanError(422, "Type delete to confirm.")
 

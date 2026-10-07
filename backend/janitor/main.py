@@ -195,7 +195,7 @@ def create_app(
     @app.post("/api/actions/simulate")
     def simulate(request: SimulateRequest):
         try:
-            return plans.simulate(store, request.plan_id, request.confirmation)
+            return plans.simulate(store, config, request.plan_id, request.confirmation)
         except plans.PlanError as error:
             raise HTTPException(error.status_code, error.message) from error
 

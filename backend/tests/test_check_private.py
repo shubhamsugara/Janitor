@@ -36,3 +36,11 @@ def test_flags_private_terms_without_printing_them(tmp_path):
 
 def test_repository_is_clean():
     assert check_private.check(check_private.git_files(), check_private.private_terms()) == []
+
+
+def test_flags_console_formatted_account_id(tmp_path):
+    path = tmp_path / "a.txt"
+    path.write_text(
+        "acct " + "1234-5678" + "-9012\nid " + "1234 5678" + " 9012\nok 1111-1111-1111\n"
+    )
+    assert len(check_private.check([path], [])) == 2

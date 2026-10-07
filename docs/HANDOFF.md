@@ -7,16 +7,28 @@ Read this first, then the spec.
 - **Design spec approved:** [`docs/superpowers/specs/2026-10-06-janitor-poc-design.md`](superpowers/specs/2026-10-06-janitor-poc-design.md) (commit `fa5f040`).
 - **Roadmap (4 phases):** [`docs/superpowers/plans/2026-10-07-janitor-roadmap.md`](superpowers/plans/2026-10-07-janitor-roadmap.md)
   — 1 MVP, 2 bug fixes, 3 new features, 4 final product.
-- **Phase 1 plan written (5 tasks), pending review:**
-  [`docs/superpowers/plans/2026-10-07-phase-1-mvp.md`](superpowers/plans/2026-10-07-phase-1-mvp.md).
-  Its code has not been run yet; executors fix small mistakes as they go.
-- **No code yet.**
+- **Phase 1 (MVP) built** on branch `phase-1-mvp` from
+  [`docs/superpowers/plans/2026-10-07-phase-1-mvp.md`](superpowers/plans/2026-10-07-phase-1-mvp.md):
+  84 backend tests pass, `tsc` clean, UI checked in a browser. A whole-branch review
+  found 4 important issues, all fixed with tests. Not merged to `main`, not pushed.
+- Run it: `make setup` once, then `make run` → http://127.0.0.1:8080 (mock data).
 
 ## Next step
 
-The user reviews the phase 1 plan and chooses the execution method (subagent-driven
-or native). Then execute it task by task. Plans for phases 2–4 are written after the
-previous phase is in use.
+1. The user tries the MVP and decides how to integrate the branch (merge, PR, or keep).
+2. Write the phase 2 (bug fixes) plan. Start from these known items:
+   - Status column text wraps ("Orph/aned"); "Simulate deleting 1 resources?" pluralization.
+   - Resources header shows the whole filtered set's size and cost next to "N orphaned".
+   - Mixed popup counts include backing snapshots ("the other 4" for 2 AMIs).
+   - Typed-confirmation hint hardcodes "10"; serve `typed_confirm_min_items` via `/api/meta`.
+   - Status popover says "Can be deleted" even when a rule blocks it.
+   - Missing-IDs warning doesn't say what to do.
+   - Empty protected-tag value or unquoted `true` in YAML gives an unclear config error.
+   - Selecting an AMI and its own snapshot blocks the snapshot (API only).
+   - Pre-commit leak check reads the working tree, not staged content.
+   - List fetches aren't sequenced; Scan now doesn't re-poll a scan started elsewhere;
+     a huge `page` value returns 500.
+   - Frontend tests (Vitest) for popup variants and selection.
 
 ## Verified dependency pins (Python 3.12, checked 2026-10-06)
 

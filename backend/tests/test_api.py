@@ -227,3 +227,58 @@ def test_spa_is_served_with_fallback(client):
     assert client.get("/assets/app.js").text == "console.log(1)"
     missing = client.get("/api/nope")
     assert missing.status_code == 404 and missing.json() == {"detail": "Not found."}
+
+
+def _store_with(tmp_path, config, resources):
+    class Provider:
+        name = "mock"
+
+        def list_inventory(self):
+            return Inventory(resources, [], [], [])
+
+    store = Store(tmp_path / "j.db")
+    Scanner(store, Provider(), config, clock=lambda: NOW).run()
+    return store
+
+
+def _r(id, type, **kw):
+    fields = {
+        "account": "111111111111",
+        "region": "us-east-1",
+        "name": id,
+        "created_at": "2026-01-01T00:00:00Z",
+        "tags": {"owner": "me"},
+    } | kw
+    return Resource(id=id, type=type, **fields)
+
+
+def test_managed_backing_snapshot_is_blocked(tmp_path, config):
+    store = _store_with(
+        tmp_path,
+        config,
+        [
+            _r("ami-a", "ami", snapshot_ids=["snap-a"]),
+            _r("snap-a", "snapshot", managed_by="aws_backup"),
+        ],
+    )
+    body = plans.make_plan(store, config, ["ami-a"], NOW)
+    assert [i["id"] for i in body["deletable"]] == ["ami-a"]
+    assert [(i["id"], i["rules"][0]["rule_id"]) for i in body["blocked"]] == [("snap-a", "R3")]
+
+
+def test_env_prod_tag_key_case_requires_typing(tmp_path, config):
+    store = _store_with(
+        tmp_path, config, [_r("vol-a", "volume", tags={"owner": "me", "Env": "PROD"})]
+    )
+    assert plans.make_plan(store, config, ["vol-a"], NOW)["requires_typed_confirmation"]
+
+
+def test_simulate_refuses_after_config_change(tmp_path, config):
+    store = _store_with(tmp_path, config, [_r("vol-a", "volume")])
+    plan_id = plans.make_plan(store, config, ["vol-a"], NOW)["plan_id"]
+    changed = config.model_copy(deep=True)
+    changed.policy.protected_tags["keep"] = "yes"
+    with pytest.raises(plans.PlanError) as refused:
+        plans.simulate(store, changed, plan_id, "")
+    assert refused.value.status_code == 409
+    assert len(plans.simulate(store, config, plan_id, "")["would_delete"]) == 1
