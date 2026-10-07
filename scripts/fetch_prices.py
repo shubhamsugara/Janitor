@@ -20,6 +20,12 @@ BASE = "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/{offer}/current/
 OUT = Path(__file__).resolve().parents[1] / "fixtures" / "prices.json"
 DEFAULT_REGIONS = ["us-east-1", "us-west-2", "eu-west-1"]
 VOLUME_TYPES = ("gp3", "gp2", "io1", "io2", "st1", "sc1", "standard")
+# io2 IOPS: one usage type per tier, each listed 0–Inf, so the caps come from AWS's docs.
+IO2_TIERS = {
+    "VolumeP-IOPS.io2": 32000,
+    "VolumeP-IOPS.io2.tier2": 64000,
+    "VolumeP-IOPS.io2.tier3": None,
+}
 REQUIRED = [
     "gp3_iops_month",
     "gp3_throughput_mibps_month",
@@ -62,7 +68,7 @@ def collect(data: Iterable[dict], rates: dict) -> None:
         if (
             row.get("Product Family") == "Storage"
             and api in VOLUME_TYPES
-            and unit == "GB-Mo"
+            and unit in ("GB-Mo", "GB-month")  # io2 storage uses the long form
         ):
             rates.setdefault("ebs_gb_month", {})[api] = price
         elif usage.endswith("EBS:VolumeP-IOPS.gp3") and price > 0:
@@ -74,10 +80,8 @@ def collect(data: Iterable[dict], rates: dict) -> None:
             )
         elif usage.endswith("EBS:VolumeP-IOPS.piops"):
             rates["io1_iops_month"] = price
-        elif usage.endswith("EBS:VolumeP-IOPS.io2"):
-            end = row.get("EndingRange", "")
-            cap = None if end in ("", "Inf") else int(float(end))
-            rates.setdefault("_io2", {})[cap] = price
+        elif (tier := usage.rpartition("EBS:")[2]) in IO2_TIERS:
+            rates.setdefault("_io2", {})[IO2_TIERS[tier]] = price
         elif usage.endswith("EBS:SnapshotUsage") and unit == "GB-Mo":
             rates.setdefault("snapshot_gb_month", {})["standard"] = price
         elif usage.endswith("EBS:SnapshotArchiveStorage"):

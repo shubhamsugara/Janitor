@@ -1,0 +1,114 @@
+{
+ "currency": "USD",
+ "fetched_at": "2026-10-07T14:13:17Z",
+ "publication_date": "2026-10-06T17:24:54Z",
+ "regions": {
+  "eu-west-1": {
+   "ebs_gb_month": {
+    "gp2": 0.11,
+    "gp3": 0.088,
+    "io1": 0.138,
+    "io2": 0.138,
+    "sc1": 0.0168,
+    "st1": 0.05,
+    "standard": 0.055
+   },
+   "gp3_iops_month": 0.0055,
+   "gp3_throughput_mibps_month": 0.044,
+   "io1_iops_month": 0.072,
+   "io2_iops_month_tiers": [
+    [
+     32000,
+     0.072
+    ],
+    [
+     64000,
+     0.0504
+    ],
+    [
+     null,
+     0.03528
+    ]
+   ],
+   "rds_snapshot_gb_month": 0.095,
+   "snapshot_gb_month": {
+    "archive": 0.0125,
+    "standard": 0.05
+   }
+  },
+  "us-east-1": {
+   "ebs_gb_month": {
+    "gp2": 0.1,
+    "gp3": 0.08,
+    "io1": 0.125,
+    "io2": 0.125,
+    "sc1": 0.015,
+    "st1": 0.045,
+    "standard": 0.05
+   },
+   "gp3_iops_month": 0.005,
+   "gp3_throughput_mibps_month": 0.04,
+   "io1_iops_month": 0.065,
+   "io2_iops_month_tiers": [
+    [
+     32000,
+     0.065
+    ],
+    [
+     64000,
+     0.0455
+    ],
+    [
+     null,
+     0.03185
+    ]
+   ],
+   "rds_snapshot_gb_month": 0.095,
+   "snapshot_gb_month": {
+    "archive": 0.0125,
+    "standard": 0.05
+   }
+  },
+  "us-west-2": {
+   "ebs_gb_month": {
+    "gp2": 0.1,
+    "gp3": 0.08,
+    "io1": 0.125,
+    "io2": 0.125,
+    "sc1": 0.015,
+    "st1": 0.045,
+    "standard": 0.05
+   },
+   "gp3_iops_month": 0.005,
+   "gp3_throughput_mibps_month": 0.04,
+   "io1_iops_month": 0.065,
+   "io2_iops_month_tiers": [
+    [
+     32000,
+     0.065
+    ],
+    [
+     64000,
+     0.0455
+    ],
+    [
+     null,
+     0.03185
+    ]
+   ],
+   "rds_snapshot_gb_month": 0.095,
+   "snapshot_gb_month": {
+    "archive": 0.0125,
+    "standard": 0.05
+   }
+  }
+ },
+ "source": [
+  "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/us-east-1/index.csv",
+  "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonRDS/current/us-east-1/index.csv",
+  "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/us-west-2/index.csv",
+  "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonRDS/current/us-west-2/index.csv",
+  "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/eu-west-1/index.csv",
+  "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonRDS/current/eu-west-1/index.csv"
+ ]
+}
