@@ -65,7 +65,7 @@ export default function ResourcePanel({ id, meta, dark, onSelect }: Props) {
   if (!detail || !graph) return <Spinner label="Loading details" className="justify-center py-24" />;
   const r = detail.resource;
   const tags = Object.entries(r.tags);
-  const active = graph.used_by.active > 0;
+  const active = (graph.used_by.active ?? 0) > 0;
 
   return (
     <div className="space-y-5">
