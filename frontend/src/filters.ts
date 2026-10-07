@@ -1,6 +1,9 @@
-import type { DateRangePickerProps } from "@cloudscape-design/components/date-range-picker";
-import type { PropertyFilterProps } from "@cloudscape-design/components/property-filter";
 import type { ResourceType } from "./api";
+
+/** A created-date range: fixed dates, or "the last N units" resolved against today. */
+export type RangeValue =
+  | { type: "absolute"; startDate: string; endDate: string }
+  | { type: "relative"; amount: number; unit: "day" | "week" | "month" | "year"; key?: string };
 
 /** A resource page's filter, sort, and page state. It lives in the URL so links reproduce views. */
 export interface Filters {
@@ -73,35 +76,12 @@ export function hasFilters(f: Filters): boolean {
   return Boolean(f.q || f.tag || f.from || f.to || LISTS.some((key) => f[key].length));
 }
 
-/** Property-filter tokens. Free text is the name or ID search; values within a property are ORed. */
-export function toQuery(f: Filters): PropertyFilterProps.Query {
-  const tokens: PropertyFilterProps.Token[] = [];
-  if (f.q) tokens.push({ operator: ":", value: f.q });
-  for (const key of LISTS) for (const value of f[key]) tokens.push({ propertyKey: key, operator: "=", value });
-  if (f.tag) tokens.push({ propertyKey: "tag", operator: "=", value: f.tag });
-  return { tokens, operation: "and" };
-}
-
-export function fromQuery(query: PropertyFilterProps.Query, f: Filters): Filters {
-  const values = (key: string) => query.tokens.filter((t) => t.propertyKey === key).map((t) => String(t.value));
-  const free = query.tokens.filter((t) => !t.propertyKey).map((t) => String(t.value));
-  return {
-    ...f,
-    q: free.join(" "),
-    status: values("status"),
-    account: values("account"),
-    region: values("region"),
-    tag: values("tag")[0] ?? "",
-    page: 1,
-  };
-}
-
-export function toRange(f: Filters): DateRangePickerProps.Value | null {
+export function toRange(f: Filters): RangeValue | null {
   return f.from || f.to ? { type: "absolute", startDate: f.from, endDate: f.to } : null;
 }
 
 /** Date-range picker value → from/to. A relative range ("last 30 days") is resolved against `today`. */
-export function fromRange(value: DateRangePickerProps.Value | null, f: Filters, today = new Date()): Filters {
+export function fromRange(value: RangeValue | null, f: Filters, today = new Date()): Filters {
   if (!value) return { ...f, from: "", to: "", page: 1 };
   if (value.type === "absolute") {
     return { ...f, from: value.startDate.slice(0, 10), to: value.endDate.slice(0, 10), page: 1 };

@@ -1,16 +1,6 @@
-import Box from "@cloudscape-design/components/box";
-import Popover from "@cloudscape-design/components/popover";
-import SpaceBetween from "@cloudscape-design/components/space-between";
-import StatusIndicator, { type StatusIndicatorProps } from "@cloudscape-design/components/status-indicator";
 import type { Meta, Outcome, ResourceType, Status } from "../api";
-
-const INDICATOR: Record<Status, StatusIndicatorProps.Type> = {
-  in_use: "success",
-  managed: "info",
-  unknown: "warning",
-  orphaned: "error",
-  idle: "stopped",
-};
+import { OutcomePill, StatusPill } from "../ui/pills";
+import { Popover } from "../ui/popover";
 
 interface Props {
   meta: Meta;
@@ -19,55 +9,39 @@ interface Props {
   reason?: string;
 }
 
-/** A status chip whose popover explains the status, using the server's definitions. */
+/** A status pill whose popover explains the status, using the server's definitions. */
 export default function StatusBadge({ meta, type, status, reason }: Props) {
   const def = meta.definitions.statuses[status];
   return (
     <Popover
-      header={def.label}
-      triggerType="text"
-      size="medium"
-      dismissButton={false}
-      content={
-        <SpaceBetween size="s">
-          <Box>{meta.definitions.by_type[type][status] ?? def.meaning}</Box>
-          {reason && (
-            <Box>
-              <Box variant="awsui-key-label">Why this one</Box>
-              {reason}
-            </Box>
-          )}
-          <Box>
-            {/* Other rules (protected tag, too new) can still block an idle or orphaned resource. */}
-            <Box variant="awsui-key-label">{def.blocks ? "Blocks deletion" : "Doesn't block deletion"}</Box>
-            {def.what_to_do}
-          </Box>
-        </SpaceBetween>
+      className="w-80 text-[13px]"
+      trigger={
+        <button type="button" className="rounded-full hover:ring-2 hover:ring-ring" aria-label={def.label}>
+          <StatusPill status={status} label={def.label} />
+        </button>
       }
     >
-      <StatusIndicator type={INDICATOR[status]} wrapText={false}>
-        {def.label}
-      </StatusIndicator>
+      <div className="space-y-3">
+        <div className="font-semibold">{def.label}</div>
+        <p className="text-muted">{meta.definitions.by_type[type]?.[status] ?? def.meaning}</p>
+        {reason && (
+          <div>
+            <div className="text-[11px] font-semibold tracking-wider text-muted uppercase">Why this one</div>
+            <p>{reason}</p>
+          </div>
+        )}
+        <div>
+          {/* Other rules (protected tag, too new) can still block an idle or orphaned resource. */}
+          <div className="text-[11px] font-semibold tracking-wider text-muted uppercase">
+            {def.blocks ? "Blocks deletion" : "Doesn't block deletion"}
+          </div>
+          <p>{def.what_to_do}</p>
+        </div>
+      </div>
     </Popover>
   );
 }
 
 export function OutcomeBadge({ outcome }: { outcome: Outcome }) {
-  if (outcome === "block")
-    return (
-      <StatusIndicator type="stopped" wrapText={false}>
-        Blocked
-      </StatusIndicator>
-    );
-  if (outcome === "warn")
-    return (
-      <StatusIndicator type="warning" wrapText={false}>
-        Review
-      </StatusIndicator>
-    );
-  return (
-    <StatusIndicator type="info" wrapText={false}>
-      Deletable
-    </StatusIndicator>
-  );
+  return <OutcomePill outcome={outcome} />;
 }

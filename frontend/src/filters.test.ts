@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EMPTY, fromQuery, fromRange, hasFilters, parseFilters, toApiParams, toQuery, toRange, toSearch } from "./filters";
+import { EMPTY, fromRange, hasFilters, parseFilters, toApiParams, toRange, toSearch } from "./filters";
 
 const full = {
   q: "base",
@@ -34,17 +34,6 @@ describe("filters in the URL", () => {
     expect(params.get("status")).toBe("orphaned,idle");
     expect(params.get("type")).toBe("volume");
     expect(params.get("page")).toBe("3");
-  });
-});
-
-describe("property filter tokens", () => {
-  it("round-trips filters through tokens and resets the page", () => {
-    expect(fromQuery(toQuery(full), full)).toEqual({ ...full, page: 1 });
-  });
-
-  it("treats free text as the name or ID search", () => {
-    const query = { operation: "and" as const, tokens: [{ operator: ":" as const, value: "web" }] };
-    expect(fromQuery(query, EMPTY).q).toBe("web");
   });
 });
 
