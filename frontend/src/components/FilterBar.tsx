@@ -39,8 +39,10 @@ function TagFilter({ value, onApply }: { value: string; onApply: (tag: string) =
           )}
         >
           <Tag className="size-3.5" aria-hidden />
-          Tag
-          {value && <span className="font-normal">: {value}</span>}
+          <span>
+            Tag
+            {value && <span className="font-normal">: {value}</span>}
+          </span>
           <ChevronDown className="size-3.5 opacity-60" aria-hidden />
         </button>
       }

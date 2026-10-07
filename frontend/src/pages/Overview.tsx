@@ -1,24 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router";
-import Badge from "@cloudscape-design/components/badge";
-import Box from "@cloudscape-design/components/box";
-import Button from "@cloudscape-design/components/button";
-import ColumnLayout from "@cloudscape-design/components/column-layout";
-import Container from "@cloudscape-design/components/container";
-import ContentLayout from "@cloudscape-design/components/content-layout";
-import Header from "@cloudscape-design/components/header";
-import Link from "@cloudscape-design/components/link";
-import PieChart from "@cloudscape-design/components/pie-chart";
-import SpaceBetween from "@cloudscape-design/components/space-between";
-import { api, runScan, type OverviewData, type Stats, type Status } from "../api";
-import { STATUS_COLORS } from "../colors";
-import { formatDate, formatGiB, formatUsd } from "../format";
+import { ArrowUpRight, CircleDollarSign, Layers, RefreshCw, TriangleAlert } from "lucide-react";
+import { Link } from "react-router";
+import { api, runScan, type OverviewData, type Stats } from "../api";
+import StatusDonut from "../charts/StatusDonut";
+import AwsIcon from "../components/AwsIcon";
+import { Kpi } from "../components/StatsHeader";
+import { formatDate, formatGiB, formatMoney } from "../format";
 import { TYPE_PAGES, type PageProps } from "../nav";
+import { Button } from "../ui/button";
+import { Card } from "../ui/card";
+import { Skeleton } from "../ui/spinner";
 
 export const SCAN_POLL_MS = 1500;
 
 export default function Overview({ meta, notify }: PageProps) {
-  const navigate = useNavigate();
   const [data, setData] = useState<OverviewData | null>(null);
   const [stats, setStats] = useState<Record<string, Stats | null>>({});
   const [scanning, setScanning] = useState(false);
@@ -51,88 +46,77 @@ export default function Overview({ meta, notify }: PageProps) {
     }
   }
 
-  const source = meta.provider === "mock" ? "Mock data" : "AWS · read-only";
+  const types = data?.types ?? [];
+  const total = types.reduce((n, t) => n + t.total, 0);
+  const orphaned = types.reduce((n, t) => n + t.orphaned, 0);
+  const orphanedGib = types.reduce((n, t) => n + t.orphaned_gib, 0);
+  // AMI cost is the cost of its snapshots, so the headline waste leaves AMIs out to count each once.
+  const waste = types.filter((t) => t.type !== "ami").reduce((n, t) => n + (t.orphaned_usd ?? 0), 0);
+
+  if (data && !data.last_scan) {
+    return (
+      <Card className="mx-auto mt-12 max-w-md p-10 text-center">
+        <h2 className="text-lg font-semibold">No scan yet</h2>
+        <p className="mt-1 text-[13px] text-muted">Janitor lists your AMIs, snapshots, and volumes, then explains each status.</p>
+        <Button variant="primary" className="mt-5" loading={scanning} onClick={scan}>
+          Run first scan
+        </Button>
+      </Card>
+    );
+  }
+
   return (
-    <ContentLayout
-      header={
-        <Header
-          variant="h1"
-          info={<Badge color={meta.provider === "mock" ? "blue" : "green"}>{source}</Badge>}
-          description={data?.last_scan ? `Last scan: ${formatDate(data.last_scan.finished_at)}` : undefined}
-          actions={
-            <Button loading={scanning || data?.scanning} onClick={scan}>
-              Scan now
-            </Button>
-          }
-        >
-          Overview
-        </Header>
-      }
-    >
-      {data && !data.last_scan ? (
-        <Container>
-          <Box textAlign="center">
-            <SpaceBetween size="s">
-              <Box variant="h3">No scan yet</Box>
-              <Button variant="primary" loading={scanning} onClick={scan}>
-                Run first scan
-              </Button>
-            </SpaceBetween>
-          </Box>
-        </Container>
-      ) : (
-        <ColumnLayout columns={4}>
-          {TYPE_PAGES.map((page) => {
-            const summary = data?.types.find((t) => t.type === page.type);
-            const s = stats[page.type];
-            return (
-              <Container
-                key={page.type}
-                header={
-                  <Header variant="h2">
-                    <Link
-                      href={page.path}
-                      fontSize="heading-m"
-                      onFollow={(e) => {
-                        e.preventDefault();
-                        navigate(page.path);
-                      }}
-                    >
-                      {page.title}
-                    </Link>
-                  </Header>
-                }
-              >
-                <SpaceBetween size="s">
-                  <Box variant="awsui-value-large">{summary ? summary.total.toLocaleString() : "—"}</Box>
-                  <Box color="text-body-secondary">
-                    {summary
-                      ? `${summary.orphaned.toLocaleString()} orphaned · ${formatGiB(summary.orphaned_gib)}` +
-                        (summary.orphaned_usd != null ? ` · ${formatUsd(summary.orphaned_usd)}` : "")
-                      : "No data"}
-                  </Box>
-                  {s && s.total > 0 && (
-                    <PieChart
-                      data={s.by_status.map((b) => ({
-                        title: meta.definitions.statuses[b.key as Status]?.label ?? b.key,
-                        value: b.count,
-                        color: STATUS_COLORS[b.key],
-                      }))}
-                      variant="donut"
-                      size="small"
-                      hideFilter
-                      hideLegend
-                      ariaLabel={`${page.title} by status`}
-                      innerMetricValue={s.total.toLocaleString()}
-                      innerMetricDescription="total"
-                    />
-                  )}
-                </SpaceBetween>
-              </Container>
-            );
-          })}
-        </ColumnLayout>
-      )}
-    </ContentLayout>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight">Cleanup overview</h2>
+          <p className="mt-1 text-[13px] text-muted">
+            {data?.last_scan ? `Last scan: ${formatDate(data.last_scan.finished_at)}` : "Loading"} · {meta.provider === "mock" ? "Mock data" : "AWS · read-only"}
+          </p>
+        </div>
+        {(scanning || data?.scanning) && (
+          <span className="inline-flex items-center gap-2 text-[13px] text-muted" role="status">
+            <RefreshCw className="size-3.5 animate-spin" aria-hidden />
+            Scanning
+          </span>
+        )}
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Kpi label="Resources" value={data ? total.toLocaleString() : "—"} detail="Across the four types" icon={Layers} />
+        <Kpi label="Orphaned" value={data ? orphaned.toLocaleString() : "—"} detail={formatGiB(orphanedGib)} icon={TriangleAlert} tone="danger" />
+        <Kpi label="Waste" value={data ? `~${formatMoney(waste)}` : "—"} detail="Orphaned, per month" icon={CircleDollarSign} tone="warning" />
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {TYPE_PAGES.map((page) => {
+          const summary = types.find((t) => t.type === page.type);
+          const s = stats[page.type];
+          return (
+            <Link key={page.type} to={page.path} className="group">
+              <Card className="h-full p-5 transition-shadow group-hover:shadow-lg group-hover:ring-1 group-hover:ring-accent/30">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <AwsIcon kind={page.type} size={32} />
+                    <span className="font-semibold">{page.title}</span>
+                  </div>
+                  <ArrowUpRight className="size-4 text-muted transition-colors group-hover:text-accent" aria-hidden />
+                </div>
+                <div className="mt-4 text-[28px] leading-none font-semibold tracking-tight tabular-nums">{summary ? summary.total.toLocaleString() : "—"}</div>
+                <p className="mt-2 text-[13px] text-muted">
+                  {summary
+                    ? `${summary.orphaned.toLocaleString()} orphaned · ${formatGiB(summary.orphaned_gib)}` +
+                      (summary.orphaned_usd != null ? ` · ~${formatMoney(summary.orphaned_usd)}/mo` : "")
+                    : "No data"}
+                </p>
+                <div className="mt-5 border-t border-line pt-4">
+                  {s && s.total > 0 ? <StatusDonut buckets={s.by_status} meta={meta} total={s.total} size={112} /> : <Skeleton className="h-28 w-full" />}
+                </div>
+              </Card>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
   );
 }

@@ -45,8 +45,10 @@ export default function DateFilter({ filters, onChange }: { filters: Filters; on
           )}
         >
           <Calendar className="size-3.5" aria-hidden />
-          Created
-          {active && <span className="font-normal">: {filters.from || "…"} – {filters.to || "…"}</span>}
+          <span>
+            Created
+            {active && <span className="font-normal">: {filters.from || "…"} – {filters.to || "…"}</span>}
+          </span>
           <ChevronDown className="size-3.5 opacity-60" aria-hidden />
         </button>
       }

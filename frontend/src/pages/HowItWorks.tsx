@@ -1,61 +1,109 @@
-import Box from "@cloudscape-design/components/box";
-import Container from "@cloudscape-design/components/container";
-import ContentLayout from "@cloudscape-design/components/content-layout";
-import Header from "@cloudscape-design/components/header";
-import SpaceBetween from "@cloudscape-design/components/space-between";
-import Table from "@cloudscape-design/components/table";
+import { ShieldCheck } from "lucide-react";
 import type { Status } from "../api";
 import StatusBadge from "../components/StatusBadge";
 import { TYPE_PAGES, type PageProps } from "../nav";
+import { Badge } from "../ui/badge";
+import { Card, CardBody, CardHeader } from "../ui/card";
+import { Table, TBody, Td, Th, THead, Tr } from "../ui/table";
 
 export default function HowItWorks({ meta }: PageProps) {
   const defs = meta.definitions;
   return (
-    <ContentLayout header={<Header variant="h1" description="Policy and people decide; Janitor shows its reasoning.">How Janitor decides</Header>}>
-      <SpaceBetween size="l">
-        <Container header={<Header variant="h2">Safety</Header>}>
-          Janitor only reads. It has no way to delete or change anything: every delete is a simulation recorded
-          in the audit log.
-        </Container>
-        <Table
-          header={<Header variant="h2" description={`When more than one applies: ${defs.precedence.map((s) => defs.statuses[s].label).join(" > ")}.`}>Statuses</Header>}
-          items={defs.precedence}
-          columnDefinitions={[
-            { id: "label", header: "Status", cell: (s: Status) => defs.statuses[s].label },
-            { id: "meaning", header: "Meaning", cell: (s: Status) => defs.statuses[s].meaning },
-            { id: "blocks", header: "Deletion", cell: (s: Status) => (defs.statuses[s].blocks ? "Blocked" : "Allowed if no rule blocks it") },
-            { id: "todo", header: "What to do", cell: (s: Status) => defs.statuses[s].what_to_do },
-          ]}
-        />
-        {TYPE_PAGES.map((page) => (
-          <Container key={page.type} header={<Header variant="h2">{page.title}</Header>}>
-            <SpaceBetween size="s">
-              {(Object.entries(defs.by_type[page.type]) as [Status, string][]).map(([status, text]) => (
-                <Box key={status}>
-                  <StatusBadge meta={meta} type={page.type} status={status} /> {text}
-                </Box>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-semibold tracking-tight">How Janitor decides</h2>
+        <p className="mt-1 text-[13px] text-muted">Policy and people decide; Janitor shows its reasoning.</p>
+      </div>
+      <Card className="flex items-start gap-4 p-5">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+          <ShieldCheck className="size-5" aria-hidden />
+        </span>
+        <div>
+          <h3 className="font-semibold">Read-only by design</h3>
+          <p className="mt-1 text-[13px] text-muted">
+            Janitor only reads. It has no way to delete or change anything: every delete is a simulation recorded in the audit log.
+          </p>
+        </div>
+      </Card>
+      <Card>
+        <CardHeader title="Statuses" description={`When more than one applies: ${defs.precedence.map((s) => defs.statuses[s].label).join(" > ")}.`} />
+        <CardBody className="pt-3">
+          <Table>
+            <THead>
+              <tr>
+                <Th>Status</Th>
+                <Th>Meaning</Th>
+                <Th>Deletion</Th>
+                <Th>What to do</Th>
+              </tr>
+            </THead>
+            <TBody>
+              {defs.precedence.map((s: Status) => (
+                <Tr key={s}>
+                  <Td>
+                    <StatusBadge meta={meta} type="ami" status={s} />
+                  </Td>
+                  <Td>{defs.statuses[s].meaning}</Td>
+                  <Td className="text-muted">{defs.statuses[s].blocks ? "Blocked" : "Allowed if no rule blocks it"}</Td>
+                  <Td className="text-muted">{defs.statuses[s].what_to_do}</Td>
+                </Tr>
               ))}
-            </SpaceBetween>
-          </Container>
+            </TBody>
+          </Table>
+        </CardBody>
+      </Card>
+      <div className="grid gap-4 lg:grid-cols-2">
+        {TYPE_PAGES.map((page) => (
+          <Card key={page.type}>
+            <CardHeader title={page.title} />
+            <CardBody className="space-y-3 pt-3">
+              {(Object.entries(defs.by_type[page.type]) as [Status, string][]).map(([status, text]) => (
+                <div key={status} className="flex items-start gap-3 text-[13px]">
+                  <StatusBadge meta={meta} type={page.type} status={status} />
+                  <span className="pt-0.5">{text}</span>
+                </div>
+              ))}
+            </CardBody>
+          </Card>
         ))}
-        <Table
-          header={<Header variant="h2" description="The strictest outcome wins: block, then warn, then pass.">Rules</Header>}
-          items={defs.rules}
-          columnDefinitions={[
-            { id: "id", header: "ID", cell: (r) => r.id },
-            { id: "title", header: "Rule", cell: (r) => r.title },
-            { id: "outcome", header: "Outcome", cell: (r) => (r.outcome === "block" ? "Block" : "Warn") },
-            { id: "explanation", header: "Why", cell: (r) => r.explanation },
-          ]}
-        />
-        <Container header={<Header variant="h2">Notes</Header>}>
-          <ul>
+      </div>
+      <Card>
+        <CardHeader title="Rules" description="The strictest outcome wins: block, then warn, then pass." />
+        <CardBody className="pt-3">
+          <Table>
+            <THead>
+              <tr>
+                <Th>ID</Th>
+                <Th>Rule</Th>
+                <Th>Outcome</Th>
+                <Th>Why</Th>
+              </tr>
+            </THead>
+            <TBody>
+              {defs.rules.map((r) => (
+                <Tr key={r.id}>
+                  <Td className="font-mono text-xs">{r.id}</Td>
+                  <Td className="font-medium">{r.title}</Td>
+                  <Td>
+                    <Badge tone={r.outcome === "block" ? "danger" : "warning"}>{r.outcome === "block" ? "Block" : "Warn"}</Badge>
+                  </Td>
+                  <Td className="text-muted">{r.explanation}</Td>
+                </Tr>
+              ))}
+            </TBody>
+          </Table>
+        </CardBody>
+      </Card>
+      <Card>
+        <CardHeader title="Notes" />
+        <CardBody className="pt-3">
+          <ul className="list-disc space-y-1.5 pl-5 text-[13px] text-muted">
             {defs.notes.map((note) => (
               <li key={note}>{note}</li>
             ))}
           </ul>
-        </Container>
-      </SpaceBetween>
-    </ContentLayout>
+        </CardBody>
+      </Card>
+    </div>
   );
 }

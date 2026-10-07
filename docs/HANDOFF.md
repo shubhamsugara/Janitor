@@ -12,6 +12,10 @@ Read this first, then the spec.
   [`docs/superpowers/plans/2026-10-07-phase-2.md`](superpowers/plans/2026-10-07-phase-2.md):
   linkage diagram and "used by", costs from the AWS price list (`fixtures/prices.json`), stats,
   filters in the URL, CSV and PDF export, five environment accounts, and the phase 1 fixes.
+- **UI refresh** on branch `ui-refresh` from
+  [`docs/superpowers/plans/2026-10-07-ui-refresh.md`](superpowers/plans/2026-10-07-ui-refresh.md):
+  Cloudscape replaced by Tailwind 4 + Radix + Recharts (in-repo kit in `frontend/src/ui/`);
+  sidebar layout, KPI cards, filter pills, slide-over detail drawer, light and dark themes.
 - Run it: `make setup` once, then `make run` → http://127.0.0.1:8080 (mock data).
 
 ## Next step

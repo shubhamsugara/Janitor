@@ -46,10 +46,10 @@ export default function StatsHeader({ stats, meta }: { stats: Stats; meta: Meta 
       </div>
       <Card>
         <CardHeader title="Breakdown" description="For the resources that match your filters. Costs are monthly estimates." />
-        <CardBody className="grid gap-8 md:grid-cols-2 xl:grid-cols-4">
+        <CardBody className="grid gap-8 md:grid-cols-2 xl:grid-cols-[1.35fr_1fr_1fr_1fr]">
           <div className="min-w-0">
             <h3 className="mb-3 text-[13px] font-medium text-muted">By status</h3>
-            <StatusDonut buckets={stats.by_status} meta={meta} total={stats.total} />
+            <StatusDonut buckets={stats.by_status} meta={meta} total={stats.total} size={132} />
           </div>
           <BarList title="By account" buckets={stats.by_account} label={(key) => accountName(meta, key)} />
           <BarList title="By region" buckets={stats.by_region} label={(key) => key} />

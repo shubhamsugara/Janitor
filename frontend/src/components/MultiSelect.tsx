@@ -35,8 +35,10 @@ export default function MultiSelect({ label, options, value, onChange }: Props) 
             summary ? "border-accent/40 bg-accent-soft text-accent" : "border-dashed border-line bg-card text-ink hover:bg-subtle",
           )}
         >
-          {label}
-          {summary && <span className="font-normal">: {summary}</span>}
+          <span>
+            {label}
+            {summary && <span className="font-normal">: {summary}</span>}
+          </span>
           <ChevronDown className="size-3.5 opacity-60" aria-hidden />
         </button>
       }

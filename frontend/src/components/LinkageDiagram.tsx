@@ -81,6 +81,7 @@ export default function LinkageDiagram({ graph, meta, dark, onSelect }: Props) {
         nodeTypes={NODE_TYPES}
         colorMode={dark ? "dark" : "light"}
         fitView
+        fitViewOptions={{ maxZoom: 1, padding: 0.15 }}
         minZoom={0.2}
         nodesDraggable={false}
         nodesConnectable={false}
