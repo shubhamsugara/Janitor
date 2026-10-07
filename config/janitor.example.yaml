@@ -1,0 +1,19 @@
+# Example configuration with fake account IDs. Copy to config/janitor.yaml for real settings.
+provider: mock            # mock | aws (overridable by JANITOR_PROVIDER)
+owner:
+  account: "111111111111"
+  regions: [us-east-1, us-west-2, eu-west-1]   # default regions for every account
+accounts:
+  "111111111111": { name: tools, profile: example-tools, owns: [ami, snapshot, volume] }
+  "222222222222": { name: dev,   profile: example-dev,   owns: [snapshot, volume, rds_snapshot] }
+  "333333333333": { name: prod,  profile: example-prod,  owns: [volume, rds_snapshot],
+                    regions: [us-east-1, eu-west-1] }
+policy:
+  orphan_after_days: 90
+  min_age_days: 30
+  protected_tags: { retain: "true", "janitor:keep": "true" }
+  typed_confirm_min_items: 10
+pricing:                  # estimates only
+  snapshot_gb_month: 0.05
+  rds_snapshot_gb_month: 0.095
+  volume_gb_month: { gp3: 0.08, gp2: 0.10, io1: 0.125, io2: 0.125, st1: 0.045, sc1: 0.015, standard: 0.05 }

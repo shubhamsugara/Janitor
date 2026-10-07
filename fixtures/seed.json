@@ -1,0 +1,2455 @@
+{
+ "anchor": "2026-10-01T00:00:00Z",
+ "resources": [
+  {
+   "id": "ami-0000521353ccc38b7",
+   "type": "ami",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "base-linux-20250827000000",
+   "created_at": "2025-08-27T00:00:00Z",
+   "size_gb": 8,
+   "state": "available",
+   "tags": {},
+   "snapshot_ids": [
+    "snap-0000d75df5c1faa9f"
+   ],
+   "source_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000d75df5c1faa9f",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "base-linux-20250827000000-root",
+   "created_at": "2025-08-27T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {},
+   "linked_ami_id": "ami-0000521353ccc38b7",
+   "managed_by": null
+  },
+  {
+   "id": "ami-0000941708770f0b6",
+   "type": "ami",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "base-linux-20251205000000",
+   "created_at": "2025-12-05T00:00:00Z",
+   "size_gb": 8,
+   "state": "available",
+   "tags": {
+    "owner": "platform",
+    "retain": "true"
+   },
+   "snapshot_ids": [
+    "snap-0000a1cc7b7052664"
+   ],
+   "source_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000a1cc7b7052664",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "base-linux-20251205000000-root",
+   "created_at": "2025-12-05T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "platform",
+    "retain": "true"
+   },
+   "linked_ami_id": "ami-0000941708770f0b6",
+   "managed_by": null
+  },
+  {
+   "id": "ami-0000e408764551fdf",
+   "type": "ami",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "base-linux-20260315000000",
+   "created_at": "2026-03-15T00:00:00Z",
+   "size_gb": 8,
+   "state": "available",
+   "tags": {
+    "owner": "platform"
+   },
+   "snapshot_ids": [
+    "snap-0000d2eddcbf9952f"
+   ],
+   "source_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000d2eddcbf9952f",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "base-linux-20260315000000-root",
+   "created_at": "2026-03-15T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "linked_ami_id": "ami-0000e408764551fdf",
+   "managed_by": null
+  },
+  {
+   "id": "ami-0000996351fc4be40",
+   "type": "ami",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "base-linux-20260603000000",
+   "created_at": "2026-06-03T00:00:00Z",
+   "size_gb": 8,
+   "state": "available",
+   "tags": {
+    "owner": "platform"
+   },
+   "snapshot_ids": [
+    "snap-0000302f02661ddfe"
+   ],
+   "source_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000302f02661ddfe",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "base-linux-20260603000000-root",
+   "created_at": "2026-06-03T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "linked_ami_id": "ami-0000996351fc4be40",
+   "managed_by": null
+  },
+  {
+   "id": "ami-0000bbb0dc286c20e",
+   "type": "ami",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "base-linux-20260802000000",
+   "created_at": "2026-08-02T00:00:00Z",
+   "size_gb": 8,
+   "state": "available",
+   "tags": {
+    "owner": "platform"
+   },
+   "snapshot_ids": [
+    "snap-0000ad00013f329c0"
+   ],
+   "source_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000ad00013f329c0",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "base-linux-20260802000000-root",
+   "created_at": "2026-08-02T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "linked_ami_id": "ami-0000bbb0dc286c20e",
+   "managed_by": null
+  },
+  {
+   "id": "ami-0000098a422e3f570",
+   "type": "ami",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "base-linux-20260911000000",
+   "created_at": "2026-09-11T00:00:00Z",
+   "size_gb": 8,
+   "state": "available",
+   "tags": {
+    "owner": "platform"
+   },
+   "snapshot_ids": [
+    "snap-00002fcb5e466e705"
+   ],
+   "source_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-00002fcb5e466e705",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "base-linux-20260911000000-root",
+   "created_at": "2026-09-11T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "linked_ami_id": "ami-0000098a422e3f570",
+   "managed_by": null
+  },
+  {
+   "id": "ami-0000572d236bf7fec",
+   "type": "ami",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "app-web-20260921000000",
+   "created_at": "2026-09-21T00:00:00Z",
+   "size_gb": 8,
+   "state": "available",
+   "tags": {
+    "owner": "platform"
+   },
+   "snapshot_ids": [
+    "snap-00009091331064483"
+   ],
+   "source_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-00009091331064483",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "app-web-20260921000000-root",
+   "created_at": "2026-09-21T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "linked_ami_id": "ami-0000572d236bf7fec",
+   "managed_by": null
+  },
+  {
+   "id": "ami-0000d0c95411bff12",
+   "type": "ami",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "app-web-20260817000000",
+   "created_at": "2026-08-17T00:00:00Z",
+   "size_gb": 8,
+   "state": "available",
+   "tags": {
+    "owner": "platform"
+   },
+   "snapshot_ids": [
+    "snap-0000ce0bd6406d27d"
+   ],
+   "source_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000ce0bd6406d27d",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "app-web-20260817000000-root",
+   "created_at": "2026-08-17T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "linked_ami_id": "ami-0000d0c95411bff12",
+   "managed_by": null
+  },
+  {
+   "id": "ami-0000c2041e990b3ea",
+   "type": "ami",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "app-web-20260504000000",
+   "created_at": "2026-05-04T00:00:00Z",
+   "size_gb": 8,
+   "state": "available",
+   "tags": {
+    "owner": "platform"
+   },
+   "snapshot_ids": [
+    "snap-000050060340466fa"
+   ],
+   "source_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-000050060340466fa",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "app-web-20260504000000-root",
+   "created_at": "2026-05-04T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "linked_ami_id": "ami-0000c2041e990b3ea",
+   "managed_by": null
+  },
+  {
+   "id": "ami-0000dc4bc0697b18c",
+   "type": "ami",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "bastion-20250519000000",
+   "created_at": "2025-05-19T00:00:00Z",
+   "size_gb": 8,
+   "state": "available",
+   "tags": {
+    "owner": "platform"
+   },
+   "snapshot_ids": [
+    "snap-0000ce8563b22e7de"
+   ],
+   "source_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000ce8563b22e7de",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "bastion-20250519000000-root",
+   "created_at": "2025-05-19T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "linked_ami_id": "ami-0000dc4bc0697b18c",
+   "managed_by": null
+  },
+  {
+   "id": "ami-000043562bf9b4438",
+   "type": "ami",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "partner-export-20260124000000",
+   "created_at": "2026-01-24T00:00:00Z",
+   "size_gb": 8,
+   "state": "available",
+   "tags": {
+    "owner": "platform"
+   },
+   "snapshot_ids": [
+    "snap-000073df07ad93428"
+   ],
+   "source_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-000073df07ad93428",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "partner-export-20260124000000-root",
+   "created_at": "2026-01-24T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "linked_ami_id": "ami-000043562bf9b4438",
+   "managed_by": null
+  },
+  {
+   "id": "ami-00005c31d2f634fdf",
+   "type": "ami",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "public-demo-20260404000000",
+   "created_at": "2026-04-04T00:00:00Z",
+   "size_gb": 8,
+   "state": "available",
+   "tags": {
+    "owner": "platform"
+   },
+   "snapshot_ids": [
+    "snap-000080f9163628ff7"
+   ],
+   "source_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-000080f9163628ff7",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "public-demo-20260404000000-root",
+   "created_at": "2026-04-04T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "linked_ami_id": "ami-00005c31d2f634fdf",
+   "managed_by": null
+  },
+  {
+   "id": "ami-0000d1d37b2133a63",
+   "type": "ami",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "AwsBackup_i-0000a1b2c3d4e5f60-20260822000000",
+   "created_at": "2026-08-22T00:00:00Z",
+   "size_gb": 8,
+   "state": "available",
+   "tags": {
+    "owner": "platform",
+    "aws:backup:source-resource": "instance/i-0000a1b2c3d4e5f60"
+   },
+   "snapshot_ids": [
+    "snap-00000e877bad1f704"
+   ],
+   "source_ami_id": null,
+   "managed_by": "aws_backup"
+  },
+  {
+   "id": "snap-00000e877bad1f704",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "AwsBackup_i-0000a1b2c3d4e5f60-20260822000000-root",
+   "created_at": "2026-08-22T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "platform",
+    "aws:backup:source-resource": "instance/i-0000a1b2c3d4e5f60"
+   },
+   "linked_ami_id": "ami-0000d1d37b2133a63",
+   "managed_by": "aws_backup"
+  },
+  {
+   "id": "ami-000063b2573144f18",
+   "type": "ami",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "test-build-20260926000000",
+   "created_at": "2026-09-26T00:00:00Z",
+   "size_gb": 8,
+   "state": "available",
+   "tags": {
+    "owner": "platform"
+   },
+   "snapshot_ids": [
+    "snap-0000a438497802716"
+   ],
+   "source_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000a438497802716",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "test-build-20260926000000-root",
+   "created_at": "2026-09-26T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "linked_ami_id": "ami-000063b2573144f18",
+   "managed_by": null
+  },
+  {
+   "id": "ami-00001f4917cdd48dd",
+   "type": "ami",
+   "account": "111111111111",
+   "region": "us-west-2",
+   "name": "base-linux-20260911000000",
+   "created_at": "2026-09-12T00:00:00Z",
+   "size_gb": 8,
+   "state": "available",
+   "tags": {
+    "owner": "platform"
+   },
+   "snapshot_ids": [
+    "snap-0000d437d1b91e6b0"
+   ],
+   "source_ami_id": "ami-0000098a422e3f570",
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000d437d1b91e6b0",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-west-2",
+   "name": "base-linux-20260911000000-root",
+   "created_at": "2026-09-12T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "linked_ami_id": "ami-00001f4917cdd48dd",
+   "managed_by": null
+  },
+  {
+   "id": "ami-000061ad57e70b161",
+   "type": "ami",
+   "account": "111111111111",
+   "region": "eu-west-1",
+   "name": "base-linux-20260315000000",
+   "created_at": "2026-03-16T00:00:00Z",
+   "size_gb": 8,
+   "state": "available",
+   "tags": {
+    "owner": "platform"
+   },
+   "snapshot_ids": [
+    "snap-00002d0a0ffc83d74"
+   ],
+   "source_ami_id": "ami-0000e408764551fdf",
+   "managed_by": null
+  },
+  {
+   "id": "snap-00002d0a0ffc83d74",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "eu-west-1",
+   "name": "base-linux-20260315000000-root",
+   "created_at": "2026-03-16T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "linked_ami_id": "ami-000061ad57e70b161",
+   "managed_by": null
+  },
+  {
+   "id": "ami-0000a1e302d747416",
+   "type": "ami",
+   "account": "111111111111",
+   "region": "eu-west-1",
+   "name": "app-web-20260504000000",
+   "created_at": "2026-05-05T00:00:00Z",
+   "size_gb": 8,
+   "state": "available",
+   "tags": {
+    "owner": "platform"
+   },
+   "snapshot_ids": [
+    "snap-000086ba4ba9b6711"
+   ],
+   "source_ami_id": "ami-0000c2041e990b3ea",
+   "managed_by": null
+  },
+  {
+   "id": "snap-000086ba4ba9b6711",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "eu-west-1",
+   "name": "app-web-20260504000000-root",
+   "created_at": "2026-05-05T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "linked_ami_id": "ami-0000a1e302d747416",
+   "managed_by": null
+  },
+  {
+   "id": "snap-000071a347c41c41a",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-west-2",
+   "name": "copy-of-retired-api-root",
+   "created_at": "2026-03-05T00:00:00Z",
+   "size_gb": 30,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "source_volume_id": "vol-0000f57cb042a39bb",
+   "linked_ami_id": "ami-00000de2f48ed81e7",
+   "managed_by": null
+  },
+  {
+   "id": "snap-00003da9490a808a3",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "retired-api-root",
+   "created_at": "2026-02-23T00:00:00Z",
+   "size_gb": 30,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "source_volume_id": "vol-0000f12be703585e3",
+   "linked_ami_id": "ami-0000b7870e5559766",
+   "managed_by": null
+  },
+  {
+   "id": "snap-000094aa7abc24062",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "nightly-tools-data",
+   "created_at": "2026-09-28T00:00:00Z",
+   "size_gb": 20,
+   "state": "completed",
+   "tags": {
+    "owner": "platform",
+    "aws:dlm:lifecycle-policy-id": "policy-0000example0001"
+   },
+   "source_volume_id": "vol-000086b26df17d4c3",
+   "linked_ami_id": null,
+   "managed_by": "dlm"
+  },
+  {
+   "id": "snap-0000bbd2a794c6dcc",
+   "type": "snapshot",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-sandbox-image-root",
+   "created_at": "2026-05-24T00:00:00Z",
+   "size_gb": 20,
+   "state": "completed",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "source_volume_id": "vol-000044edbfaf24793",
+   "linked_ami_id": "ami-00002215273ad86d2",
+   "managed_by": null
+  },
+  {
+   "id": "vol-00003907794fc0f4a",
+   "type": "volume",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-ci-data",
+   "created_at": "2025-10-01T00:00:00Z",
+   "size_gb": 100,
+   "state": "in-use",
+   "tags": {
+    "owner": "platform"
+   },
+   "attached_instance": "i-0000178d13f49b96b",
+   "volume_type": "gp3"
+  },
+  {
+   "id": "snap-00003376431008595",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-ci-data-weekly",
+   "created_at": "2026-06-23T00:00:00Z",
+   "size_gb": 100,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "source_volume_id": "vol-00003907794fc0f4a",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-00000d20e358fbdc1",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-ci-data-old",
+   "created_at": "2025-08-27T00:00:00Z",
+   "size_gb": 100,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "source_volume_id": "vol-000054eb291a89407",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-000034efdc2546b95",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-migration-temp",
+   "created_at": "2026-09-19T00:00:00Z",
+   "size_gb": 40,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "source_volume_id": "vol-0000ff67a7025e6b3",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "vol-00005ec491d677adb",
+   "type": "volume",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-runner-cache",
+   "created_at": "2026-03-15T00:00:00Z",
+   "size_gb": 50,
+   "state": "available",
+   "tags": {
+    "owner": "platform"
+   },
+   "attached_instance": null,
+   "volume_type": "gp3"
+  },
+  {
+   "id": "vol-0000913165117c32c",
+   "type": "volume",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-scratch",
+   "created_at": "2026-09-16T00:00:00Z",
+   "size_gb": 10,
+   "state": "available",
+   "tags": {
+    "owner": "platform"
+   },
+   "attached_instance": null,
+   "volume_type": "gp3"
+  },
+  {
+   "id": "vol-0000a739dc49e0d36",
+   "type": "volume",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-bastion-root",
+   "created_at": "2025-05-19T00:00:00Z",
+   "size_gb": 8,
+   "state": "in-use",
+   "tags": {
+    "owner": "platform"
+   },
+   "attached_instance": "i-000025e7214de0550",
+   "volume_type": "gp3"
+  },
+  {
+   "id": "vol-000072bebefd98280",
+   "type": "volume",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-api-1-root",
+   "created_at": "2026-09-11T00:00:00Z",
+   "size_gb": 20,
+   "state": "in-use",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "attached_instance": "i-0000a6e10d2bf8f1a",
+   "volume_type": "gp3"
+  },
+  {
+   "id": "vol-0000faff5776eb9f9",
+   "type": "volume",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-old-cache",
+   "created_at": "2026-04-04T00:00:00Z",
+   "size_gb": 200,
+   "state": "available",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "attached_instance": null,
+   "volume_type": "gp2"
+  },
+  {
+   "id": "vol-0000855f87cdb7487",
+   "type": "volume",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-test-data",
+   "created_at": "2026-05-04T00:00:00Z",
+   "size_gb": 80,
+   "state": "available",
+   "tags": {},
+   "attached_instance": null,
+   "volume_type": "gp3"
+  },
+  {
+   "id": "vol-00007fca55f46c048",
+   "type": "volume",
+   "account": "333333333333",
+   "region": "us-east-1",
+   "name": "prod-api-root",
+   "created_at": "2025-12-05T00:00:00Z",
+   "size_gb": 20,
+   "state": "in-use",
+   "tags": {
+    "owner": "platform",
+    "env": "prod"
+   },
+   "attached_instance": "i-00008977343d1494f",
+   "volume_type": "gp3"
+  },
+  {
+   "id": "vol-00008c415a80e95d4",
+   "type": "volume",
+   "account": "333333333333",
+   "region": "us-east-1",
+   "name": "prod-scratch-data",
+   "created_at": "2026-02-03T00:00:00Z",
+   "size_gb": 500,
+   "state": "available",
+   "tags": {
+    "owner": "data",
+    "env": "prod"
+   },
+   "attached_instance": null,
+   "volume_type": "io2"
+  },
+  {
+   "id": "vol-0000310c2255f40a9",
+   "type": "volume",
+   "account": "333333333333",
+   "region": "us-east-1",
+   "name": "prod-ledger-archive",
+   "created_at": "2025-08-27T00:00:00Z",
+   "size_gb": 1000,
+   "state": "available",
+   "tags": {
+    "owner": "finance",
+    "env": "prod",
+    "retain": "true"
+   },
+   "attached_instance": null,
+   "volume_type": "st1"
+  },
+  {
+   "id": "vol-0000ae772ac2837fd",
+   "type": "volume",
+   "account": "333333333333",
+   "region": "eu-west-1",
+   "name": "prod-eu-api-root",
+   "created_at": "2026-03-16T00:00:00Z",
+   "size_gb": 20,
+   "state": "in-use",
+   "tags": {
+    "owner": "platform",
+    "env": "prod"
+   },
+   "attached_instance": "i-00005c999e33ab440",
+   "volume_type": "gp3"
+  },
+  {
+   "id": "vol-0000f102371d577b5",
+   "type": "volume",
+   "account": "333333333333",
+   "region": "eu-west-1",
+   "name": "prod-eu-reindex",
+   "created_at": "2026-09-11T00:00:00Z",
+   "size_gb": 60,
+   "state": "available",
+   "tags": {
+    "owner": "search",
+    "env": "prod"
+   },
+   "attached_instance": null,
+   "volume_type": "gp3"
+  },
+  {
+   "id": "arn:aws:rds:us-east-1:222222222222:snapshot:rds:dev-orders-20260930000000",
+   "type": "rds_snapshot",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "rds:dev-orders-20260930000000",
+   "created_at": "2026-09-30T00:00:00Z",
+   "size_gb": 50,
+   "state": "available",
+   "tags": {
+    "owner": "data"
+   },
+   "source_db_id": "dev-orders",
+   "db_kind": "instance",
+   "managed_by": "rds_automated"
+  },
+  {
+   "id": "arn:aws:rds:us-east-1:222222222222:snapshot:rds:dev-orders-20260929000000",
+   "type": "rds_snapshot",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "rds:dev-orders-20260929000000",
+   "created_at": "2026-09-29T00:00:00Z",
+   "size_gb": 50,
+   "state": "available",
+   "tags": {
+    "owner": "data"
+   },
+   "source_db_id": "dev-orders",
+   "db_kind": "instance",
+   "managed_by": "rds_automated"
+  },
+  {
+   "id": "arn:aws:rds:us-east-1:222222222222:snapshot:dev-orders-20260628000000",
+   "type": "rds_snapshot",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-orders-20260628000000",
+   "created_at": "2026-06-28T00:00:00Z",
+   "size_gb": 50,
+   "state": "available",
+   "tags": {
+    "owner": "data"
+   },
+   "source_db_id": "dev-orders",
+   "db_kind": "instance",
+   "managed_by": null
+  },
+  {
+   "id": "arn:aws:rds:us-east-1:222222222222:snapshot:dev-orders-20260802000000",
+   "type": "rds_snapshot",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-orders-20260802000000",
+   "created_at": "2026-08-02T00:00:00Z",
+   "size_gb": 50,
+   "state": "available",
+   "tags": {},
+   "source_db_id": "dev-orders",
+   "db_kind": "instance",
+   "managed_by": null
+  },
+  {
+   "id": "arn:aws:rds:us-east-1:222222222222:snapshot:dev-legacy-20251205000000",
+   "type": "rds_snapshot",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-legacy-20251205000000",
+   "created_at": "2025-12-05T00:00:00Z",
+   "size_gb": 50,
+   "state": "available",
+   "tags": {
+    "owner": "data"
+   },
+   "source_db_id": "dev-legacy",
+   "db_kind": "instance",
+   "managed_by": null
+  },
+  {
+   "id": "arn:aws:rds:us-east-1:222222222222:snapshot:dev-legacy-20260315000000",
+   "type": "rds_snapshot",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-legacy-20260315000000",
+   "created_at": "2026-03-15T00:00:00Z",
+   "size_gb": 50,
+   "state": "available",
+   "tags": {
+    "owner": "data"
+   },
+   "source_db_id": "dev-legacy",
+   "db_kind": "instance",
+   "managed_by": null
+  },
+  {
+   "id": "arn:aws:rds:us-east-1:222222222222:cluster-snapshot:dev-analytics-20260822000000",
+   "type": "rds_snapshot",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-analytics-20260822000000",
+   "created_at": "2026-08-22T00:00:00Z",
+   "size_gb": 120,
+   "state": "available",
+   "tags": {
+    "owner": "data"
+   },
+   "source_db_id": "dev-analytics",
+   "db_kind": "cluster",
+   "managed_by": null
+  },
+  {
+   "id": "arn:aws:rds:us-east-1:222222222222:cluster-snapshot:dev-reports-20260603000000",
+   "type": "rds_snapshot",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-reports-20260603000000",
+   "created_at": "2026-06-03T00:00:00Z",
+   "size_gb": 80,
+   "state": "available",
+   "tags": {
+    "owner": "data"
+   },
+   "source_db_id": "dev-reports",
+   "db_kind": "cluster",
+   "managed_by": null
+  },
+  {
+   "id": "arn:aws:rds:us-east-1:222222222222:cluster-snapshot:dev-reports-20260921000000",
+   "type": "rds_snapshot",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-reports-20260921000000",
+   "created_at": "2026-09-21T00:00:00Z",
+   "size_gb": 80,
+   "state": "available",
+   "tags": {
+    "owner": "data"
+   },
+   "source_db_id": "dev-reports",
+   "db_kind": "cluster",
+   "managed_by": null
+  },
+  {
+   "id": "arn:aws:rds:us-east-1:333333333333:snapshot:prod-orders-20260924000000",
+   "type": "rds_snapshot",
+   "account": "333333333333",
+   "region": "us-east-1",
+   "name": "prod-orders-20260924000000",
+   "created_at": "2026-09-24T00:00:00Z",
+   "size_gb": 50,
+   "state": "available",
+   "tags": {
+    "owner": "data",
+    "env": "prod"
+   },
+   "source_db_id": "prod-orders",
+   "db_kind": "instance",
+   "managed_by": "aws_backup"
+  },
+  {
+   "id": "arn:aws:rds:us-east-1:333333333333:snapshot:prod-orders-20260703000000",
+   "type": "rds_snapshot",
+   "account": "333333333333",
+   "region": "us-east-1",
+   "name": "prod-orders-20260703000000",
+   "created_at": "2026-07-03T00:00:00Z",
+   "size_gb": 50,
+   "state": "available",
+   "tags": {
+    "owner": "data",
+    "env": "prod"
+   },
+   "source_db_id": "prod-orders",
+   "db_kind": "instance",
+   "managed_by": null
+  },
+  {
+   "id": "snap-000021cd372eb411b",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-backup-000",
+   "created_at": "2026-08-13T00:00:00Z",
+   "size_gb": 100,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "source_volume_id": "vol-00003bd3d11ca205b",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000325d32fe269cd",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-west-2",
+   "name": "tools-backup-001",
+   "created_at": "2026-03-27T00:00:00Z",
+   "size_gb": 20,
+   "state": "completed",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "source_volume_id": "vol-00005a10d840e5bca",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000471abb13c2bc6",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-backup-002",
+   "created_at": "2025-09-25T00:00:00Z",
+   "size_gb": 20,
+   "state": "completed",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "source_volume_id": "vol-0000198fc29698004",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000ed909889e9b1f",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-backup-003",
+   "created_at": "2025-06-20T00:00:00Z",
+   "size_gb": 20,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "source_volume_id": "vol-0000eede252ee6543",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000e1c75043085b3",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-backup-004",
+   "created_at": "2025-08-15T00:00:00Z",
+   "size_gb": 20,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "source_volume_id": "vol-0000670e89e247801",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000b1125def1f844",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "eu-west-1",
+   "name": "tools-backup-005",
+   "created_at": "2026-08-16T00:00:00Z",
+   "size_gb": 20,
+   "state": "completed",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "source_volume_id": "vol-00007ade6ff15610d",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000822048197dbca",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-west-2",
+   "name": "tools-backup-006",
+   "created_at": "2026-04-29T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {},
+   "source_volume_id": "vol-0000501e655f74ad1",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000ccb5ca3b3e98d",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-backup-007",
+   "created_at": "2025-06-17T00:00:00Z",
+   "size_gb": 50,
+   "state": "completed",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "source_volume_id": "vol-00003e34defaa2482",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000dededc0186f1a",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-backup-008",
+   "created_at": "2025-10-21T00:00:00Z",
+   "size_gb": 100,
+   "state": "completed",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "source_volume_id": "vol-0000a1500e6a9d736",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000927c85f64413f",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-backup-009",
+   "created_at": "2026-06-04T00:00:00Z",
+   "size_gb": 50,
+   "state": "completed",
+   "tags": {
+    "owner": "data"
+   },
+   "source_volume_id": "vol-0000dcd2920fdd00b",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-00009e54f6098a5a7",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-backup-010",
+   "created_at": "2026-05-09T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "source_volume_id": "vol-00003907794fc0f4a",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-000070b40f18ee9e2",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-backup-011",
+   "created_at": "2025-01-21T00:00:00Z",
+   "size_gb": 50,
+   "state": "completed",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "source_volume_id": "vol-00003907794fc0f4a",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000a9b17d95bdd70",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-west-2",
+   "name": "tools-backup-012",
+   "created_at": "2026-02-21T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "source_volume_id": "vol-000028ed62215b96f",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000bedc824472b8f",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "eu-west-1",
+   "name": "tools-backup-013",
+   "created_at": "2024-11-13T00:00:00Z",
+   "size_gb": 50,
+   "state": "completed",
+   "tags": {
+    "owner": "data"
+   },
+   "source_volume_id": "vol-0000d2fd0e11f0218",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000d58e1ad9b94a8",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "eu-west-1",
+   "name": "tools-backup-014",
+   "created_at": "2025-12-19T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {},
+   "source_volume_id": "vol-0000221cb304962f2",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-00009c7367145a675",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-backup-015",
+   "created_at": "2026-05-01T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "data"
+   },
+   "source_volume_id": "vol-000018aa22e66ed88",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-00006830170c2bda3",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-backup-016",
+   "created_at": "2025-02-09T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "source_volume_id": "vol-00003907794fc0f4a",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-000083368af2fc97b",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "eu-west-1",
+   "name": "tools-backup-017",
+   "created_at": "2025-01-20T00:00:00Z",
+   "size_gb": 50,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "source_volume_id": "vol-0000bdbab84fb43e1",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-00001b34cafe9ea28",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-backup-018",
+   "created_at": "2026-02-16T00:00:00Z",
+   "size_gb": 50,
+   "state": "completed",
+   "tags": {},
+   "source_volume_id": "vol-0000d38877f283518",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000ca0edb3da5a41",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-west-2",
+   "name": "tools-backup-019",
+   "created_at": "2026-08-11T00:00:00Z",
+   "size_gb": 20,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "source_volume_id": "vol-0000c14bfc20b288c",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000fc98c7ee49a13",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-west-2",
+   "name": "tools-backup-020",
+   "created_at": "2025-08-04T00:00:00Z",
+   "size_gb": 50,
+   "state": "completed",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "source_volume_id": "vol-0000efa887290b736",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-000066caabf0ca9e7",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-backup-021",
+   "created_at": "2025-11-27T00:00:00Z",
+   "size_gb": 50,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "source_volume_id": "vol-00003907794fc0f4a",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000ae41c46da61c1",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-backup-022",
+   "created_at": "2026-06-07T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "data"
+   },
+   "source_volume_id": "vol-0000f49414c86a104",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-000022e77f68c5014",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-west-2",
+   "name": "tools-backup-023",
+   "created_at": "2026-06-17T00:00:00Z",
+   "size_gb": 100,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "source_volume_id": "vol-0000dad198ed7a7de",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-00007581b247da1d8",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-west-2",
+   "name": "tools-backup-024",
+   "created_at": "2026-07-05T00:00:00Z",
+   "size_gb": 50,
+   "state": "completed",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "source_volume_id": "vol-000012f861beeb052",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-00002fa96be7b4e4a",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-backup-025",
+   "created_at": "2025-12-04T00:00:00Z",
+   "size_gb": 50,
+   "state": "completed",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "source_volume_id": "vol-00003907794fc0f4a",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000fbd94de8439f8",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "eu-west-1",
+   "name": "tools-backup-026",
+   "created_at": "2026-07-04T00:00:00Z",
+   "size_gb": 100,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "source_volume_id": "vol-000026f2280831b41",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-00003349d29676032",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "eu-west-1",
+   "name": "tools-backup-027",
+   "created_at": "2025-12-18T00:00:00Z",
+   "size_gb": 100,
+   "state": "completed",
+   "tags": {
+    "owner": "data"
+   },
+   "source_volume_id": "vol-0000f4478165de1d0",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000ff9350946ab88",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-west-2",
+   "name": "tools-backup-028",
+   "created_at": "2025-09-22T00:00:00Z",
+   "size_gb": 50,
+   "state": "completed",
+   "tags": {
+    "owner": "data"
+   },
+   "source_volume_id": "vol-0000565bda3f16926",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000e091a59ae9d25",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-west-2",
+   "name": "tools-backup-029",
+   "created_at": "2025-01-15T00:00:00Z",
+   "size_gb": 100,
+   "state": "completed",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "source_volume_id": "vol-00006dfcc5b6e00d5",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000b6c7b10e09a9e",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-west-2",
+   "name": "tools-backup-030",
+   "created_at": "2026-09-01T00:00:00Z",
+   "size_gb": 20,
+   "state": "completed",
+   "tags": {
+    "owner": "data"
+   },
+   "source_volume_id": "vol-00002fe0647c4b01d",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000497d23bf4d14e",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-west-2",
+   "name": "tools-backup-031",
+   "created_at": "2025-06-12T00:00:00Z",
+   "size_gb": 50,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "source_volume_id": "vol-0000e2995f9a0c741",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-00000d7c539925d80",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-west-2",
+   "name": "tools-backup-032",
+   "created_at": "2024-11-12T00:00:00Z",
+   "size_gb": 50,
+   "state": "completed",
+   "tags": {},
+   "source_volume_id": "vol-000002369898894a8",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000d6b5c0fdff6b0",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-west-2",
+   "name": "tools-backup-033",
+   "created_at": "2025-08-20T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "source_volume_id": "vol-00001b7e01c521ced",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-000020245ad9d301c",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "eu-west-1",
+   "name": "tools-backup-034",
+   "created_at": "2025-07-08T00:00:00Z",
+   "size_gb": 20,
+   "state": "completed",
+   "tags": {
+    "owner": "data"
+   },
+   "source_volume_id": "vol-000005097ffe9c0b0",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-00006863a4c860608",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-backup-035",
+   "created_at": "2025-11-03T00:00:00Z",
+   "size_gb": 100,
+   "state": "completed",
+   "tags": {},
+   "source_volume_id": "vol-0000c211c87ae8263",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000eb61c6feaedb6",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-backup-036",
+   "created_at": "2025-06-16T00:00:00Z",
+   "size_gb": 20,
+   "state": "completed",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "source_volume_id": "vol-00003907794fc0f4a",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-000022010221146c0",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "eu-west-1",
+   "name": "tools-backup-037",
+   "created_at": "2024-12-11T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "data"
+   },
+   "source_volume_id": "vol-00001a47aa46a4d18",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-000084d6394f43c38",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "eu-west-1",
+   "name": "tools-backup-038",
+   "created_at": "2025-11-28T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "source_volume_id": "vol-0000292b2e7213ad6",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000db28bb4dc238d",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "eu-west-1",
+   "name": "tools-backup-039",
+   "created_at": "2024-11-05T00:00:00Z",
+   "size_gb": 100,
+   "state": "completed",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "source_volume_id": "vol-00002cc6a7bcf7e45",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000432d0cb3c930e",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-backup-040",
+   "created_at": "2025-10-31T00:00:00Z",
+   "size_gb": 20,
+   "state": "completed",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "source_volume_id": "vol-000025eee41c92450",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000b66824eaadd3d",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-west-2",
+   "name": "tools-backup-041",
+   "created_at": "2025-10-29T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {},
+   "source_volume_id": "vol-00005d74a6a1b8f59",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-000078fda29cf88fc",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "eu-west-1",
+   "name": "tools-backup-042",
+   "created_at": "2024-12-17T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "data"
+   },
+   "source_volume_id": "vol-0000666fbc4465154",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000e795c5f5eb4f4",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-backup-043",
+   "created_at": "2025-03-09T00:00:00Z",
+   "size_gb": 50,
+   "state": "completed",
+   "tags": {},
+   "source_volume_id": "vol-0000568df1b15f2eb",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000e23ac4ba3f059",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-west-2",
+   "name": "tools-backup-044",
+   "created_at": "2025-08-09T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "data"
+   },
+   "source_volume_id": "vol-0000aeedfb74b8ba3",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-000015117d1051b16",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "eu-west-1",
+   "name": "tools-backup-045",
+   "created_at": "2026-06-26T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "source_volume_id": "vol-0000302e4d74b0dd4",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000f4e1fd476ca43",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "eu-west-1",
+   "name": "tools-backup-046",
+   "created_at": "2025-03-31T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "source_volume_id": "vol-0000e601a5e3bf7ea",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000b8074f5546653",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-west-2",
+   "name": "tools-backup-047",
+   "created_at": "2025-09-24T00:00:00Z",
+   "size_gb": 20,
+   "state": "completed",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "source_volume_id": "vol-00007f81193258a6e",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-00004c7b0d96d9bf9",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-west-2",
+   "name": "tools-backup-048",
+   "created_at": "2026-05-04T00:00:00Z",
+   "size_gb": 50,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "source_volume_id": "vol-0000f4a08c9e2cf7c",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-00002200b4a1ebe1f",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-backup-049",
+   "created_at": "2025-01-03T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "source_volume_id": "vol-00006ae116a26db43",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-000031aebc399ad00",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "eu-west-1",
+   "name": "tools-backup-050",
+   "created_at": "2025-11-10T00:00:00Z",
+   "size_gb": 20,
+   "state": "completed",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "source_volume_id": "vol-0000218474b24cce5",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000ecbc845b55820",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "eu-west-1",
+   "name": "tools-backup-051",
+   "created_at": "2024-11-23T00:00:00Z",
+   "size_gb": 20,
+   "state": "completed",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "source_volume_id": "vol-00007ef81333cd938",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000454b145ab1055",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "eu-west-1",
+   "name": "tools-backup-052",
+   "created_at": "2024-11-20T00:00:00Z",
+   "size_gb": 100,
+   "state": "completed",
+   "tags": {},
+   "source_volume_id": "vol-0000770ce9e09d2e2",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000a76ea5956397a",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "eu-west-1",
+   "name": "tools-backup-053",
+   "created_at": "2025-03-28T00:00:00Z",
+   "size_gb": 20,
+   "state": "completed",
+   "tags": {
+    "owner": "data"
+   },
+   "source_volume_id": "vol-00003d57d083507e5",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-000000f64e2042b83",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-backup-054",
+   "created_at": "2025-10-12T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "source_volume_id": "vol-000038e7aa2f02a26",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000dcc65992873e0",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-backup-055",
+   "created_at": "2026-08-03T00:00:00Z",
+   "size_gb": 50,
+   "state": "completed",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "source_volume_id": "vol-0000080206bc88cdb",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-00004bb384758e2f7",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-backup-056",
+   "created_at": "2025-05-19T00:00:00Z",
+   "size_gb": 100,
+   "state": "completed",
+   "tags": {
+    "owner": "platform"
+   },
+   "source_volume_id": "vol-000055aa810a4cd91",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-0000b47e710024d7a",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-west-2",
+   "name": "tools-backup-057",
+   "created_at": "2026-07-18T00:00:00Z",
+   "size_gb": 8,
+   "state": "completed",
+   "tags": {
+    "owner": "data"
+   },
+   "source_volume_id": "vol-000000033759eb1cc",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-00006a87284f4fffe",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "eu-west-1",
+   "name": "tools-backup-058",
+   "created_at": "2025-01-28T00:00:00Z",
+   "size_gb": 100,
+   "state": "completed",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "source_volume_id": "vol-0000ba4c373e8d1b5",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "snap-00005fd83600752cc",
+   "type": "snapshot",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "name": "tools-backup-059",
+   "created_at": "2026-06-17T00:00:00Z",
+   "size_gb": 20,
+   "state": "completed",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "source_volume_id": "vol-00003907794fc0f4a",
+   "linked_ami_id": null,
+   "managed_by": null
+  },
+  {
+   "id": "vol-0000cf72b9691798d",
+   "type": "volume",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-ephemeral-000",
+   "created_at": "2026-08-05T00:00:00Z",
+   "size_gb": 10,
+   "state": "in-use",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "attached_instance": "i-0000a897585865ae4",
+   "volume_type": "gp3"
+  },
+  {
+   "id": "vol-0000e0d52af8788be",
+   "type": "volume",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-ephemeral-001",
+   "created_at": "2025-11-01T00:00:00Z",
+   "size_gb": 10,
+   "state": "in-use",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "attached_instance": "i-00004a833322f0691",
+   "volume_type": "gp3"
+  },
+  {
+   "id": "vol-0000f48b56fb46e86",
+   "type": "volume",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-ephemeral-002",
+   "created_at": "2025-08-17T00:00:00Z",
+   "size_gb": 40,
+   "state": "available",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "attached_instance": null,
+   "volume_type": "gp3"
+  },
+  {
+   "id": "vol-0000949e31b2a9919",
+   "type": "volume",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-ephemeral-003",
+   "created_at": "2026-09-29T00:00:00Z",
+   "size_gb": 20,
+   "state": "in-use",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "attached_instance": "i-0000730eb56cb0da7",
+   "volume_type": "gp3"
+  },
+  {
+   "id": "vol-0000773ccb352c7a6",
+   "type": "volume",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-ephemeral-004",
+   "created_at": "2026-08-12T00:00:00Z",
+   "size_gb": 10,
+   "state": "available",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "attached_instance": null,
+   "volume_type": "gp3"
+  },
+  {
+   "id": "vol-0000565d9588c65ad",
+   "type": "volume",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-ephemeral-005",
+   "created_at": "2026-01-12T00:00:00Z",
+   "size_gb": 40,
+   "state": "available",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "attached_instance": null,
+   "volume_type": "gp3"
+  },
+  {
+   "id": "vol-0000d5fec89a1daba",
+   "type": "volume",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-ephemeral-006",
+   "created_at": "2026-03-14T00:00:00Z",
+   "size_gb": 10,
+   "state": "available",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "attached_instance": null,
+   "volume_type": "gp3"
+  },
+  {
+   "id": "vol-00007f1a79e90637a",
+   "type": "volume",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-ephemeral-007",
+   "created_at": "2026-07-31T00:00:00Z",
+   "size_gb": 10,
+   "state": "available",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "attached_instance": null,
+   "volume_type": "gp3"
+  },
+  {
+   "id": "vol-0000616f066809570",
+   "type": "volume",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-ephemeral-008",
+   "created_at": "2026-01-29T00:00:00Z",
+   "size_gb": 40,
+   "state": "in-use",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "attached_instance": "i-0000f043f9fa1d67a",
+   "volume_type": "gp3"
+  },
+  {
+   "id": "vol-0000c0ac2ea50ada1",
+   "type": "volume",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-ephemeral-009",
+   "created_at": "2025-06-16T00:00:00Z",
+   "size_gb": 20,
+   "state": "available",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "attached_instance": null,
+   "volume_type": "gp3"
+  },
+  {
+   "id": "vol-00004f274bc5b5abe",
+   "type": "volume",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-ephemeral-010",
+   "created_at": "2025-08-22T00:00:00Z",
+   "size_gb": 20,
+   "state": "in-use",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "attached_instance": "i-00002a16500f25bfa",
+   "volume_type": "gp3"
+  },
+  {
+   "id": "vol-00009f9a5deb4ff20",
+   "type": "volume",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-ephemeral-011",
+   "created_at": "2025-09-04T00:00:00Z",
+   "size_gb": 20,
+   "state": "in-use",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "attached_instance": "i-0000d0e9cc2a073c7",
+   "volume_type": "gp3"
+  },
+  {
+   "id": "vol-00005c8a6f6fe83d1",
+   "type": "volume",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-ephemeral-012",
+   "created_at": "2025-05-25T00:00:00Z",
+   "size_gb": 20,
+   "state": "available",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "attached_instance": null,
+   "volume_type": "gp3"
+  },
+  {
+   "id": "vol-0000a08af54e80632",
+   "type": "volume",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-ephemeral-013",
+   "created_at": "2026-02-08T00:00:00Z",
+   "size_gb": 10,
+   "state": "in-use",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "attached_instance": "i-00003e02695db5092",
+   "volume_type": "gp3"
+  },
+  {
+   "id": "vol-000011bb1b7b16c67",
+   "type": "volume",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-ephemeral-014",
+   "created_at": "2026-07-02T00:00:00Z",
+   "size_gb": 20,
+   "state": "available",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "attached_instance": null,
+   "volume_type": "gp3"
+  },
+  {
+   "id": "vol-000055322d094e429",
+   "type": "volume",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-ephemeral-015",
+   "created_at": "2026-01-31T00:00:00Z",
+   "size_gb": 40,
+   "state": "available",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "attached_instance": null,
+   "volume_type": "gp3"
+  },
+  {
+   "id": "vol-0000cf41d55c9093b",
+   "type": "volume",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-ephemeral-016",
+   "created_at": "2026-03-11T00:00:00Z",
+   "size_gb": 10,
+   "state": "in-use",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "attached_instance": "i-0000cdc35827441d4",
+   "volume_type": "gp3"
+  },
+  {
+   "id": "vol-0000eb5f378b14e83",
+   "type": "volume",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-ephemeral-017",
+   "created_at": "2026-01-27T00:00:00Z",
+   "size_gb": 10,
+   "state": "in-use",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "attached_instance": "i-0000b80d4e0772b2c",
+   "volume_type": "gp3"
+  },
+  {
+   "id": "vol-000032d5b9e0f6371",
+   "type": "volume",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-ephemeral-018",
+   "created_at": "2025-09-08T00:00:00Z",
+   "size_gb": 20,
+   "state": "available",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "attached_instance": null,
+   "volume_type": "gp3"
+  },
+  {
+   "id": "vol-0000e8f5042bfa4ba",
+   "type": "volume",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "name": "dev-ephemeral-019",
+   "created_at": "2026-02-12T00:00:00Z",
+   "size_gb": 20,
+   "state": "in-use",
+   "tags": {
+    "owner": "dev-team"
+   },
+   "attached_instance": "i-000065a195b29ff47",
+   "volume_type": "gp3"
+  }
+ ],
+ "shares": [
+  {
+   "image_id": "ami-0000521353ccc38b7",
+   "principal_type": "account",
+   "principal": "222222222222"
+  },
+  {
+   "image_id": "ami-0000521353ccc38b7",
+   "principal_type": "account",
+   "principal": "333333333333"
+  },
+  {
+   "image_id": "ami-0000941708770f0b6",
+   "principal_type": "account",
+   "principal": "222222222222"
+  },
+  {
+   "image_id": "ami-0000941708770f0b6",
+   "principal_type": "account",
+   "principal": "333333333333"
+  },
+  {
+   "image_id": "ami-0000e408764551fdf",
+   "principal_type": "account",
+   "principal": "222222222222"
+  },
+  {
+   "image_id": "ami-0000e408764551fdf",
+   "principal_type": "account",
+   "principal": "333333333333"
+  },
+  {
+   "image_id": "ami-0000996351fc4be40",
+   "principal_type": "account",
+   "principal": "222222222222"
+  },
+  {
+   "image_id": "ami-0000996351fc4be40",
+   "principal_type": "account",
+   "principal": "333333333333"
+  },
+  {
+   "image_id": "ami-0000bbb0dc286c20e",
+   "principal_type": "account",
+   "principal": "222222222222"
+  },
+  {
+   "image_id": "ami-0000bbb0dc286c20e",
+   "principal_type": "account",
+   "principal": "333333333333"
+  },
+  {
+   "image_id": "ami-0000098a422e3f570",
+   "principal_type": "account",
+   "principal": "222222222222"
+  },
+  {
+   "image_id": "ami-0000098a422e3f570",
+   "principal_type": "account",
+   "principal": "333333333333"
+  },
+  {
+   "image_id": "ami-0000572d236bf7fec",
+   "principal_type": "account",
+   "principal": "333333333333"
+  },
+  {
+   "image_id": "ami-0000d0c95411bff12",
+   "principal_type": "account",
+   "principal": "333333333333"
+  },
+  {
+   "image_id": "ami-0000c2041e990b3ea",
+   "principal_type": "account",
+   "principal": "333333333333"
+  },
+  {
+   "image_id": "ami-000043562bf9b4438",
+   "principal_type": "account",
+   "principal": "444444444444"
+  },
+  {
+   "image_id": "ami-00005c31d2f634fdf",
+   "principal_type": "group",
+   "principal": "all"
+  },
+  {
+   "image_id": "ami-00001f4917cdd48dd",
+   "principal_type": "account",
+   "principal": "222222222222"
+  },
+  {
+   "image_id": "ami-000061ad57e70b161",
+   "principal_type": "account",
+   "principal": "333333333333"
+  },
+  {
+   "image_id": "ami-0000a1e302d747416",
+   "principal_type": "account",
+   "principal": "333333333333"
+  }
+ ],
+ "usage": [
+  {
+   "image_id": "ami-0000098a422e3f570",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "ref_type": "instance",
+   "ref_id": "i-0000610f67678cc69",
+   "ref_name": "dev-api-1"
+  },
+  {
+   "image_id": "ami-0000098a422e3f570",
+   "account": "333333333333",
+   "region": "us-east-1",
+   "ref_type": "asg",
+   "ref_id": "prod-api-asg",
+   "ref_name": "prod-api-asg"
+  },
+  {
+   "image_id": "ami-0000572d236bf7fec",
+   "account": "333333333333",
+   "region": "us-east-1",
+   "ref_type": "launch_template",
+   "ref_id": "lt-000044856e2563e4b",
+   "ref_name": "prod-web v7"
+  },
+  {
+   "image_id": "ami-0000dc4bc0697b18c",
+   "account": "111111111111",
+   "region": "us-east-1",
+   "ref_type": "instance",
+   "ref_id": "i-00003f98f8c9e51d5",
+   "ref_name": "tools-bastion"
+  },
+  {
+   "image_id": "ami-00001f4917cdd48dd",
+   "account": "222222222222",
+   "region": "us-west-2",
+   "ref_type": "instance",
+   "ref_id": "i-0000ea26fad4f23b9",
+   "ref_name": "dev-worker-1"
+  },
+  {
+   "image_id": "ami-000061ad57e70b161",
+   "account": "333333333333",
+   "region": "eu-west-1",
+   "ref_type": "instance",
+   "ref_id": "i-0000b274f6c5fe71b",
+   "ref_name": "prod-eu-api-1"
+  }
+ ],
+ "databases": [
+  {
+   "id": "dev-orders",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "kind": "instance"
+  },
+  {
+   "id": "dev-analytics",
+   "account": "222222222222",
+   "region": "us-east-1",
+   "kind": "cluster"
+  },
+  {
+   "id": "prod-orders",
+   "account": "333333333333",
+   "region": "us-east-1",
+   "kind": "instance"
+  }
+ ]
+}

@@ -1,0 +1,35 @@
+[project]
+name = "janitor"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi==0.142.2",
+  "uvicorn[standard]==0.54.0",
+  "pydantic==2.13.5",
+  "pyyaml==6.0.3",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest==9.1.1",
+  "httpx2==2.13.1",
+  "ruff==0.16.10",
+]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["janitor*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]

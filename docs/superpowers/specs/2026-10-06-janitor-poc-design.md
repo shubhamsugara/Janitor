@@ -3,7 +3,7 @@
 - **Date:** 2026-10-06
 - **Status:** Design — pending review
 - **Supersedes for this round:** the stack, auth, Claude, LocalStack, and delete
-  sections of [`janitor-spec-1.md`](../../../janitor-spec-1.md). That file remains
+  sections of [`janitor-spec-1.md`](../../../test-docs/janitor-spec-1.md). That file remains
   the long-term vision; this spec is what gets built now.
 
 ---

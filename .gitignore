@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+config/janitor.yaml
+data/
+*.db
+*.db-wal
+*.db-shm
+.env
+.private-terms
+frontend/node_modules/
+frontend/dist/
