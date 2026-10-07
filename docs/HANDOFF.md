@@ -7,28 +7,23 @@ Read this first, then the spec.
 - **Design spec approved:** [`docs/superpowers/specs/2026-10-06-janitor-poc-design.md`](superpowers/specs/2026-10-06-janitor-poc-design.md) (commit `fa5f040`).
 - **Roadmap (4 phases):** [`docs/superpowers/plans/2026-10-07-janitor-roadmap.md`](superpowers/plans/2026-10-07-janitor-roadmap.md)
   — 1 MVP, 2 bug fixes, 3 new features, 4 final product.
-- **Phase 1 (MVP) built** on branch `phase-1-mvp` from
-  [`docs/superpowers/plans/2026-10-07-phase-1-mvp.md`](superpowers/plans/2026-10-07-phase-1-mvp.md):
-  84 backend tests pass, `tsc` clean, UI checked in a browser. A whole-branch review
-  found 4 important issues, all fixed with tests. Not merged to `main`, not pushed.
+- **Phase 1 (MVP)** is merged to `main` locally (not pushed).
+- **Phase 2** is built on branch `phase-2` from
+  [`docs/superpowers/plans/2026-10-07-phase-2.md`](superpowers/plans/2026-10-07-phase-2.md):
+  linkage diagram and "used by", costs from the AWS price list (`fixtures/prices.json`), stats,
+  filters in the URL, CSV and PDF export, five environment accounts, and the phase 1 fixes.
 - Run it: `make setup` once, then `make run` → http://127.0.0.1:8080 (mock data).
 
 ## Next step
 
-1. The user tries the MVP and decides how to integrate the branch (merge, PR, or keep).
-2. Write the phase 2 (bug fixes) plan. Start from these known items:
-   - Status column text wraps ("Orph/aned"); "Simulate deleting 1 resources?" pluralization.
-   - Resources header shows the whole filtered set's size and cost next to "N orphaned".
-   - Mixed popup counts include backing snapshots ("the other 4" for 2 AMIs).
-   - Typed-confirmation hint hardcodes "10"; serve `typed_confirm_min_items` via `/api/meta`.
-   - Status popover says "Can be deleted" even when a rule blocks it.
-   - Missing-IDs warning doesn't say what to do.
-   - Empty protected-tag value or unquoted `true` in YAML gives an unclear config error.
-   - Selecting an AMI and its own snapshot blocks the snapshot (API only).
-   - Pre-commit leak check reads the working tree, not staged content.
-   - List fetches aren't sequenced; Scan now doesn't re-poll a scan started elsewhere;
-     a huge `page` value returns 500.
-   - Frontend tests (Vitest) for popup variants and selection.
+1. Phase 2 is built on branch `phase-2`; the user decides how to integrate it.
+2. Next: plan phase 3 (read-only AWS provider) from the roadmap. `make prices` and `make icons`
+   refresh the price list and the local AWS icons.
+3. Behind a TLS-inspecting proxy, `make icons` (and possibly `make prices`) fails with
+   `CERTIFICATE_VERIFY_FAILED`. Point Python at the machine's trusted roots instead of turning
+   verification off: `security find-certificate -a -p /Library/Keychains/System.keychain
+   /System/Library/Keychains/SystemRootCertificates.keychain > /tmp/roots.pem`, then
+   `SSL_CERT_FILE=/tmp/roots.pem make icons`.
 
 ## Verified dependency pins (Python 3.12, checked 2026-10-06)
 

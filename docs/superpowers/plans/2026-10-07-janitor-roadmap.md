@@ -7,7 +7,7 @@ you can run.
 | Phase | Goal | Plan |
 |---|---|---|
 | 1. MVP | A working app on mock data: inventory, statuses with reasons, core rules, simulated delete flow, audit, basic UI | [`2026-10-07-phase-1-mvp.md`](2026-10-07-phase-1-mvp.md) |
-| 2. Bug fixes | Fix what using the MVP turns up; fill test gaps; error and empty states | Written after the MVP has been used |
+| 2. Fixes and insight | Fix what using the MVP turned up, plus the linkage diagram, trustworthy costs, stats, filters, export, and a refreshed UI | [`2026-10-07-phase-2.md`](2026-10-07-phase-2.md) |
 | 3. New features | Read-only AWS, remaining rules, richer filters and selection, help and walkthrough | Written after phase 2 |
 | 4. Final product | Container, ECS-ready base path, scale and performance, CI, polish | Written after phase 3 |
 

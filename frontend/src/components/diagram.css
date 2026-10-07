@@ -37,7 +37,7 @@
 
 .janitor-node.status-in_use { border-left-color: #00802f; }
 .janitor-node.status-managed { border-left-color: #006ce0; }
-.janitor-node.status-unknown { border-left-color: #855900; }
+.janitor-node.status-unknown { border-left-color: #b38600; }
 .janitor-node.status-orphaned { border-left-color: #db0000; }
 .janitor-node.status-idle { border-left-color: #8c8c94; }
 .janitor-node.active { box-shadow: 0 0 0 3px rgba(0, 128, 47, 0.28); }

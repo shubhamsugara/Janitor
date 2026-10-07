@@ -1,24 +1,33 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router";
 import Box from "@cloudscape-design/components/box";
 import Button from "@cloudscape-design/components/button";
+import ButtonDropdown from "@cloudscape-design/components/button-dropdown";
+import DateRangePicker, { type DateRangePickerProps } from "@cloudscape-design/components/date-range-picker";
 import Header from "@cloudscape-design/components/header";
 import Link from "@cloudscape-design/components/link";
 import Pagination from "@cloudscape-design/components/pagination";
-import Select, { type SelectProps } from "@cloudscape-design/components/select";
+import PropertyFilter, { type PropertyFilterProps } from "@cloudscape-design/components/property-filter";
 import SpaceBetween from "@cloudscape-design/components/space-between";
 import Table, { type TableProps } from "@cloudscape-design/components/table";
-import TextFilter from "@cloudscape-design/components/text-filter";
-import { api, type Plan, type Resource, type ResourcePage, type ResourceType, type Status } from "../api";
+import { api, exportCsvUrl, type Plan, type Resource, type ResourcePage, type ResourceType, type Status } from "../api";
 import DeleteModal from "../components/DeleteModal";
-import { useDetail } from "../detail";
+import StatsHeader from "../components/StatsHeader";
 import StatusBadge, { OutcomeBadge } from "../components/StatusBadge";
+import { useDetail } from "../detail";
+import { buildReport, downloadPdf } from "../export/pdfReport";
+import { EMPTY, fromQuery, fromRange, hasFilters, parseFilters, toApiParams, toQuery, toRange, toSearch, type Filters } from "../filters";
 import { accountName, formatDate, formatGiB, formatUsd, simulationSummary } from "../format";
 import type { PageProps } from "../nav";
+import { sequencer } from "../sequencer";
 
 const PAGE_SIZE = 50;
-const STATUS_ORDER: Status[] = ["in_use", "managed", "unknown", "orphaned", "idle"];
-const ANY_STATUS: SelectProps.Option = { label: "Any status", value: "" };
-const ANY_REGION: SelectProps.Option = { label: "Any region", value: "" };
+const STATUSES: Status[] = ["in_use", "managed", "unknown", "orphaned", "idle"];
+const RELATIVE_RANGES: DateRangePickerProps.RelativeOption[] = [
+  { key: "last-30-days", amount: 30, unit: "day", type: "relative" },
+  { key: "last-90-days", amount: 90, unit: "day", type: "relative" },
+  { key: "last-year", amount: 1, unit: "year", type: "relative" },
+];
 
 interface Props extends PageProps {
   type: ResourceType;
@@ -26,58 +35,70 @@ interface Props extends PageProps {
 }
 
 export default function Resources({ meta, notify, type, title }: Props) {
-  const [text, setText] = useState("");
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<SelectProps.Option>(ANY_STATUS);
-  const [region, setRegion] = useState<SelectProps.Option>(ANY_REGION);
-  const [page, setPage] = useState(1);
-  const [sort, setSort] = useState({ field: "created_at", descending: true });
+  const [search, setSearch] = useSearchParams();
+  const filters = useMemo(() => parseFilters(search), [search]);
+  const setFilters = useCallback((next: Filters) => setSearch(toSearch(next), { replace: true }), [setSearch]);
   const [data, setData] = useState<ResourcePage | null>(null);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Resource[]>([]);
-  const { open } = useDetail();
   const [plan, setPlan] = useState<Plan | null>(null);
   const [planning, setPlanning] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setQuery(text);
-      setPage(1);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [text]);
+  const [exporting, setExporting] = useState(false);
+  const { open } = useDetail();
+  const nextRequest = useMemo(sequencer, []);
 
   const load = useCallback(() => {
+    const isCurrent = nextRequest(); // ignore responses for filters the user has moved past
     setLoading(true);
-    const params = new URLSearchParams({
-      type,
-      page: String(page),
+    const params = toApiParams(type, filters, {
+      page: String(filters.page),
       page_size: String(PAGE_SIZE),
-      sort: `${sort.descending ? "-" : ""}${sort.field}`,
+      sort: filters.sort,
     });
-    if (query) params.set("q", query);
-    if (status.value) params.set("status", status.value);
-    if (region.value) params.set("region", region.value);
     api
       .resources(params)
-      .then(setData)
-      .catch((e: Error) => notify("error", e.message))
-      .finally(() => setLoading(false));
-  }, [type, page, sort, query, status, region, notify]);
+      .then((result) => {
+        if (isCurrent()) setData(result);
+      })
+      .catch((e: Error) => {
+        if (isCurrent()) notify("error", e.message);
+      })
+      .finally(() => {
+        if (isCurrent()) setLoading(false);
+      });
+  }, [type, filters, notify, nextRequest]);
   useEffect(load, [load]);
 
-  const regionOptions = useMemo(() => {
-    const regions = new Set([...meta.owner.regions, ...meta.accounts.flatMap((a) => a.regions)]);
-    return [ANY_REGION, ...[...regions].sort().map((r) => ({ label: r, value: r }))];
+  const filteringProperties: PropertyFilterProps.FilteringProperty[] = useMemo(
+    () => [
+      {
+        key: "account",
+        propertyLabel: "Account",
+        groupValuesLabel: "Accounts",
+        operators: [{ operator: "=", format: (value) => accountName(meta, String(value)) }],
+      },
+      { key: "region", propertyLabel: "Region", groupValuesLabel: "Regions", operators: ["="] },
+      {
+        key: "status",
+        propertyLabel: "Status",
+        groupValuesLabel: "Statuses",
+        operators: [{ operator: "=", format: (value) => meta.definitions.statuses[value as Status]?.label ?? String(value) }],
+      },
+      { key: "tag", propertyLabel: "Tag (key=value)", groupValuesLabel: "Tags", operators: ["="] },
+    ],
+    [meta],
+  );
+  const filteringOptions: PropertyFilterProps.FilteringOption[] = useMemo(() => {
+    const regions = [...new Set([...meta.owner.regions, ...meta.accounts.flatMap((a) => a.regions)])].sort();
+    return [
+      ...meta.accounts.map((a) => ({ propertyKey: "account", value: a.id, label: a.name })),
+      ...regions.map((r) => ({ propertyKey: "region", value: r })),
+      ...STATUSES.map((s) => ({ propertyKey: "status", value: s, label: meta.definitions.statuses[s].label })),
+    ];
   }, [meta]);
 
-  const filtered = Boolean(text || status.value || region.value);
-  function resetFilters() {
-    setText("");
-    setStatus(ANY_STATUS);
-    setRegion(ANY_REGION);
-    setPage(1);
-  }
+  const filtered = hasFilters(filters);
+  const reset = () => setFilters({ ...EMPTY, sort: filters.sort });
 
   async function planDelete() {
     setPlanning(true);
@@ -87,6 +108,27 @@ export default function Resources({ meta, notify, type, title }: Props) {
       notify("error", (e as Error).message);
     } finally {
       setPlanning(false);
+    }
+  }
+
+  async function exportAs(format: string) {
+    const params = toApiParams(type, filters, { sort: filters.sort });
+    if (format === "csv") {
+      const link = document.createElement("a");
+      link.href = exportCsvUrl(params);
+      link.download = "";
+      link.click();
+      return;
+    }
+    setExporting(true);
+    try {
+      const report = buildReport(await api.exportJson(params), meta, type, title);
+      await downloadPdf(report);
+      notify("success", `Exported ${report.rows.length.toLocaleString()} rows to ${report.filename}.`);
+    } catch (e) {
+      notify("error", `Couldn't build the PDF (${(e as Error).message}). Try again, or export CSV.`);
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -124,14 +166,40 @@ export default function Resources({ meta, notify, type, title }: Props) {
 
   const stats = data?.stats;
   const description = stats
-    ? `${stats.orphaned.toLocaleString()} orphaned · ${formatGiB(stats.size_gib)}` +
-      (stats.est_monthly_usd != null ? ` · ${formatUsd(stats.est_monthly_usd)}` : "")
+    ? `${stats.orphaned.toLocaleString()} orphaned · ${formatGiB(stats.orphaned_gib)}` +
+      (stats.orphaned_usd != null ? ` · ${formatUsd(stats.orphaned_usd)}` : "")
     : undefined;
 
   return (
     <SpaceBetween size="l">
+      <Header
+        variant="h1"
+        counter={data ? `(${data.total.toLocaleString()})` : undefined}
+        description={description}
+        actions={
+          <SpaceBetween direction="horizontal" size="xs">
+            <ButtonDropdown
+              loading={exporting}
+              items={[
+                { id: "csv", text: "CSV, all matching rows" },
+                { id: "pdf", text: "PDF report, up to 5,000 rows" },
+              ]}
+              onItemClick={({ detail }) => exportAs(detail.id)}
+            >
+              Export
+            </ButtonDropdown>
+            {selected.length > 0 && <Button onClick={() => setSelected([])}>Clear selection</Button>}
+            <Button variant="primary" disabled={selected.length === 0} loading={planning} onClick={planDelete}>
+              {selected.length ? `Plan delete (${selected.length})` : "Plan delete"}
+            </Button>
+          </SpaceBetween>
+        }
+      >
+        {title}
+      </Header>
+      {stats && stats.total > 0 && <StatsHeader stats={stats} meta={meta} />}
       <Table
-        variant="full-page"
+        variant="container"
         trackBy="id"
         items={data?.items ?? []}
         columnDefinitions={columns}
@@ -140,71 +208,60 @@ export default function Resources({ meta, notify, type, title }: Props) {
         selectionType="multi"
         selectedItems={selected}
         onSelectionChange={({ detail }) => setSelected(detail.selectedItems)}
-        sortingColumn={{ sortingField: sort.field }}
-        sortingDescending={sort.descending}
-        onSortingChange={({ detail }) => {
-          setSort({ field: detail.sortingColumn.sortingField ?? "created_at", descending: Boolean(detail.isDescending) });
-          setPage(1);
-        }}
-        header={
-          <Header
-            variant="h1"
-            counter={data ? `(${data.total.toLocaleString()})` : undefined}
-            description={description}
-            actions={
-              <SpaceBetween direction="horizontal" size="xs">
-                {selected.length > 0 && <Button onClick={() => setSelected([])}>Clear selection</Button>}
-                <Button variant="primary" disabled={selected.length === 0} loading={planning} onClick={planDelete}>
-                  {selected.length ? `Plan delete (${selected.length})` : "Plan delete"}
-                </Button>
-              </SpaceBetween>
-            }
-          >
-            {title}
-          </Header>
+        sortingColumn={{ sortingField: filters.sort.replace(/^-/, "") }}
+        sortingDescending={filters.sort.startsWith("-")}
+        onSortingChange={({ detail }) =>
+          setFilters({
+            ...filters,
+            sort: `${detail.isDescending ? "-" : ""}${detail.sortingColumn.sortingField ?? "created_at"}`,
+            page: 1,
+          })
         }
         filter={
-          <SpaceBetween direction="horizontal" size="xs">
-            <TextFilter
-              filteringText={text}
-              filteringPlaceholder="Find by name or ID"
-              countText={data ? `${data.total.toLocaleString()} matches` : ""}
-              onChange={({ detail }) => setText(detail.filteringText)}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "flex-start" }}>
+            <div style={{ flex: "1 1 420px" }}>
+              <PropertyFilter
+                query={toQuery(filters)}
+                onChange={({ detail }) => setFilters(fromQuery(detail, filters))}
+                filteringProperties={filteringProperties}
+                filteringOptions={filteringOptions}
+                filteringPlaceholder="Filter by account, region, status, tag, or name"
+                countText={data ? `${data.total.toLocaleString()} matches` : ""}
+                hideOperations
+                expandToViewport
+              />
+            </div>
+            <DateRangePicker
+              value={toRange(filters)}
+              onChange={({ detail }) => setFilters(fromRange(detail.value, filters))}
+              relativeOptions={RELATIVE_RANGES}
+              isValidRange={(value) =>
+                value?.type === "absolute" && value.startDate && value.endDate && value.startDate > value.endDate
+                  ? { valid: false, errorMessage: "The start date is after the end date. Choose an earlier start." }
+                  : { valid: true }
+              }
+              dateOnly
+              placeholder="Created between"
+              expandToViewport
             />
-            <Select
-              selectedOption={status}
-              options={[ANY_STATUS, ...STATUS_ORDER.map((s) => ({ label: meta.definitions.statuses[s].label, value: s }))]}
-              onChange={({ detail }) => {
-                setStatus(detail.selectedOption);
-                setPage(1);
-              }}
-            />
-            <Select
-              selectedOption={region}
-              options={regionOptions}
-              onChange={({ detail }) => {
-                setRegion(detail.selectedOption);
-                setPage(1);
-              }}
-            />
-            {filtered && <Button onClick={resetFilters}>Reset filters</Button>}
-          </SpaceBetween>
+            {filtered && <Button onClick={reset}>Reset filters</Button>}
+          </div>
         }
         pagination={
           <Pagination
-            currentPageIndex={page}
+            currentPageIndex={filters.page}
             pagesCount={Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_SIZE))}
-            onChange={({ detail }) => setPage(detail.currentPageIndex)}
+            onChange={({ detail }) => setFilters({ ...filters, page: detail.currentPageIndex })}
           />
         }
         empty={
           <Box textAlign="center" color="inherit">
             {data?.scan_id == null ? (
-              "No scan yet. Run a scan from the overview."
+              "No scan yet. Run a scan from the top bar."
             ) : filtered ? (
               <SpaceBetween size="s">
                 <Box>No resources match these filters.</Box>
-                <Button onClick={resetFilters}>Reset filters</Button>
+                <Button onClick={reset}>Reset filters</Button>
               </SpaceBetween>
             ) : (
               `No ${title} found.`
@@ -215,6 +272,7 @@ export default function Resources({ meta, notify, type, title }: Props) {
       {plan && (
         <DeleteModal
           plan={plan}
+          meta={meta}
           onClose={() => setPlan(null)}
           onSimulated={(result) => {
             setPlan(null);

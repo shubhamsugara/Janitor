@@ -38,19 +38,36 @@ export default function StatusBadge({ meta, type, status, reason }: Props) {
             </Box>
           )}
           <Box>
-            <Box variant="awsui-key-label">{def.blocks ? "Blocks deletion" : "Can be deleted"}</Box>
+            {/* Other rules (protected tag, too new) can still block an idle or orphaned resource. */}
+            <Box variant="awsui-key-label">{def.blocks ? "Blocks deletion" : "Doesn't block deletion"}</Box>
             {def.what_to_do}
           </Box>
         </SpaceBetween>
       }
     >
-      <StatusIndicator type={INDICATOR[status]}>{def.label}</StatusIndicator>
+      <StatusIndicator type={INDICATOR[status]} wrapText={false}>
+        {def.label}
+      </StatusIndicator>
     </Popover>
   );
 }
 
 export function OutcomeBadge({ outcome }: { outcome: Outcome }) {
-  if (outcome === "block") return <StatusIndicator type="stopped">Blocked</StatusIndicator>;
-  if (outcome === "warn") return <StatusIndicator type="warning">Review</StatusIndicator>;
-  return <StatusIndicator type="info">Deletable</StatusIndicator>;
+  if (outcome === "block")
+    return (
+      <StatusIndicator type="stopped" wrapText={false}>
+        Blocked
+      </StatusIndicator>
+    );
+  if (outcome === "warn")
+    return (
+      <StatusIndicator type="warning" wrapText={false}>
+        Review
+      </StatusIndicator>
+    );
+  return (
+    <StatusIndicator type="info" wrapText={false}>
+      Deletable
+    </StatusIndicator>
+  );
 }
