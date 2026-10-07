@@ -1,0 +1,88 @@
+import { useCallback, useEffect, useState } from "react";
+import { Route, Routes, useLocation, useNavigate } from "react-router";
+import Alert from "@cloudscape-design/components/alert";
+import AppLayout from "@cloudscape-design/components/app-layout";
+import Box from "@cloudscape-design/components/box";
+import Flashbar, { type FlashbarProps } from "@cloudscape-design/components/flashbar";
+import SideNavigation, { type SideNavigationProps } from "@cloudscape-design/components/side-navigation";
+import Spinner from "@cloudscape-design/components/spinner";
+import { api, type Meta } from "./api";
+import { TYPE_PAGES, type Notify } from "./nav";
+import Audit from "./pages/Audit";
+import HowItWorks from "./pages/HowItWorks";
+import Overview from "./pages/Overview";
+import Resources from "./pages/Resources";
+
+const NAV_ITEMS: SideNavigationProps.Item[] = [
+  { type: "link", text: "Overview", href: "/" },
+  { type: "section", text: "Resources", items: TYPE_PAGES.map((p) => ({ type: "link" as const, text: p.title, href: p.path })) },
+  { type: "divider" },
+  { type: "link", text: "Audit", href: "/audit" },
+  { type: "link", text: "How Janitor decides", href: "/how-it-works" },
+];
+
+export default function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [meta, setMeta] = useState<Meta | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [flash, setFlash] = useState<FlashbarProps.MessageDefinition[]>([]);
+
+  const notify: Notify = useCallback((type, content) => {
+    const id = `${Date.now()}-${Math.random()}`;
+    const dismiss = () => setFlash((items) => items.filter((i) => i.id !== id));
+    setFlash((items) => [...items, { id, type, content, dismissible: true, onDismiss: dismiss }]);
+  }, []);
+
+  useEffect(() => {
+    api.meta().then(setMeta).catch((e: Error) => setError(e.message));
+  }, []);
+
+  let content;
+  if (error) {
+    content = (
+      <Alert type="error" header="Janitor can't reach its server">
+        {error} Start the backend with make dev, then reload the page.
+      </Alert>
+    );
+  } else if (!meta) {
+    content = <Spinner size="large" />;
+  } else {
+    content = (
+      <Routes>
+        <Route path="/" element={<Overview meta={meta} notify={notify} />} />
+        {TYPE_PAGES.map((p) => (
+          <Route
+            key={p.type}
+            path={p.path}
+            element={<Resources key={p.type} meta={meta} notify={notify} type={p.type} title={p.title} />}
+          />
+        ))}
+        <Route path="/audit" element={<Audit meta={meta} notify={notify} />} />
+        <Route path="/how-it-works" element={<HowItWorks meta={meta} notify={notify} />} />
+        <Route path="*" element={<Box>This page doesn't exist. Choose a page from the navigation.</Box>} />
+      </Routes>
+    );
+  }
+
+  return (
+    <AppLayout
+      navigation={
+        <SideNavigation
+          header={{ text: "Janitor", href: "/" }}
+          activeHref={location.pathname}
+          items={NAV_ITEMS}
+          onFollow={(event) => {
+            if (!event.detail.external) {
+              event.preventDefault();
+              navigate(event.detail.href);
+            }
+          }}
+        />
+      }
+      notifications={<Flashbar items={flash} />}
+      toolsHide
+      content={content}
+    />
+  );
+}
