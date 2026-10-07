@@ -23,11 +23,10 @@ Read this first, then the spec.
 1. Phase 2 is built on branch `phase-2`; the user decides how to integrate it.
 2. Next: plan phase 3 (read-only AWS provider) from the roadmap. `make prices` and `make icons`
    refresh the price list and the local AWS icons.
-3. Behind a TLS-inspecting proxy, `make icons` (and possibly `make prices`) fails with
-   `CERTIFICATE_VERIFY_FAILED`. Point Python at the machine's trusted roots instead of turning
-   verification off: `security find-certificate -a -p /Library/Keychains/System.keychain
-   /System/Library/Keychains/SystemRootCertificates.keychain > /tmp/roots.pem`, then
-   `SSL_CERT_FILE=/tmp/roots.pem make icons`.
+3. Behind a TLS-inspecting proxy, Python alone fails with `CERTIFICATE_VERIFY_FAILED`. On macOS,
+   `make prices` and `make icons` handle it: they export the system keychain's certificates to
+   `.venv/trusted-certs.pem` and point `SSL_CERT_FILE` at it (verification stays on). Elsewhere,
+   set `SSL_CERT_FILE` to your organization's CA bundle.
 
 ## Verified dependency pins (Python 3.12, checked 2026-10-06)
 
