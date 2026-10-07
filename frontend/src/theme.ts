@@ -1,5 +1,3 @@
-import { applyMode, Mode } from "@cloudscape-design/global-styles";
-
 export type Theme = "light" | "dark";
 const KEY = "janitor:theme";
 
@@ -11,8 +9,9 @@ export function savedTheme(): Theme {
   }
 }
 
+/** The theme is a `dark` class on <html>; index.html sets it before first paint too. */
 export function applyTheme(theme: Theme): void {
-  applyMode(theme === "dark" ? Mode.Dark : Mode.Light);
+  document.documentElement.classList.toggle("dark", theme === "dark");
   try {
     localStorage.setItem(KEY, theme);
   } catch {

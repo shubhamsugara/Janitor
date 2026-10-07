@@ -3,7 +3,7 @@ import { afterEach } from "vitest";
 
 afterEach(cleanup);
 
-// jsdom has no matchMedia; Cloudscape queries it for motion and breakpoints.
+// jsdom has no matchMedia or ResizeObserver; Radix and Recharts use them.
 if (!window.matchMedia) {
   window.matchMedia = (query: string) =>
     ({
@@ -16,4 +16,12 @@ if (!window.matchMedia) {
       removeEventListener: () => {},
       dispatchEvent: () => false,
     }) as MediaQueryList;
+}
+
+if (!("ResizeObserver" in window)) {
+  window.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
 }
