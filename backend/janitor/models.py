@@ -27,7 +27,12 @@ class Resource:
     source_db_id: str | None = None  # RDS snapshot
     db_kind: str | None = None  # RDS snapshot: "instance" or "cluster"
     managed_by: str | None = None  # "aws_backup", "dlm", or "rds_automated"
+    iops: int | None = None  # volume
+    throughput: int | None = None  # volume, MiB/s
+    encrypted: bool | None = None  # volume
+    storage_tier: str | None = None  # snapshot: "standard" or "archive"
     est_monthly_cost: float | None = None
+    cost_breakdown: dict | None = None  # see janitor.pricing
     status: str = ""
     status_reason: str = ""
 
@@ -47,6 +52,16 @@ class Usage:
     ref_type: str  # "instance", "launch_template", "asg", or "launch_config"
     ref_id: str
     ref_name: str = ""
+    ref_state: str = ""  # instance: running/stopped/...; asg: active/inactive; templates: ""
+
+    @property
+    def active(self) -> bool | None:
+        """Running instance or ASG with capacity: True. Templates are references, not running: None."""
+        if self.ref_type == "instance":
+            return self.ref_state == "running"
+        if self.ref_type == "asg":
+            return self.ref_state == "active"
+        return None
 
 
 @dataclass

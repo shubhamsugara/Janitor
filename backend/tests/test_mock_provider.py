@@ -37,3 +37,24 @@ def test_provider_interface_is_read_only(cls):
 
 def test_seed_file_matches_generator():
     assert _load_script("make_seed").build() == json.loads(SEED.read_text())
+
+
+def test_usage_active_reflects_its_state():
+    from janitor.models import Usage
+
+    def use(ref_type, state):
+        return Usage("ami-1", "222222222222", "us-east-1", ref_type, "x", "x", state)
+
+    assert use("instance", "running").active is True
+    assert use("instance", "stopped").active is False
+    assert use("asg", "active").active is True
+    assert use("asg", "inactive").active is False
+    assert use("launch_template", "").active is None
+
+
+def test_seed_has_running_and_stopped_users(inventory):
+    states = {(u.ref_type, u.ref_state) for u in inventory.usage}
+    assert {("instance", "running"), ("instance", "stopped"), ("asg", "active")} <= states
+    volumes = [r for r in inventory.resources if r.type == "volume"]
+    assert any(v.volume_type == "io2" and v.iops for v in volumes)
+    assert any(r.storage_tier == "archive" for r in inventory.resources)

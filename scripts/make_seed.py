@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Generate fixtures/seed.json, the mock dataset. Fake IDs only; fixed RNG seed.
 
-Every status per type appears, plus the demo moments: an in-use AMI, a prod-tagged
-volume, a dangling copied snapshot, snapshots of a deleted database, and an AMI shared
-with an account Janitor doesn't scan.
+Every status per type appears, plus the demo moments: an in-use AMI with running and
+stopped users, a prod-tagged volume, a dangling copied snapshot, snapshots of a deleted
+database, and an AMI shared with an account Janitor doesn't scan.
 """
 
 import json
@@ -12,12 +12,14 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 ANCHOR = datetime(2026, 10, 1, tzinfo=UTC)
-TOOLS, DEV, PROD, UNSCANNED = (
+TOOLS, DEV, PRD, UNSCANNED = (
     "111111111111",
     "222222222222",
     "333333333333",
     "444444444444",
 )
+SBX, UAT, QAS = "555555555555", "666666666666", "777777777777"
+ENVS = [SBX, DEV, UAT, QAS, PRD]
 EAST, WEST, EU = "us-east-1", "us-west-2", "eu-west-1"
 OUT = Path(__file__).resolve().parents[1] / "fixtures" / "seed.json"
 
@@ -87,6 +89,7 @@ class Seed:
             tags=dict(tags),
             linked_ami_id=ami_id,
             managed_by=managed_by,
+            storage_tier="standard",
         )
         for principal in shared_with:
             kind = "account" if principal.isdigit() else "group"
@@ -95,7 +98,7 @@ class Seed:
             )
         return ami_id
 
-    def use(self, image_id, account, region, ref_type, ref_name):
+    def use(self, image_id, account, region, ref_type, ref_name, state=""):
         prefix = {"instance": "i", "launch_template": "lt"}.get(ref_type)
         ref_id = self.new_id(prefix) if prefix else ref_name
         self.usage.append(
@@ -106,6 +109,7 @@ class Seed:
                 "ref_type": ref_type,
                 "ref_id": ref_id,
                 "ref_name": ref_name,
+                "ref_state": state,
             }
         )
 
@@ -120,7 +124,12 @@ class Seed:
         vtype="gp3",
         attached=False,
         tags=None,
+        iops=None,
+        throughput=None,
+        encrypted=True,
     ):
+        if vtype == "gp3":
+            iops, throughput = iops or 3000, throughput or 125
         return self.add(
             id=self.new_id("vol"),
             type="volume",
@@ -133,6 +142,9 @@ class Seed:
             tags={"owner": "platform"} if tags is None else tags,
             attached_instance=self.new_id("i") if attached else None,
             volume_type=vtype,
+            iops=iops,
+            throughput=throughput,
+            encrypted=encrypted,
         )
 
     def snapshot(
@@ -147,6 +159,7 @@ class Seed:
         linked_ami=None,
         tags=None,
         managed_by=None,
+        tier="standard",
     ):
         return self.add(
             id=self.new_id("snap"),
@@ -161,6 +174,7 @@ class Seed:
             source_volume_id=volume or self.new_id("vol"),
             linked_ami_id=linked_ami,
             managed_by=managed_by,
+            storage_tier=tier,
         )
 
     def database(self, account, region, db_id, kind="instance"):
@@ -210,36 +224,42 @@ class Seed:
 
 def build() -> dict:
     s = Seed()
+    prod = {"env": "prod"}
 
-    # base-linux in the primary region: shared with dev and prod; only the newest is in use.
+    # base-linux in the primary region, shared with every environment; only the newest is used.
     s.ami(
-        EAST, f"base-linux-{stamp(400)}", 400, tags={}, shared_with=[DEV, PROD]
+        EAST, f"base-linux-{stamp(400)}", 400, tags={}, shared_with=ENVS
     )  # orphaned, no owner tag
     s.ami(
         EAST,
         f"base-linux-{stamp(300)}",
         300,
         tags={"owner": "platform", "retain": "true"},
-        shared_with=[DEV, PROD],
+        shared_with=ENVS,
     )  # orphaned but protected
     base_200 = s.ami(
-        EAST, f"base-linux-{stamp(200)}", 200, shared_with=[DEV, PROD]
+        EAST, f"base-linux-{stamp(200)}", 200, shared_with=ENVS
     )  # source of a live copy
     s.ami(
-        EAST, f"base-linux-{stamp(120)}", 120, shared_with=[DEV, PROD]
+        EAST, f"base-linux-{stamp(120)}", 120, shared_with=ENVS
     )  # orphaned, deletable
-    s.ami(EAST, f"base-linux-{stamp(60)}", 60, shared_with=[DEV, PROD])  # idle
-    base_20 = s.ami(EAST, f"base-linux-{stamp(20)}", 20, shared_with=[DEV, PROD])
-    s.use(base_20, DEV, EAST, "instance", "dev-api-1")
-    s.use(base_20, PROD, EAST, "asg", "prod-api-asg")
+    s.ami(EAST, f"base-linux-{stamp(60)}", 60, shared_with=ENVS)  # idle
+    base_20 = s.ami(EAST, f"base-linux-{stamp(20)}", 20, shared_with=ENVS)
+    s.use(base_20, DEV, EAST, "instance", "dev-api-1", "running")
+    s.use(base_20, PRD, EAST, "asg", "prd-api-asg", "active")
+    s.use(base_20, QAS, EAST, "instance", "qas-api-1", "stopped")
+    s.use(base_20, UAT, EAST, "launch_template", "uat-api v3")
 
-    web_10 = s.ami(EAST, f"app-web-{stamp(10)}", 10, shared_with=[PROD])
-    s.use(web_10, PROD, EAST, "launch_template", "prod-web v7")
-    s.ami(EAST, f"app-web-{stamp(45)}", 45, shared_with=[PROD])  # idle
-    web_150 = s.ami(EAST, f"app-web-{stamp(150)}", 150, shared_with=[PROD])  # orphaned
+    web_10 = s.ami(EAST, f"app-web-{stamp(10)}", 10, shared_with=[UAT, QAS, PRD])
+    s.use(web_10, PRD, EAST, "launch_template", "prd-web v7")
+    s.use(web_10, PRD, EAST, "asg", "prd-web-asg", "active")
+    s.ami(EAST, f"app-web-{stamp(45)}", 45, shared_with=[UAT, QAS, PRD])  # idle
+    web_150 = s.ami(
+        EAST, f"app-web-{stamp(150)}", 150, shared_with=[UAT, QAS, PRD]
+    )  # orphaned
 
     bastion = s.ami(EAST, f"bastion-{stamp(500)}", 500)
-    s.use(bastion, TOOLS, EAST, "instance", "tools-bastion")
+    s.use(bastion, TOOLS, EAST, "instance", "tools-bastion", "running")
     s.ami(EAST, f"partner-export-{stamp(250)}", 250, shared_with=[UNSCANNED])  # unknown
     s.ami(
         EAST, f"public-demo-{stamp(180)}", 180, shared_with=["all"]
@@ -256,17 +276,17 @@ def build() -> dict:
     )
     s.ami(EAST, f"test-build-{stamp(5)}", 5)  # idle and too new
 
-    # Copies in other regions get new AMI IDs and are shared within their own region.
+    # Copies in other regions get new AMI IDs and are shared within their own region with prd.
     west_copy = s.ami(
-        WEST, f"base-linux-{stamp(20)}", 19, source=base_20, shared_with=[DEV]
+        WEST, f"base-linux-{stamp(20)}", 19, source=base_20, shared_with=[PRD]
     )
-    s.use(west_copy, DEV, WEST, "instance", "dev-worker-1")
+    s.use(west_copy, PRD, WEST, "instance", "prd-dr-api-1", "stopped")
     eu_copy = s.ami(
-        EU, f"base-linux-{stamp(200)}", 199, source=base_200, shared_with=[PROD]
+        EU, f"base-linux-{stamp(200)}", 199, source=base_200, shared_with=[PRD]
     )
-    s.use(eu_copy, PROD, EU, "instance", "prod-eu-api-1")
+    s.use(eu_copy, PRD, EU, "instance", "prd-eu-api-1", "running")
     s.ami(
-        EU, f"app-web-{stamp(150)}", 149, source=web_150, shared_with=[PROD]
+        EU, f"app-web-{stamp(150)}", 149, source=web_150, shared_with=[PRD]
     )  # orphaned copy
 
     # Dangling snapshots: their AMI was deregistered, the snapshot stayed.
@@ -302,11 +322,22 @@ def build() -> dict:
         tags={"owner": "dev-team"},
     )
 
-    data_vol = s.volume(TOOLS, EAST, "tools-ci-data", 365, size=100, attached=True)
+    data_vol = s.volume(
+        TOOLS,
+        EAST,
+        "tools-ci-data",
+        365,
+        size=100,
+        attached=True,
+        iops=6000,
+        throughput=250,
+    )
     s.snapshot(
         TOOLS, EAST, "tools-ci-data-weekly", 100, size=100, volume=data_vol
     )  # idle: volume exists
-    s.snapshot(TOOLS, EAST, "tools-ci-data-old", 400, size=100)  # orphaned: volume gone
+    s.snapshot(
+        TOOLS, EAST, "tools-ci-data-old", 400, size=100, tier="archive"
+    )  # orphaned, archived
     s.snapshot(TOOLS, EAST, "tools-migration-temp", 12, size=40)  # idle: young
     s.volume(TOOLS, EAST, "tools-runner-cache", 200, size=50)  # orphaned
     s.volume(TOOLS, EAST, "tools-scratch", 15, size=10)  # idle
@@ -326,47 +357,81 @@ def build() -> dict:
         DEV, EAST, "dev-test-data", 150, size=80, tags={}
     )  # orphaned, no owner tag
     s.volume(
-        PROD,
-        EAST,
-        "prod-api-root",
-        300,
-        attached=True,
-        tags={"owner": "platform", "env": "prod"},
+        SBX, EAST, "sbx-playground", 300, size=40, vtype="gp2", tags={}, encrypted=False
     )
     s.volume(
-        PROD,
+        SBX, EAST, "sbx-notebook-data", 10, size=20, tags={"owner": "data-science"}
+    )
+    s.volume(
+        UAT,
         EAST,
-        "prod-scratch-data",
+        "uat-api-root",
+        60,
+        attached=True,
+        tags={"owner": "platform", "env": "uat"},
+    )
+    s.volume(
+        UAT,
+        EAST,
+        "uat-load-test-data",
+        120,
+        size=300,
+        vtype="io1",
+        iops=3000,
+        tags={"owner": "perf", "env": "uat"},
+    )
+    s.volume(
+        QAS,
+        EAST,
+        "qas-api-root",
+        45,
+        attached=True,
+        tags={"owner": "platform", "env": "qas"},
+    )
+    s.volume(
+        QAS,
+        EAST,
+        "qas-regression-cache",
+        95,
+        size=100,
+        tags={"owner": "qa", "env": "qas"},
+    )
+    s.volume(
+        PRD,
+        EAST,
+        "prd-api-root",
+        300,
+        attached=True,
+        tags={"owner": "platform", **prod},
+    )
+    s.volume(
+        PRD,
+        EAST,
+        "prd-scratch-data",
         240,
         size=500,
         vtype="io2",
-        tags={"owner": "data", "env": "prod"},
-    )  # orphaned; needs typed confirmation
+        iops=40000,
+        tags={"owner": "data", **prod},
+    )  # orphaned; needs typed confirmation; tiered IOPS
     s.volume(
-        PROD,
+        PRD,
         EAST,
-        "prod-ledger-archive",
+        "prd-ledger-archive",
         400,
         size=1000,
         vtype="st1",
-        tags={"owner": "finance", "env": "prod", "retain": "true"},
+        tags={"owner": "finance", "retain": "true", **prod},
     )  # protected
     s.volume(
-        PROD,
+        PRD,
         EU,
-        "prod-eu-api-root",
+        "prd-eu-api-root",
         199,
         attached=True,
-        tags={"owner": "platform", "env": "prod"},
+        tags={"owner": "platform", **prod},
     )
-    s.volume(
-        PROD,
-        EU,
-        "prod-eu-reindex",
-        20,
-        size=60,
-        tags={"owner": "search", "env": "prod"},
-    )
+    s.volume(PRD, EU, "prd-eu-reindex", 20, size=60, tags={"owner": "search", **prod})
 
     s.database(DEV, EAST, "dev-orders")
     s.rds_snapshot(DEV, EAST, "dev-orders", 1, automated=True)
@@ -383,16 +448,21 @@ def build() -> dict:
     s.rds_snapshot(
         DEV, EAST, "dev-reports", 10, kind="cluster", size=80
     )  # idle, too new
-    s.database(PROD, EAST, "prod-orders")
+    s.database(PRD, EAST, "prd-orders")
     s.rds_snapshot(
-        PROD,
+        PRD,
         EAST,
-        "prod-orders",
+        "prd-orders",
         7,
         managed_by="aws_backup",
-        tags={"owner": "data", "env": "prod"},
+        tags={"owner": "data", **prod},
     )
-    s.rds_snapshot(PROD, EAST, "prod-orders", 90, tags={"owner": "data", "env": "prod"})
+    s.rds_snapshot(PRD, EAST, "prd-orders", 90, tags={"owner": "data", **prod})
+    s.database(SBX, EAST, "sbx-demo")
+    s.rds_snapshot(SBX, EAST, "sbx-demo", 50, tags={"owner": "data-science"})
+    s.rds_snapshot(UAT, EAST, "uat-orders", 150)  # orphaned: database deleted
+    s.database(QAS, EAST, "qas-orders")
+    s.rds_snapshot(QAS, EAST, "qas-orders", 1, automated=True)
 
     # Background noise from a fixed RNG.
     for n in range(60):
@@ -416,9 +486,9 @@ def build() -> dict:
     for n in range(20):
         days = s.rng.randint(1, 500)
         s.volume(
-            DEV,
+            s.rng.choice(ENVS),
             EAST,
-            f"dev-ephemeral-{n:03d}",
+            f"ephemeral-{n:03d}",
             days,
             size=s.rng.choice([10, 20, 40]),
             attached=s.rng.random() < 0.5,

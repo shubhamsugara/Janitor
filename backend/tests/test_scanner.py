@@ -28,8 +28,8 @@ def test_scan_stores_statuses_costs_and_rules(setup):
     scan_id = scanner.run()
     assert store.latest_scan()["id"] == scan_id
     assert by_name(store, scan_id, "dev-old-cache").est_monthly_cost == 20.0  # 200 GiB × gp2 0.10
-    assert by_name(store, scan_id, "prod-ledger-archive").status == "orphaned"
-    assert rules_of(store, scan_id, by_name(store, scan_id, "prod-ledger-archive")) == {"R4"}
+    assert by_name(store, scan_id, "prd-ledger-archive").status == "orphaned"
+    assert rules_of(store, scan_id, by_name(store, scan_id, "prd-ledger-archive")) == {"R4"}
     assert "W4" in rules_of(store, scan_id, by_name(store, scan_id, "dev-test-data"))
     actions = [e["action"] for e in store.list_audit(1, 10)[0]]
     assert actions == ["scan_finished", "scan_started"]
@@ -43,7 +43,7 @@ def test_demo_moments(setup):
         == "unknown"
     )
     assert by_name(store, scan_id, "copy-of-retired-api-root").status == "orphaned"
-    assert by_name(store, scan_id, "prod-scratch-data").tags["env"] == "prod"
+    assert by_name(store, scan_id, "prd-scratch-data").tags["env"] == "prod"
     eu_copies = store.query_resources(
         scan_id, {"type": "ami", "region": "eu-west-1", "status": "in_use"}
     )[0]
@@ -93,3 +93,9 @@ def test_config_change_takes_effect_without_rescanning(setup, config):
     relaxed.policy.min_age_days = 0
     recompute_rules(store, relaxed, scan_id, NOW)
     assert "R5" not in rules_of(store, scan_id, young)
+
+
+def test_scan_stores_databases(setup):
+    store, scanner = setup
+    scanner.run()
+    assert store._db.execute("SELECT COUNT(*) FROM databases").fetchone()[0] >= 4

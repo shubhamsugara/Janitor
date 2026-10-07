@@ -46,7 +46,7 @@ def test_health_and_meta(client):
     assert client.get("/health").json() == {"status": "ok"}
     meta = client.get("/api/meta").json()
     assert meta["provider"] == "mock" and meta["read_only"] is True
-    assert {a["name"] for a in meta["accounts"]} == {"tools", "dev", "prod"}
+    assert {a["name"] for a in meta["accounts"]} == {"tools", "sbx", "dev", "uat", "qas", "prd"}
     assert "older than 90 days" in meta["definitions"]["statuses"]["orphaned"]["meaning"]
 
 
@@ -92,7 +92,12 @@ def test_resource_detail(client):
     assert body["resource"]["status"] == "in_use"
     assert [r["id"] for r in body["rules"]] == ["R1", "R2", "R3", "R4", "R5", "W4"]
     assert next(r for r in body["rules"] if r["id"] == "R1")["outcome"] == "block"
-    assert {u["ref_name"] for u in body["related"]["usage"]} == {"dev-api-1", "prod-api-asg"}
+    assert {u["ref_name"] for u in body["related"]["usage"]} == {
+        "dev-api-1",
+        "prd-api-asg",
+        "qas-api-1",
+        "uat-api v3",
+    }
     assert any(link["relation"] == "copy" for link in body["related"]["links"])
     assert client.get("/api/resources/vol-nope").status_code == 404
 
@@ -120,7 +125,7 @@ def test_plan_none_blocked_expands_ami_to_its_snapshot(client):
     ]
     assert body["totals"] == {"count": 2, "size_gib": 8, "est_monthly_usd": 0.4}
     [impact] = body["share_impact"]
-    assert {a["name"] for a in impact["accounts"]} == {"dev", "prod"}
+    assert {a["name"] for a in impact["accounts"]} == {"sbx", "dev", "uat", "qas", "prd"}
 
 
 def test_plan_mixed_and_share_impact_lists_copies(client):
@@ -141,7 +146,7 @@ def test_plan_reports_missing_ids(client):
 
 
 def test_typed_confirmation_for_prod_and_warnings(client):
-    prod = plan(client, find(client, "volume", "prod-scratch-data")["id"]).json()
+    prod = plan(client, find(client, "volume", "prd-scratch-data")["id"]).json()
     assert prod["requires_typed_confirmation"]
     warned = plan(client, find(client, "volume", "dev-test-data")["id"]).json()
     assert warned["requires_typed_confirmation"]

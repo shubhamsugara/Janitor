@@ -179,3 +179,35 @@ def test_audit_is_append_only(store):
         store._db.execute("UPDATE audit SET actor = 'x'")
     with pytest.raises(sqlite3.DatabaseError, match="append-only"):
         store._db.execute("DELETE FROM audit")
+
+
+def test_new_fields_round_trip(tmp_path):
+    from janitor.models import Database
+
+    store = Store(tmp_path / "j.db")
+    scan_id = store.start_scan("mock")
+    breakdown = {"lines": [{"label": "Storage (gp3)", "amount": 1.6}], "total": 1.6}
+    store.save_inventory(
+        scan_id,
+        [res("vol-9", iops=6000, throughput=250, encrypted=False, cost_breakdown=breakdown)],
+        [],
+        [Usage("ami-1", "222222222222", "us-east-1", "instance", "i-1", "web", "running")],
+        [Database("db1", "222222222222", "us-east-1", "instance")],
+    )
+    [vol] = store.get_resources(scan_id, ["vol-9"])
+    assert (vol.iops, vol.throughput, vol.encrypted) == (6000, 250, False)
+    assert vol.cost_breakdown == breakdown
+    assert store._db.execute("SELECT ref_state FROM usage").fetchone()[0] == "running"
+    assert store._db.execute("SELECT COUNT(*) FROM databases").fetchone()[0] == 1
+
+
+def test_schema_change_drops_scan_cache_but_keeps_audit(tmp_path):
+    path = tmp_path / "j.db"
+    old = Store(path)
+    old.add_audit("plan", {"plan_id": "p1"})
+    old.finish_scan(old.start_scan("mock"), "ok")
+    old._db.execute("PRAGMA user_version = 1")
+    old._db.commit()
+    new = Store(path)
+    assert new.last_scan() is None
+    assert new.list_audit(1, 10)[1] == 1

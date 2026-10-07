@@ -12,7 +12,15 @@ def test_example_config_loads():
     assert config.owner.account == "111111111111"
     assert config.account_name("222222222222") == "dev"
     assert config.account_name("444444444444") == "444444444444"
-    assert config.regions_for("333333333333") == ["us-east-1", "eu-west-1"]
+    assert config.regions_for("333333333333") == ["us-east-1", "us-west-2", "eu-west-1"]
+    assert [a.name for a in config.accounts.values()] == [
+        "tools",
+        "sbx",
+        "dev",
+        "uat",
+        "qas",
+        "prd",
+    ]
     assert config.regions_for("222222222222") == ["us-east-1", "us-west-2", "eu-west-1"]
     assert config.policy.protected_tags == {"retain": "true", "janitor:keep": "true"}
 

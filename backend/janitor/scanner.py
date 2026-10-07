@@ -100,7 +100,7 @@ class Scanner:
                 r.status, r.status_reason = statuses[r.id]
                 r.est_monthly_cost = estimate_cost(r, self._config.pricing)
             self._store.save_inventory(
-                scan_id, inventory.resources, inventory.shares, inventory.usage
+                scan_id, inventory.resources, inventory.shares, inventory.usage, inventory.databases
             )
             recompute_rules(self._store, self._config, scan_id, now)
         except Exception as exc:

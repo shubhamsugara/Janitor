@@ -13,10 +13,11 @@ from dataclasses import asdict, fields
 from datetime import UTC, datetime
 from pathlib import Path
 
-from janitor.models import Resource, RuleResult, Share, Usage, format_ts
+from janitor.models import Database, Resource, RuleResult, Share, Usage, format_ts
 
+SCHEMA_VERSION = 2  # bump when a scan table changes shape; old scan data is dropped
 RESOURCE_FIELDS = [f.name for f in fields(Resource)]
-JSON_FIELDS = {"tags", "snapshot_ids"}
+JSON_FIELDS = {"tags", "snapshot_ids", "cost_breakdown"}
 SORTABLE = {
     "id",
     "name",
@@ -27,7 +28,7 @@ SORTABLE = {
     "account",
     "est_monthly_cost",
 }
-SCAN_TABLES = ("resources", "shares", "usage", "policy_results")
+SCAN_TABLES = ("resources", "shares", "usage", "policy_results", "databases")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS scans (
@@ -38,7 +39,8 @@ CREATE TABLE IF NOT EXISTS resources (
   region TEXT NOT NULL, name TEXT NOT NULL, created_at TEXT NOT NULL, size_gb INTEGER,
   state TEXT, tags TEXT NOT NULL, snapshot_ids TEXT NOT NULL, source_ami_id TEXT,
   linked_ami_id TEXT, source_volume_id TEXT, attached_instance TEXT, volume_type TEXT,
-  source_db_id TEXT, db_kind TEXT, managed_by TEXT, est_monthly_cost REAL,
+  source_db_id TEXT, db_kind TEXT, managed_by TEXT, iops INTEGER, throughput INTEGER,
+  encrypted INTEGER, storage_tier TEXT, est_monthly_cost REAL, cost_breakdown TEXT,
   status TEXT NOT NULL, status_reason TEXT NOT NULL,
   PRIMARY KEY (scan_id, id));
 CREATE INDEX IF NOT EXISTS resources_type_status ON resources (scan_id, type, status);
@@ -46,7 +48,11 @@ CREATE TABLE IF NOT EXISTS shares (
   scan_id INTEGER NOT NULL, image_id TEXT NOT NULL, principal_type TEXT NOT NULL, principal TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS usage (
   scan_id INTEGER NOT NULL, image_id TEXT NOT NULL, account TEXT NOT NULL, region TEXT NOT NULL,
-  ref_type TEXT NOT NULL, ref_id TEXT NOT NULL, ref_name TEXT NOT NULL);
+  ref_type TEXT NOT NULL, ref_id TEXT NOT NULL, ref_name TEXT NOT NULL,
+  ref_state TEXT NOT NULL DEFAULT '');
+CREATE TABLE IF NOT EXISTS databases (
+  scan_id INTEGER NOT NULL, id TEXT NOT NULL, account TEXT NOT NULL, region TEXT NOT NULL,
+  kind TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS policy_results (
   scan_id INTEGER NOT NULL, resource_id TEXT NOT NULL, rule_id TEXT NOT NULL,
   outcome TEXT NOT NULL, message TEXT NOT NULL);
@@ -89,6 +95,8 @@ def _resource(row: sqlite3.Row) -> Resource:
     data = {f: row[f] for f in RESOURCE_FIELDS}
     for f in JSON_FIELDS:
         data[f] = json.loads(data[f])
+    if data["encrypted"] is not None:
+        data["encrypted"] = bool(data["encrypted"])  # SQLite stores booleans as 0/1
     return Resource(**data)
 
 
@@ -134,6 +142,13 @@ class Store:
         self._lock = threading.Lock()
         with self._lock:
             self._db.execute("PRAGMA journal_mode=WAL")
+            if self._db.execute("PRAGMA user_version").fetchone()[0] != SCHEMA_VERSION:
+                # Scan data is a cache, so drop it when its shape changes. The audit log stays.
+                drops = "".join(
+                    f"DROP TABLE IF EXISTS {t};" for t in (*SCAN_TABLES, "scans", "plans")
+                )
+                self._db.executescript(drops)
+                self._db.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
             self._db.executescript(SCHEMA)
 
     def _q(self, sql: str, params=()) -> list[sqlite3.Row]:
@@ -187,7 +202,12 @@ class Store:
     # Inventory
 
     def save_inventory(
-        self, scan_id: int, resources: list[Resource], shares: list[Share], usage: list[Usage]
+        self,
+        scan_id: int,
+        resources: list[Resource],
+        shares: list[Share],
+        usage: list[Usage],
+        databases: list[Database] = (),
     ) -> None:
         cols = ",".join(["scan_id", *RESOURCE_FIELDS])
         marks = _marks([None] * (len(RESOURCE_FIELDS) + 1))
@@ -201,11 +221,24 @@ class Store:
                 [(scan_id, s.image_id, s.principal_type, s.principal) for s in shares],
             )
             self._db.executemany(
-                "INSERT INTO usage VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO usage VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 [
-                    (scan_id, u.image_id, u.account, u.region, u.ref_type, u.ref_id, u.ref_name)
+                    (
+                        scan_id,
+                        u.image_id,
+                        u.account,
+                        u.region,
+                        u.ref_type,
+                        u.ref_id,
+                        u.ref_name,
+                        u.ref_state,
+                    )
                     for u in usage
                 ],
+            )
+            self._db.executemany(
+                "INSERT INTO databases VALUES (?, ?, ?, ?, ?)",
+                [(scan_id, d.id, d.account, d.region, d.kind) for d in databases],
             )
 
     def query_resources(
@@ -325,7 +358,7 @@ class Store:
             out["usage"] = [
                 dict(u)
                 for u in self._q(
-                    "SELECT account, region, ref_type, ref_id, ref_name FROM usage "
+                    "SELECT account, region, ref_type, ref_id, ref_name, ref_state FROM usage "
                     "WHERE scan_id = ? AND image_id = ? AND region = ?",
                     (scan_id, r.id, r.region),
                 )

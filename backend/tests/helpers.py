@@ -19,3 +19,6 @@ def stamp(days: int) -> str:
 
 def days_ago(days: int) -> str:
     return format_ts(NOW - timedelta(days=days))
+
+
+SBX, UAT, QAS = "555555555555", "666666666666", "777777777777"
