@@ -1,0 +1,67 @@
+.janitor-diagram {
+  height: 460px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.janitor-node {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 236px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #000716;
+  border: 1px solid #c6c6cd;
+  border-left: 6px solid #8c8c94;
+  box-shadow: 0 1px 3px rgba(0, 7, 22, 0.12);
+  font-family: "Open Sans", "Helvetica Neue", Roboto, Arial, sans-serif;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.janitor-node.clickable {
+  cursor: pointer;
+}
+
+.janitor-node:hover {
+  box-shadow: 0 6px 16px rgba(0, 7, 22, 0.2);
+  transform: translateY(-1px);
+}
+
+.janitor-node.root {
+  border: 2px solid #006ce0;
+  border-left-width: 6px;
+  box-shadow: 0 0 0 4px rgba(0, 108, 224, 0.2);
+}
+
+.janitor-node.status-in_use { border-left-color: #00802f; }
+.janitor-node.status-managed { border-left-color: #006ce0; }
+.janitor-node.status-unknown { border-left-color: #855900; }
+.janitor-node.status-orphaned { border-left-color: #db0000; }
+.janitor-node.status-idle { border-left-color: #8c8c94; }
+.janitor-node.active { box-shadow: 0 0 0 3px rgba(0, 128, 47, 0.28); }
+.janitor-node.more { justify-content: center; font-style: italic; }
+
+.janitor-node-text { min-width: 0; }
+.janitor-node-label { font-weight: 700; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.janitor-node-meta,
+.janitor-node-state { font-size: 11px; color: #5f6b7a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.janitor-node.active .janitor-node-state { color: #00802f; font-weight: 600; }
+
+.react-flow__edge.edge-used_by .react-flow__edge-path { stroke: #00802f; stroke-width: 2; }
+.react-flow__edge.edge-backs .react-flow__edge-path,
+.react-flow__edge.edge-snapshot_of .react-flow__edge-path,
+.react-flow__edge.edge-snapshot_of_db .react-flow__edge-path { stroke: #7aa116; }
+.react-flow__edge.edge-copied_to .react-flow__edge-path { stroke: #ed7100; stroke-dasharray: 6 4; }
+.react-flow__edge.edge-shared_with .react-flow__edge-path { stroke: #e7157b; stroke-dasharray: 2 4; }
+
+/* Cloudscape marks dark mode with this class on <body>. */
+.awsui-dark-mode .janitor-node { background: #161d26; color: #e9ebed; border-color: #424650; }
+.awsui-dark-mode .janitor-node-meta,
+.awsui-dark-mode .janitor-node-state { color: #a4a4ad; }
+
+.janitor-legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; }
+.janitor-legend span::before { content: ""; display: inline-block; width: 22px; margin-right: 6px; vertical-align: middle; border-top: 3px solid var(--legend-color); }
+.janitor-legend .dashed::before { border-top-style: dashed; }
+.janitor-legend .dotted::before { border-top-style: dotted; }

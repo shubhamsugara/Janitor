@@ -1,4 +1,5 @@
 import "@cloudscape-design/global-styles/index.css";
+import "@xyflow/react/dist/style.css";
 import { I18nProvider } from "@cloudscape-design/components/i18n";
 import messages from "@cloudscape-design/components/i18n/messages/all.en";
 import { StrictMode } from "react";

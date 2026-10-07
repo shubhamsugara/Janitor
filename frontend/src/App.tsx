@@ -8,7 +8,7 @@ import SideNavigation, { type SideNavigationProps } from "@cloudscape-design/com
 import Spinner from "@cloudscape-design/components/spinner";
 import SplitPanel from "@cloudscape-design/components/split-panel";
 import { api, runScan, type Meta } from "./api";
-import ResourceDetailPanel from "./components/ResourceDetail";
+import ResourcePanel from "./components/ResourcePanel";
 import TopBar from "./components/TopBar";
 import { DetailContext, type DetailApi } from "./detail";
 import { TYPE_PAGES, type Notify } from "./nav";
@@ -132,7 +132,7 @@ export default function App() {
         splitPanel={
           selectedId && meta ? (
             <SplitPanel header="Resource details" closeBehavior="hide">
-              <ResourceDetailPanel id={selectedId} meta={meta} onClose={() => setSelectedId(null)} />
+              <ResourcePanel id={selectedId} meta={meta} dark={theme === "dark"} onSelect={setSelectedId} />
             </SplitPanel>
           ) : undefined
         }
