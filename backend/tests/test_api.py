@@ -370,3 +370,55 @@ def test_meta_exposes_policy_and_price_source(client):
 def test_huge_page_number_is_rejected_not_a_server_error(client):
     assert client.get("/api/resources", params={"page": 10**20}).status_code == 422
     assert client.get("/api/audit", params={"page": 10**20}).status_code == 422
+
+
+def test_bad_dates_are_rejected(client):
+    response = client.get("/api/resources", params={"created_from": "31/01/2026"})
+    assert response.status_code == 422 and "YYYY-MM-DD" in response.json()["detail"]
+    assert client.get("/api/stats", params={"created_to": "2026-02-30"}).status_code == 422
+
+
+def test_stats_route_follows_filters(client):
+    all_volumes = client.get("/api/stats", params={"type": "volume"}).json()
+    prd = client.get("/api/stats", params={"type": "volume", "account": "333333333333"}).json()
+    assert 0 < prd["total"] < all_volumes["total"]
+    assert [b["key"] for b in prd["by_account"]] == ["333333333333"]
+    assert all_volumes["blocked"] + all_volumes["deletable"] == all_volumes["total"]
+
+
+def test_header_stats_report_orphaned_size_and_cost(client):
+    stats = client.get("/api/resources", params={"type": "volume"}).json()["stats"]
+    assert 0 < stats["orphaned_gib"] < stats["size_gib"]
+    assert stats["orphaned_usd"] < stats["est_monthly_usd"]
+
+
+def test_export_csv_route(client):
+    response = client.get(
+        "/api/resources/export.csv", params={"type": "volume", "status": "orphaned"}
+    )
+    assert response.status_code == 200 and response.headers["content-type"].startswith("text/csv")
+    assert 'filename="janitor-volume-20261001.csv"' in response.headers["content-disposition"]
+    lines = response.text.strip().splitlines()
+    total = client.get("/api/stats", params={"type": "volume", "status": "orphaned"}).json()[
+        "total"
+    ]
+    assert len(lines) == total + 1
+
+
+def test_export_filename_ignores_unknown_type(client):
+    response = client.get("/api/resources/export.csv", params={"type": 'x"\r\nSet-Cookie: a=b'})
+    assert response.status_code == 200
+    assert (
+        response.headers["content-disposition"] == 'attachment; filename="janitor-all-20261001.csv"'
+    )
+
+
+def test_export_json_route(client):
+    body = client.get("/api/resources/export.json", params={"type": "snapshot"}).json()
+    assert body["total"] == len(body["items"]) and body["truncated"] is False
+    assert body["stats"]["total"] == body["total"] and body["filters"] == {"type": "snapshot"}
+    assert body["provider"] == "mock" and body["generated_at"] == "2026-10-01T00:00:00Z"
+
+
+def test_export_rejects_bad_sort(client):
+    assert client.get("/api/resources/export.csv", params={"sort": "nope"}).status_code == 422

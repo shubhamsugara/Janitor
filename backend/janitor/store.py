@@ -29,6 +29,12 @@ SORTABLE = {
     "est_monthly_cost",
 }
 SCAN_TABLES = ("resources", "shares", "usage", "policy_results", "databases")
+AGE_BUCKETS = (("<30d", 30), ("30–90d", 90), ("90–180d", 180), ("180–365d", 365))
+AGE_KEYS = [label for label, _ in AGE_BUCKETS] + [">1y"]
+BLOCKED_SQL = (
+    "EXISTS (SELECT 1 FROM policy_results p WHERE p.scan_id = resources.scan_id "
+    "AND p.resource_id = resources.id AND p.outcome = 'block')"
+)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS scans (
@@ -102,14 +108,14 @@ def _resource(row: sqlite3.Row) -> Resource:
 
 def _where(scan_id: int, filters: dict) -> tuple[str, list]:
     clauses, params = ["scan_id = ?"], [scan_id]
-    for key in ("type", "account", "region"):
-        if filters.get(key):
-            clauses.append(f"{key} = ?")
-            params.append(filters[key])
-    if filters.get("status"):
-        statuses = [s for s in filters["status"].split(",") if s]
-        clauses.append(f"status IN ({_marks(statuses)})")
-        params += statuses
+    if filters.get("type"):
+        clauses.append("type = ?")
+        params.append(filters["type"])
+    for key in ("account", "region", "status"):  # comma-separated lists
+        values = [v for v in (filters.get(key) or "").split(",") if v]
+        if values:
+            clauses.append(f"{key} IN ({_marks(values)})")
+            params += values
     if filters.get("q"):
         escaped = filters["q"].replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         clauses.append("(name LIKE ? ESCAPE '\\' OR id LIKE ? ESCAPE '\\')")
@@ -264,21 +270,63 @@ class Store:
         )
         return [_resource(r) for r in rows], total
 
-    def stats(self, scan_id: int, filters: dict) -> dict:
+    def stats(self, scan_id: int, filters: dict, now: datetime | None = None) -> dict:
         where, params = _where(scan_id, filters)
         row = self._q(
             "SELECT COUNT(*) AS total, COALESCE(SUM(status = 'orphaned'), 0) AS orphaned, "
-            "COALESCE(SUM(size_gb), 0) AS size_gib, SUM(est_monthly_cost) AS cost "
+            "COALESCE(SUM(size_gb), 0) AS size_gib, SUM(est_monthly_cost) AS cost, "
+            "COALESCE(SUM(CASE WHEN status = 'orphaned' THEN size_gb END), 0) AS orphaned_gib, "
+            "SUM(CASE WHEN status = 'orphaned' THEN est_monthly_cost END) AS orphaned_cost, "
+            f"COALESCE(SUM({BLOCKED_SQL}), 0) AS blocked "
             f"FROM resources WHERE {where}",
             params,
         )[0]
-        cost = row["cost"]
+        cost, orphaned_cost = row["cost"], row["orphaned_cost"]
+        now_ts = format_ts(now or datetime.now(UTC))
+        cases = " ".join(
+            f"WHEN julianday(?) - julianday(created_at) < {days} THEN '{label}'"
+            for label, days in AGE_BUCKETS
+        )
+        by_age = {
+            b["key"]: b
+            for b in self._breakdown(
+                f"CASE {cases} ELSE '>1y' END", [now_ts] * len(AGE_BUCKETS), where, params
+            )
+        }
         return {
             "total": row["total"],
             "orphaned": row["orphaned"],
             "size_gib": row["size_gib"],
             "est_monthly_usd": None if cost is None else round(cost, 2),
+            "orphaned_gib": row["orphaned_gib"],
+            "orphaned_usd": None if orphaned_cost is None else round(orphaned_cost, 2),
+            "blocked": row["blocked"],
+            "deletable": row["total"] - row["blocked"],
+            "by_status": self._breakdown("status", [], where, params),
+            "by_account": self._breakdown("account", [], where, params),
+            "by_region": self._breakdown("region", [], where, params),
+            "by_age": [
+                by_age.get(k, {"key": k, "count": 0, "gib": 0, "usd": None}) for k in AGE_KEYS
+            ],
         }
+
+    def _breakdown(self, expr: str, expr_params: list, where: str, params: list) -> list[dict]:
+        """Count, GiB, and cost grouped by `expr` (a column name or a fixed CASE expression)."""
+        rows = self._q(
+            f"SELECT {expr} AS key, COUNT(*) AS count, COALESCE(SUM(size_gb), 0) AS gib, "
+            f"SUM(est_monthly_cost) AS usd FROM resources WHERE {where} "
+            "GROUP BY key ORDER BY count DESC, key",
+            [*expr_params, *params],
+        )
+        return [
+            {
+                "key": r["key"],
+                "count": r["count"],
+                "gib": r["gib"],
+                "usd": None if r["usd"] is None else round(r["usd"], 2),
+            }
+            for r in rows
+        ]
 
     def overview(self, scan_id: int) -> list[dict]:
         rows = self._q(

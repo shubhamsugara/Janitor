@@ -4,24 +4,26 @@ Run: uvicorn janitor.main:create_app --factory --host 127.0.0.1 --port 8080
 """
 
 import os
+import re
 from collections.abc import Callable
 from dataclasses import asdict
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Annotated, Self
 
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
-from janitor import definitions, plans
+from janitor import definitions, export, plans
 from janitor.config import load_config
 from janitor.graph import build_graph
+from janitor.models import TYPES, format_ts
 from janitor.pricing import PriceTable
 from janitor.providers.mock import MockProvider
 from janitor.rules import RULES, strictest
 from janitor.scanner import Scanner, ScanRunning, recompute_rules
-from janitor.store import Store
+from janitor.store import SORTABLE, Store
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MAX_PAGE = 1_000_000  # larger offsets overflow SQLite's integer
@@ -55,6 +57,53 @@ class PlanRequest(BaseModel):
 class SimulateRequest(BaseModel):
     plan_id: str
     confirmation: str = ""
+
+
+DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def list_filters(
+    type: str | None = None,
+    q: str | None = None,
+    account: str | None = None,
+    region: str | None = None,
+    status: str | None = None,
+    created_from: str | None = None,
+    created_to: str | None = None,
+    tag: str | None = None,
+) -> dict:
+    """The resource filters shared by the list, stats, and export routes."""
+    for name, value in (("created_from", created_from), ("created_to", created_to)):
+        if value is None:
+            continue
+        try:
+            if not DATE.match(value):
+                raise ValueError(value)
+            date.fromisoformat(value)
+        except ValueError:
+            raise HTTPException(
+                422, f"Use YYYY-MM-DD for {name}, for example 2026-01-31."
+            ) from None
+    return {
+        "type": type,
+        "q": q,
+        "account": account,
+        "region": region,
+        "status": status,
+        "created_from": created_from,
+        "created_to": created_to,
+        "tag": tag,
+    }
+
+
+Filters = Annotated[dict, Depends(list_filters)]
+
+
+def _check_sort(sort: str) -> None:
+    if sort.lstrip("-") not in SORTABLE:
+        raise HTTPException(
+            422, f"Can't sort by {sort.lstrip('-')}. Choose one of: {', '.join(sorted(SORTABLE))}."
+        )
 
 
 def create_app(
@@ -125,14 +174,7 @@ def create_app(
 
     @app.get("/api/resources")
     def resources(
-        type: str | None = None,
-        q: str | None = None,
-        account: str | None = None,
-        region: str | None = None,
-        status: str | None = None,
-        created_from: str | None = None,
-        created_to: str | None = None,
-        tag: str | None = None,
+        filters: Filters,
         sort: str = "-created_at",
         page: Annotated[int, Query(ge=1, le=MAX_PAGE)] = 1,
         page_size: Annotated[int, Query(ge=1, le=500)] = 50,
@@ -140,26 +182,50 @@ def create_app(
         current = scan_id()
         if current is None:
             return {"items": [], "total": 0, "stats": None, "scan_id": None}
-        filters = {
-            "type": type,
-            "q": q,
-            "account": account,
-            "region": region,
-            "status": status,
-            "created_from": created_from,
-            "created_to": created_to,
-            "tag": tag,
-        }
-        try:
-            items, total = store.query_resources(current, filters, sort, page, page_size)
-        except ValueError as exc:
-            raise HTTPException(422, str(exc)) from exc
+        _check_sort(sort)
+        items, total = store.query_resources(current, filters, sort, page, page_size)
         hits = store.rule_results(current, [r.id for r in items])
         return {
             "items": [asdict(r) | {"outcome": strictest(hits.get(r.id, []))} for r in items],
             "total": total,
-            "stats": store.stats(current, filters),
+            "stats": store.stats(current, filters, clock()),
             "scan_id": current,
+        }
+
+    @app.get("/api/stats")
+    def stats(filters: Filters):
+        current = scan_id()
+        return store.stats(current, filters, clock()) if current else None
+
+    def export_scan(sort: str) -> int:
+        current = scan_id()
+        if current is None:
+            raise HTTPException(409, "No scan yet. Run a scan, then export.")
+        _check_sort(sort)
+        return current
+
+    @app.get("/api/resources/export.csv")
+    def export_csv(filters: Filters, sort: str = "-created_at"):
+        current = export_scan(sort)
+        kind = (
+            filters["type"] if filters["type"] in TYPES else "all"
+        )  # never echo raw input into a header
+        name = f"janitor-{kind}-{clock():%Y%m%d}.csv"
+        return StreamingResponse(
+            export.csv_lines(store, config, current, filters, sort),
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="{name}"'},
+        )
+
+    @app.get("/api/resources/export.json")
+    def export_json(filters: Filters, sort: str = "-created_at"):
+        current = export_scan(sort)
+        body = export.json_export(store, config, current, filters, sort)
+        return body | {
+            "stats": store.stats(current, filters, clock()),
+            "filters": {k: v for k, v in filters.items() if v},
+            "generated_at": format_ts(clock()),
+            "provider": provider.name,
         }
 
     @app.get("/api/resources/{resource_id:path}/graph")

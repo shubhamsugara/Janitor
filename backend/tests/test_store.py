@@ -1,4 +1,5 @@
 import sqlite3
+from datetime import UTC, datetime
 
 import pytest
 
@@ -107,13 +108,39 @@ def test_pagination_and_sort(store):
 
 
 def test_stats_and_overview(store):
-    assert store.stats(store.scan_id, {"type": "volume"}) == {
+    store.save_rule_results(store.scan_id, [RuleResult("vol-1", "R4", "block", "Tagged.")])
+    stats = store.stats(store.scan_id, {"type": "volume"}, datetime(2026, 2, 15, tzinfo=UTC))
+    assert {
+        k: stats[k]
+        for k in (
+            "total",
+            "orphaned",
+            "size_gib",
+            "est_monthly_usd",
+            "orphaned_gib",
+            "orphaned_usd",
+            "blocked",
+            "deletable",
+        )
+    } == {
         "total": 4,
         "orphaned": 3,
         "size_gib": 40,
         "est_monthly_usd": 4.0,
+        "orphaned_gib": 30,
+        "orphaned_usd": 3.0,
+        "blocked": 1,
+        "deletable": 3,
     }
-    assert store.stats(store.scan_id, {"type": "ami"})["est_monthly_usd"] is None
+    assert stats["by_status"] == [
+        {"key": "orphaned", "count": 3, "gib": 30, "usd": 3.0},
+        {"key": "idle", "count": 1, "gib": 10, "usd": 1.0},
+    ]
+    assert stats["by_region"][0] == {"key": "us-east-1", "count": 3, "gib": 30, "usd": 3.0}
+    assert [b["key"] for b in stats["by_age"]] == ["<30d", "30–90d", "90–180d", "180–365d", ">1y"]
+    assert [b["count"] for b in stats["by_age"]] == [2, 2, 0, 0, 0]
+    ami_stats = store.stats(store.scan_id, {"type": "ami"})
+    assert ami_stats["est_monthly_usd"] is None and ami_stats["orphaned_usd"] is None
     vol = next(t for t in store.overview(store.scan_id) if t["type"] == "volume")
     assert vol == {
         "type": "volume",
@@ -211,3 +238,13 @@ def test_schema_change_drops_scan_cache_but_keeps_audit(tmp_path):
     new = Store(path)
     assert new.last_scan() is None
     assert new.list_audit(1, 10)[1] == 1
+
+
+def test_filters_accept_lists(store):
+    assert ids(store, type="volume", region="us-east-1,eu-west-1") == [
+        "vol-1",
+        "vol-2",
+        "vol-3",
+        "vol-4",
+    ]
+    assert ids(store, account="111111111111,999999999999", type="ami") == ["ami-1", "ami-2"]
