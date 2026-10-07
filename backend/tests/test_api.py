@@ -315,3 +315,58 @@ def test_graph_route_with_arn(client):
         client.get(f"/api/resources/{quote(rds['id'], safe='')}").json()["resource"]["id"]
         == rds["id"]
     )
+
+
+def test_selected_snapshot_goes_with_its_ami(tmp_path, config):
+    store = _store_with(
+        tmp_path, config, [_r("ami-a", "ami", snapshot_ids=["snap-a"]), _r("snap-a", "snapshot")]
+    )
+    body = plans.make_plan(store, config, ["ami-a", "snap-a"], NOW)
+    assert body["variant"] == "none_blocked"
+    assert [(i["id"], i["parent"]) for i in body["deletable"]] == [
+        ("ami-a", None),
+        ("snap-a", "ami-a"),
+    ]
+
+
+def test_selected_snapshot_of_a_blocked_ami_stays_blocked(tmp_path, config):
+    retained = {"owner": "me", "retain": "true"}
+    store = _store_with(
+        tmp_path,
+        config,
+        [_r("ami-a", "ami", snapshot_ids=["snap-a"], tags=retained), _r("snap-a", "snapshot")],
+    )
+    body = plans.make_plan(store, config, ["ami-a", "snap-a"], NOW)
+    assert body["variant"] == "all_blocked" and {i["id"] for i in body["blocked"]} == {
+        "ami-a",
+        "snap-a",
+    }
+
+
+def test_plan_rules_are_in_rule_order(client):
+    body = plan(client, find(client, "ami", f"base-linux-{stamp(20)}")["id"]).json()
+    assert [r["rule_id"] for r in body["blocked"][0]["rules"]] == ["R1", "R5"]
+
+
+def test_skipped_items_name_their_rule(client):
+    used = find(client, "ami", f"base-linux-{stamp(20)}")["id"]
+    deletable = find(client, "ami", f"base-linux-{stamp(120)}")["id"]
+    body = plan(client, used, deletable).json()
+    result = client.post("/api/actions/simulate", json={"plan_id": body["plan_id"]}).json()
+    assert [(s["id"], s["rule"]) for s in result["skipped"]] == [(used, "In use")]
+    assert result["skipped"][0]["reason"].startswith("Used by")
+
+
+def test_meta_exposes_policy_and_price_source(client):
+    meta = client.get("/api/meta").json()
+    assert meta["policy"] == {
+        "orphan_after_days": 90,
+        "min_age_days": 30,
+        "typed_confirm_min_items": 10,
+    }
+    assert meta["prices"] == {"source_date": "2026-09-30", "fallback": False}
+
+
+def test_huge_page_number_is_rejected_not_a_server_error(client):
+    assert client.get("/api/resources", params={"page": 10**20}).status_code == 422
+    assert client.get("/api/audit", params={"page": 10**20}).status_code == 422

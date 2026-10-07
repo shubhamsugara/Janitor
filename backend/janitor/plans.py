@@ -7,10 +7,11 @@ from datetime import datetime
 from janitor.config import Config
 from janitor.linker import MANAGED_REASONS
 from janitor.models import Resource, RuleResult
-from janitor.rules import RULES_BY_ID, evaluate, strictest
+from janitor.rules import RULES, RULES_BY_ID, evaluate
 from janitor.store import Store
 
 MAX_SELECTION = 1000
+RULE_ORDER = {rule.id: n for n, rule in enumerate(RULES)}
 
 
 class PlanError(Exception):
@@ -40,7 +41,7 @@ def _item(r: Resource, hits: list[RuleResult], parent: str | None = None) -> dic
                 "outcome": h.outcome,
                 "message": h.message,
             }
-            for h in hits
+            for h in sorted(hits, key=lambda h: RULE_ORDER[h.rule_id])
         ],
     }
 
@@ -49,8 +50,11 @@ def _blocked(item: dict) -> bool:
     return any(rule["outcome"] == "block" for rule in item["rules"])
 
 
-def _block_reason(rules: list[dict]) -> str:
-    return next((r["message"] for r in rules if r["outcome"] == "block"), "Blocked.")
+def _block_rule(rules: list[dict]) -> dict:
+    """The first blocking rule, in RULES order (items' rules are sorted)."""
+    return next(
+        (r for r in rules if r["outcome"] == "block"), {"title": "Blocked", "message": "Blocked."}
+    )
 
 
 def _totals(items: list[dict]) -> dict:
@@ -87,9 +91,13 @@ def _backing_snapshots(
     items: list[dict],
     now: datetime,
 ) -> list[dict]:
-    """Snapshots used only by the AMIs being deleted go with them (spec §9)."""
+    """Snapshots used only by the AMIs being deleted go with them (spec §9).
+
+    That includes snapshots the user also selected directly: on their own they are "in use"
+    (R1), but only by AMIs this plan deregisters.
+    """
     deleting = {i["id"] for i in items if i["type"] == "ami" and not _blocked(i)}
-    taken = {r.id for r in selected}
+    taken: set[str] = set()
     out = []
     for ami in (r for r in selected if r.id in deleting):
         for snap_id in ami.snapshot_ids:
@@ -155,7 +163,9 @@ def make_plan(store: Store, config: Config, ids: list[str], now: datetime) -> di
         )
     hits = store.rule_results(scan_id, [r.id for r in selected])
     items = [_item(r, hits.get(r.id, [])) for r in selected]
-    items += _backing_snapshots(store, config, scan_id, selected, items, now)
+    backing = _backing_snapshots(store, config, scan_id, selected, items, now)
+    backing_ids = {b["id"] for b in backing}
+    items = [i for i in items if i["id"] not in backing_ids] + backing
     blocked = [i for i in items if _blocked(i)]
     deletable = [i for i in items if not _blocked(i)]
     any_blocked = any(i["parent"] is None for i in blocked)
@@ -212,26 +222,30 @@ def simulate(store: Store, config: Config, plan_id: str, confirmation: str) -> d
     if plan["requires_typed_confirmation"] and confirmation.strip().lower() != "delete":
         raise PlanError(422, "Type delete to confirm.")
 
-    # Re-check top-level items: rules may have changed if the config changed since planning.
+    # Re-check top-level items against the stored rule results: a safety net if they changed.
     top = [i["id"] for i in plan["deletable"] if i["parent"] is None]
     current = store.rule_results(plan["scan_id"], top)
-    now_blocked = {}
+    now_blocked: dict[str, tuple[str, str]] = {}  # id -> (rule title, message)
     for item_id in top:
-        hits = current.get(item_id, [])
-        if strictest(hits) == "block":
-            now_blocked[item_id] = next(h.message for h in hits if h.outcome == "block")
+        hit = next((h for h in current.get(item_id, []) if h.outcome == "block"), None)
+        if hit:
+            now_blocked[item_id] = (RULES_BY_ID[hit.rule_id].title, hit.message)
 
-    skipped = [
-        {"id": i["id"], "name": i["name"], "reason": _block_reason(i["rules"])}
-        for i in plan["blocked"]
-    ]
+    skipped = []
+    for i in plan["blocked"]:
+        rule = _block_rule(i["rules"])
+        skipped.append(
+            {"id": i["id"], "name": i["name"], "rule": rule["title"], "reason": rule["message"]}
+        )
     would_delete = []
     for item in plan["deletable"]:
-        reason = now_blocked.get(item["id"])
-        if reason is None and item["parent"] in now_blocked:
-            reason = f"Kept because {item['parent']} is now blocked."
-        if reason:
-            skipped.append({"id": item["id"], "name": item["name"], "reason": reason})
+        blocked = now_blocked.get(item["id"])
+        if blocked is None and item["parent"] in now_blocked:
+            blocked = ("Kept with its AMI", f"Kept because {item['parent']} is now blocked.")
+        if blocked:
+            skipped.append(
+                {"id": item["id"], "name": item["name"], "rule": blocked[0], "reason": blocked[1]}
+            )
         else:
             would_delete.append(item)
 

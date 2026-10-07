@@ -1,2 +1,2 @@
 #!/bin/sh
-exec python3 scripts/check_private.py
+exec python3 scripts/check_private.py --staged

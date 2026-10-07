@@ -62,3 +62,21 @@ def test_invalid_config_is_rejected(tmp_path, change, message):
     path.write_text(yaml.safe_dump(data))
     with pytest.raises(ValidationError, match=message):
         load_config(path)
+
+
+def test_protected_tag_values_accept_yaml_booleans(tmp_path):
+    data = yaml.safe_load(EXAMPLE.read_text())
+    data["policy"]["protected_tags"] = {"retain": True}
+    path = tmp_path / "janitor.yaml"
+    path.write_text(yaml.safe_dump(data))  # dumps as an unquoted `true`
+    assert load_config(path).policy.protected_tags == {"retain": "true"}
+
+
+@pytest.mark.parametrize("value", ["", "  ", None])
+def test_protected_tag_needs_a_value(tmp_path, value):
+    data = yaml.safe_load(EXAMPLE.read_text())
+    data["policy"]["protected_tags"] = {"retain": value}
+    path = tmp_path / "janitor.yaml"
+    path.write_text(yaml.safe_dump(data))
+    with pytest.raises(ValidationError, match="needs a value"):
+        load_config(path)

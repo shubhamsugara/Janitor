@@ -24,6 +24,7 @@ from janitor.scanner import Scanner, ScanRunning, recompute_rules
 from janitor.store import Store
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+MAX_PAGE = 1_000_000  # larger offsets overflow SQLite's integer
 
 
 class Settings(BaseModel):
@@ -104,6 +105,12 @@ def create_app(
                 }
                 for account_id, a in config.accounts.items()
             ],
+            "policy": {
+                "orphan_after_days": config.policy.orphan_after_days,
+                "min_age_days": config.policy.min_age_days,
+                "typed_confirm_min_items": config.policy.typed_confirm_min_items,
+            },
+            "prices": {"source_date": prices.source_date, "fallback": not prices.data},
             "definitions": definitions.build(config),
         }
 
@@ -127,7 +134,7 @@ def create_app(
         created_to: str | None = None,
         tag: str | None = None,
         sort: str = "-created_at",
-        page: Annotated[int, Query(ge=1)] = 1,
+        page: Annotated[int, Query(ge=1, le=MAX_PAGE)] = 1,
         page_size: Annotated[int, Query(ge=1, le=500)] = 50,
     ):
         current = scan_id()
@@ -214,7 +221,8 @@ def create_app(
 
     @app.get("/api/audit")
     def audit(
-        page: Annotated[int, Query(ge=1)] = 1, page_size: Annotated[int, Query(ge=1, le=200)] = 50
+        page: Annotated[int, Query(ge=1, le=MAX_PAGE)] = 1,
+        page_size: Annotated[int, Query(ge=1, le=200)] = 50,
     ):
         items, total = store.list_audit(page, page_size)
         return {"items": items, "total": total}

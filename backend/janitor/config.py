@@ -34,6 +34,21 @@ class Policy(_Strict):
     protected_tags: dict[str, str] = Field(default_factory=dict)
     typed_confirm_min_items: int = Field(10, ge=1)
 
+    @field_validator("protected_tags", mode="before")
+    @classmethod
+    def _tag_values(cls, tags: object) -> object:
+        """YAML reads an unquoted `true` as a boolean; an empty value would protect nothing."""
+        if not isinstance(tags, dict):
+            return tags  # let pydantic report the type error
+        clean = {}
+        for key, value in tags.items():
+            if isinstance(value, bool):
+                value = str(value).lower()
+            if value is None or not str(value).strip() or not str(key).strip():
+                raise ValueError(f'protected tag {key!r} needs a value, for example retain: "true"')
+            clean[str(key)] = str(value)
+        return clean
+
 
 class Pricing(_Strict):
     snapshot_gb_month: float = 0.05
