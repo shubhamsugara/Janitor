@@ -5,25 +5,18 @@ Read this first, then the spec.
 ## Status
 
 - **Design spec approved:** [`docs/superpowers/specs/2026-10-06-janitor-poc-design.md`](superpowers/specs/2026-10-06-janitor-poc-design.md) (commit `fa5f040`).
-- **No code yet.** No implementation plan written yet.
-- The original vision docs moved to `test-docs/` (that move is not committed yet).
+- **Roadmap (4 phases):** [`docs/superpowers/plans/2026-10-07-janitor-roadmap.md`](superpowers/plans/2026-10-07-janitor-roadmap.md)
+  — 1 MVP, 2 bug fixes, 3 new features, 4 final product.
+- **Phase 1 plan written (5 tasks), pending review:**
+  [`docs/superpowers/plans/2026-10-07-phase-1-mvp.md`](superpowers/plans/2026-10-07-phase-1-mvp.md).
+  Its code has not been run yet; executors fix small mistakes as they go.
+- **No code yet.**
 
 ## Next step
 
-Write the implementation plan with the `superpowers:writing-plans` skill. Split the
-spec into three plans, each producing working, testable software on its own. Write
-plan 1 first and save it to `docs/superpowers/plans/`.
-
-1. **Backend core on mock data:** config, models, MockProvider + seed fixture
-   (`scripts/make_seed.py`), store (SQLite), linker, rules, definitions,
-   plan/simulate, FastAPI routes, leak check (`scripts/check_private.py`).
-2. **UI + container:** React + TypeScript + Vite + Cloudscape SPA, base-path
-   handling, Dockerfile, `docker-compose.yml`, Makefile, Playwright end-to-end test.
-3. **Read-only AWS provider:** assume-role with the Describe-only session policy,
-   the botocore guard, moto tests, live re-check in simulate.
-
-After the plan is reviewed, the user chooses the execution method
-(subagent-driven or native) before any code is written.
+The user reviews the phase 1 plan and chooses the execution method (subagent-driven
+or native). Then execute it task by task. Plans for phases 2–4 are written after the
+previous phase is in use.
 
 ## Verified dependency pins (Python 3.12, checked 2026-10-06)
 
