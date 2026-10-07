@@ -422,3 +422,18 @@ def test_export_json_route(client):
 
 def test_export_rejects_bad_sort(client):
     assert client.get("/api/resources/export.csv", params={"sort": "nope"}).status_code == 422
+
+
+def test_selected_snapshot_that_is_blocked_on_its_own_makes_the_plan_mixed(tmp_path, config):
+    retained = {"owner": "me", "retain": "true"}
+    store = _store_with(
+        tmp_path,
+        config,
+        [_r("ami-a", "ami", snapshot_ids=["snap-a"]), _r("snap-a", "snapshot", tags=retained)],
+    )
+    body = plans.make_plan(store, config, ["ami-a", "snap-a"], NOW)
+    assert body["variant"] == "mixed"
+    assert [(i["id"], i["parent"]) for i in body["blocked"]] == [
+        ("snap-a", None)
+    ]  # counted as selected
+    assert [i["id"] for i in body["deletable"]] == ["ami-a"]

@@ -67,3 +67,12 @@ def test_staged_mode_passes_a_clean_index(tmp_path):
     (tmp_path / "a.txt").write_text("account 111111111111\n")
     _git(tmp_path, "add", "a.txt")
     assert check_private.check_staged([], root=tmp_path) == []
+
+
+def test_non_utf8_files_are_still_checked(tmp_path):
+    _git(tmp_path, "init", "-q")
+    path = tmp_path / "inventory.csv"
+    path.write_bytes(f"caf\xe9,{REAL_LOOKING}\n".encode("latin-1"))  # what Excel's "CSV" saves
+    _git(tmp_path, "add", "inventory.csv")
+    assert len(check_private.check_staged([], root=tmp_path)) == 1
+    assert len(check_private.check([path], [])) == 1

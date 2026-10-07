@@ -122,3 +122,82 @@ def test_context_ids_are_prefixed(scanned):
 def test_unknown_resource_has_no_graph(scanned):
     store, config, scan_id = scanned
     assert build_graph(store, config, scan_id, "ami-0000000000000dead") is None
+
+
+def _fan_out_store(tmp_path, config):
+    from janitor.models import Inventory, Resource, Share, Usage
+
+    ami = Resource(
+        id="ami-big",
+        type="ami",
+        account="111111111111",
+        region="us-east-1",
+        name="big",
+        created_at="2026-01-01T00:00:00Z",
+        size_gb=8,
+        tags={"owner": "me"},
+    )
+    usage = [
+        Usage(
+            "ami-big",
+            "333333333333",
+            "us-east-1",
+            "instance",
+            f"i-stop{n:03d}",
+            f"stopped-{n:03d}",
+            "stopped",
+        )
+        for n in range(30)
+    ]
+    usage += [
+        Usage(
+            "ami-big",
+            "333333333333",
+            "us-east-1",
+            "instance",
+            f"i-run{n}",
+            f"running-{n}",
+            "running",
+        )
+        for n in range(2)
+    ]
+    shares = [
+        Share("ami-big", "account", "333333333333"),
+        Share("ami-big", "account", "444444444444"),
+    ]
+
+    class Provider:
+        name = "mock"
+
+        def list_inventory(self):
+            return Inventory([ami], shares, usage, [])
+
+    store = Store(tmp_path / "fan.db")
+    return store, Scanner(store, Provider(), config, clock=lambda: NOW).run()
+
+
+def test_lane_cap_keeps_running_users_and_shares(tmp_path, config):
+    store, scan_id = _fan_out_store(tmp_path, config)
+    g = build_graph(store, config, scan_id, "ami-big", lane_cap=10)
+    labels = {n["label"] for n in g["nodes"] if n["depth"] == 1}
+    assert {"running-0", "running-1", "prd", "444444444444 (not scanned)"} <= labels
+    assert next(n for n in g["nodes"] if n["id"] == "more:1")["label"] == "+24 more"
+    assert ("ami-big", "more:1") in {(e["source"], e["target"]) for e in g["edges"]}
+
+
+def test_used_by_admits_what_janitor_cant_see(scanned):
+    store, _, scan_id = scanned
+    public = named(store, scan_id, f"public-demo-{stamp(180)}", type="ami")
+    partner = named(store, scan_id, f"partner-export-{stamp(250)}", type="ami")
+    assert graph_of(scanned, public)["used_by"]["summary"] == (
+        "Nothing in the scanned accounts uses it. It is public, so other AWS accounts may."
+    )
+    assert graph_of(scanned, partner)["used_by"]["summary"] == (
+        "Nothing in the scanned accounts uses it. It is shared with 444444444444, "
+        "which Janitor doesn't scan, so it may be used there."
+    )
+    [snap] = store.get_resources(scan_id, partner.snapshot_ids)
+    assert graph_of(scanned, snap)["used_by"]["summary"] == (
+        f"It backs {partner.id} ({partner.name}). Nothing in the scanned accounts uses it. "
+        "It is shared with 444444444444, which Janitor doesn't scan, so it may be used there."
+    )

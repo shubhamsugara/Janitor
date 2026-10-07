@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Background, Controls, Handle, MarkerType, Position, ReactFlow, type Edge, type Node, type NodeProps } from "@xyflow/react";
 import type { Graph, GraphNode, Meta } from "../api";
-import { RELATION_LABELS, layoutGraph } from "../graphLayout";
+import { RELATION_LABELS, diagramHeight, layoutGraph } from "../graphLayout";
 import AwsIcon from "./AwsIcon";
 import "./diagram.css";
 
@@ -74,7 +74,7 @@ export default function LinkageDiagram({ graph, meta, dark, onSelect }: Props) {
   }, [graph, meta]);
 
   return (
-    <div className="janitor-diagram">
+    <div className="janitor-diagram" style={{ height: diagramHeight(graph) }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}

@@ -166,6 +166,10 @@ def make_plan(store: Store, config: Config, ids: list[str], now: datetime) -> di
     backing = _backing_snapshots(store, config, scan_id, selected, items, now)
     backing_ids = {b["id"] for b in backing}
     items = [i for i in items if i["id"] not in backing_ids] + backing
+    selected_ids = {r.id for r in selected}
+    for i in items:
+        if _blocked(i) and i["id"] in selected_ids:
+            i["parent"] = None  # selected and kept: the user's own item, not one riding along
     blocked = [i for i in items if _blocked(i)]
     deletable = [i for i in items if not _blocked(i)]
     any_blocked = any(i["parent"] is None for i in blocked)

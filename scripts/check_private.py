@@ -61,10 +61,8 @@ def check(paths: list[Path], terms: list[str]) -> list[str]:
     for path in paths:
         if not path.is_file():
             continue
-        try:
-            text = path.read_text()
-        except UnicodeDecodeError:
-            continue
+        # Not UTF-8 (an Excel CSV, a PDF) still gets checked: an ID is ASCII in any of them.
+        text = path.read_text(errors="replace")
         problems += check_text(str(path), text, terms)
     return problems
 
@@ -84,10 +82,7 @@ def check_staged(terms: list[str], root: Path = ROOT) -> list[str]:
         .split("\0")
     )
     for name in filter(None, names):
-        try:
-            text = git("show", f":{name}").decode()
-        except UnicodeDecodeError:
-            continue
+        text = git("show", f":{name}").decode(errors="replace")
         problems += check_text(name, text, terms)
     return problems
 

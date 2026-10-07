@@ -107,11 +107,34 @@ def used_by(store: Store, config: Config, scan_id: int, r: Resource) -> dict:
         }
     else:
         refs = []
-    return {
-        "active": sum(1 for u in refs if u.active),
-        "total": len(refs),
-        "summary": summarize(refs, via, config),
-    }
+    summary = summarize(refs, via, config)
+    amis = [r] if r.type == "ami" else via or []
+    blind_spot = _blind_spot(store, config, scan_id, amis) if not refs else None
+    if blind_spot:
+        backs = f"It backs {_join([f'{a.id} ({a.name})' for a in via])}. " if via else ""
+        summary = f"{backs}Nothing in the scanned accounts uses it. {blind_spot}"
+    return {"active": sum(1 for u in refs if u.active), "total": len(refs), "summary": summary}
+
+
+def _blind_spot(store: Store, config: Config, scan_id: int, amis: list[Resource]) -> str | None:
+    """Why "nothing uses it" can't be proven: the AMI reaches accounts Janitor doesn't scan."""
+    shares = [s for ami in amis for s in store.shares_for(scan_id, ami.id)]
+    if any(s.principal_type == "group" and s.principal == "all" for s in shares):
+        return "It is public, so other AWS accounts may."
+    unscanned = sorted(
+        {
+            s.principal
+            for s in shares
+            if s.principal_type == "account" and s.principal not in config.accounts
+        }
+    )
+    if unscanned:
+        return f"It is shared with {_join(unscanned)}, which Janitor doesn't scan, so it may be used there."
+    if any(s.principal_type in ("org", "ou") for s in shares):
+        return (
+            "It is shared with an organization or OU, so accounts Janitor doesn't scan may use it."
+        )
+    return None
 
 
 class _Walker:
@@ -241,6 +264,17 @@ class _Walker:
         return out
 
 
+def _priority(node: dict) -> int:
+    """Which neighbors survive the lane cap: resources, running users, shares, then the rest."""
+    if node["kind"] in RESOURCE_KINDS:
+        return 0
+    if node["active"]:
+        return 1
+    if node["kind"] in ("account", "database"):
+        return 2
+    return 3 if node["active"] is False else 4
+
+
 def build_graph(
     store: Store, config: Config, scan_id: int, root_id: str, depth: int = 2, lane_cap: int = 25
 ) -> dict | None:
@@ -258,13 +292,17 @@ def build_graph(
         node, hops = queue.popleft()
         if hops == depth:
             continue
-        for neighbor, edge in walker.neighbors(node):
+        for neighbor, edge in sorted(walker.neighbors(node), key=lambda pair: _priority(pair[0])):
             if neighbor["id"] in nodes:
                 edges.add(edge)
                 continue
-            lane = node["depth"] + (1 if edge.source == node["id"] else -1)
+            downstream = edge.source == node["id"]
+            lane = node["depth"] + (1 if downstream else -1)
             if lane_size[lane] >= lane_cap:
                 hidden[lane].add(neighbor["id"])
+                more = f"more:{lane}"
+                ends = (node["id"], more) if downstream else (more, node["id"])
+                edges.add(Edge(*ends, edge.relation))  # the "+N more" node stays connected
                 continue
             lane_size[lane] += 1
             nodes[neighbor["id"]] = neighbor | {"depth": lane}

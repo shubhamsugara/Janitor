@@ -55,3 +55,11 @@ export function layoutGraph(graph: Graph): Placed[] {
   }
   return placed;
 }
+
+/** Canvas height for a graph: tall enough for its fullest lane at full size, within bounds. */
+export function diagramHeight(graph: Graph): number {
+  const lanes = new Map<number, number>();
+  for (const node of graph.nodes) lanes.set(node.depth, (lanes.get(node.depth) ?? 0) + 1);
+  const rows = Math.max(0, ...lanes.values());
+  return Math.min(900, Math.max(360, rows * ROW_HEIGHT + 80));
+}
