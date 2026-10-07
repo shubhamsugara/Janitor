@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from janitor import definitions, plans
 from janitor.config import load_config
+from janitor.pricing import PriceTable
 from janitor.providers.mock import MockProvider
 from janitor.rules import RULES, strictest
 from janitor.scanner import Scanner, ScanRunning, recompute_rules
@@ -29,6 +30,7 @@ class Settings(BaseModel):
     db_path: str = "data/janitor.db"
     seed_path: str = str(REPO_ROOT / "fixtures" / "seed.json")
     static_dir: str = str(REPO_ROOT / "frontend" / "dist")
+    prices_path: str = str(REPO_ROOT / "fixtures" / "prices.json")
     scan_on_startup: bool = True
 
     @classmethod
@@ -39,6 +41,7 @@ class Settings(BaseModel):
             db_path=os.environ.get("JANITOR_DB", defaults.db_path),
             seed_path=os.environ.get("JANITOR_SEED", defaults.seed_path),
             static_dir=os.environ.get("JANITOR_STATIC_DIR", defaults.static_dir),
+            prices_path=os.environ.get("JANITOR_PRICES", defaults.prices_path),
         )
 
 
@@ -65,7 +68,8 @@ def create_app(
     provider = MockProvider(settings.seed_path, clock=clock)
     store = Store(settings.db_path)
     store.fail_running_scans()
-    scanner = Scanner(store, provider, config, clock)
+    prices = PriceTable.load(settings.prices_path, config.pricing)
+    scanner = Scanner(store, provider, config, clock, prices)
     latest = store.latest_scan()
     if latest:
         recompute_rules(store, config, latest["id"], clock())

@@ -37,6 +37,7 @@ class Policy(_Strict):
 
 class Pricing(_Strict):
     snapshot_gb_month: float = 0.05
+    snapshot_archive_gb_month: float = 0.0125
     rds_snapshot_gb_month: float = 0.095
     volume_gb_month: dict[str, float] = Field(default_factory=lambda: {"gp3": 0.08})
 

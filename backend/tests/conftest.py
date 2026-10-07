@@ -12,6 +12,7 @@ def clean_env(monkeypatch):
         "JANITOR_DB",
         "JANITOR_SEED",
         "JANITOR_STATIC_DIR",
+        "JANITOR_PRICES",
     ):
         monkeypatch.delenv(key, raising=False)
 

@@ -17,5 +17,6 @@ policy:
   typed_confirm_min_items: 10
 pricing:                  # fallback only: real rates come from fixtures/prices.json
   snapshot_gb_month: 0.05
+  snapshot_archive_gb_month: 0.0125
   rds_snapshot_gb_month: 0.095
   volume_gb_month: { gp3: 0.08, gp2: 0.10, io1: 0.125, io2: 0.125, st1: 0.045, sc1: 0.015, standard: 0.05 }

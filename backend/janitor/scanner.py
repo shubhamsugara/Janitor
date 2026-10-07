@@ -5,9 +5,9 @@ import threading
 from collections.abc import Callable
 from datetime import UTC, datetime
 
-from janitor.config import Config, Pricing
+from janitor.config import Config
 from janitor.linker import LinkContext, link
-from janitor.models import Resource
+from janitor.pricing import PriceTable, apply_costs
 from janitor.providers.base import CloudProvider
 from janitor.rules import evaluate
 from janitor.store import Store
@@ -17,21 +17,6 @@ log = logging.getLogger(__name__)
 
 class ScanRunning(Exception):
     """Raised when a scan is requested while one is running."""
-
-
-def estimate_cost(r: Resource, pricing: Pricing) -> float | None:
-    """Monthly estimate: size × rate. AMIs have no cost of their own; their snapshots do."""
-    if r.size_gb is None or r.type == "ami":
-        return None
-    if r.type == "snapshot":
-        rate = pricing.snapshot_gb_month
-    elif r.type == "rds_snapshot":
-        rate = pricing.rds_snapshot_gb_month
-    else:
-        rate = pricing.volume_gb_month.get(r.volume_type or "")
-        if rate is None:
-            return None
-    return round(r.size_gb * rate, 2)
 
 
 def recompute_rules(store: Store, config: Config, scan_id: int, now: datetime) -> None:
@@ -47,11 +32,13 @@ class Scanner:
         provider: CloudProvider,
         config: Config,
         clock: Callable[[], datetime] | None = None,
+        prices: PriceTable | None = None,
     ):
         self._store = store
         self._provider = provider
         self._config = config
         self._clock = clock or (lambda: datetime.now(UTC))
+        self._prices = prices or PriceTable(config.pricing)
         self._lock = threading.Lock()
         self._thread: threading.Thread | None = None
 
@@ -98,7 +85,7 @@ class Scanner:
             statuses = link(inventory, LinkContext.from_config(self._config, now))
             for r in inventory.resources:
                 r.status, r.status_reason = statuses[r.id]
-                r.est_monthly_cost = estimate_cost(r, self._config.pricing)
+            apply_costs(inventory.resources, self._prices)
             self._store.save_inventory(
                 scan_id, inventory.resources, inventory.shares, inventory.usage, inventory.databases
             )

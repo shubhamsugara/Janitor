@@ -2,7 +2,7 @@ from urllib.parse import quote
 
 import pytest
 from fastapi.testclient import TestClient
-from helpers import EXAMPLE, NOW, SEED, stamp
+from helpers import EXAMPLE, NOW, SEED, TEST_PRICES, stamp
 
 from janitor import plans
 from janitor.main import Settings, create_app
@@ -22,6 +22,7 @@ def app(tmp_path):
         db_path=str(tmp_path / "janitor.db"),
         seed_path=str(SEED),
         static_dir=str(static),
+        prices_path=str(TEST_PRICES),
     )
     return create_app(settings, clock=lambda: NOW)
 
@@ -81,7 +82,9 @@ def test_resource_list_filters_paginates_and_reports_stats(client):
     ).json()
     assert len(body["items"]) == 2 and body["total"] > 2
     assert all(i["status"] == "orphaned" for i in body["items"])
-    assert body["stats"]["total"] == body["total"] and body["stats"]["est_monthly_usd"] is None
+    assert (
+        body["stats"]["total"] == body["total"] and body["stats"]["est_monthly_usd"] > 0
+    )  # AMIs cost their snapshots
     assert {"outcome", "status_reason", "tags"} <= set(body["items"][0])
     assert client.get("/api/resources", params={"sort": "nope"}).status_code == 422
 
@@ -287,3 +290,10 @@ def test_simulate_refuses_after_config_change(tmp_path, config):
         plans.simulate(store, changed, plan_id, "")
     assert refused.value.status_code == 409
     assert len(plans.simulate(store, config, plan_id, "")["would_delete"]) == 1
+
+
+def test_volume_cost_has_a_breakdown(client):
+    vol = find(client, "volume", "prd-scratch-data")
+    labels = [line["label"] for line in vol["cost_breakdown"]["lines"]]
+    assert labels[0] == "Storage (io2)" and "Provisioned IOPS 32,001–40,000" in labels
+    assert vol["est_monthly_cost"] == vol["cost_breakdown"]["total"]

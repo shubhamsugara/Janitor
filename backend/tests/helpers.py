@@ -22,3 +22,4 @@ def days_ago(days: int) -> str:
 
 
 SBX, UAT, QAS = "555555555555", "666666666666", "777777777777"
+TEST_PRICES = ROOT / "backend" / "tests" / "data" / "prices.json"
