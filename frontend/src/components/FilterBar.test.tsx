@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { Meta } from "../api";
 import { EMPTY } from "../filters";
@@ -33,5 +33,21 @@ describe("FilterBar", () => {
   it("shows no reset button when nothing is filtered", () => {
     render(<FilterBar meta={meta} filters={EMPTY} onChange={() => {}} total={5} />);
     expect(screen.queryByRole("button", { name: "Reset filters" })).toBeNull();
+  });
+
+  it("a reset during typing wins over the half-typed search", () => {
+    vi.useFakeTimers();
+    try {
+      const onChange = vi.fn();
+      const filters = { ...EMPTY, status: ["orphaned"] };
+      const { rerender } = render(<FilterBar meta={meta} filters={filters} onChange={onChange} total={1} />);
+      fireEvent.change(screen.getByLabelText("Search name or ID"), { target: { value: "web" } });
+      rerender(<FilterBar meta={meta} filters={{ ...EMPTY }} onChange={onChange} total={1} />); // Reset landed
+      act(() => vi.advanceTimersByTime(500));
+      expect(onChange).not.toHaveBeenCalledWith(expect.objectContaining({ q: "web" }));
+      expect((screen.getByLabelText("Search name or ID") as HTMLInputElement).value).toBe("");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

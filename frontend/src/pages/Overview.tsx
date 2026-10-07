@@ -22,7 +22,7 @@ export default function Overview({ meta, notify }: PageProps) {
     api.overview().then(setData).catch((e: Error) => notify("error", e.message));
     Promise.all(TYPE_PAGES.map((p) => api.stats(new URLSearchParams({ type: p.type }))))
       .then((all) => setStats(Object.fromEntries(TYPE_PAGES.map((p, i) => [p.type, all[i]]))))
-      .catch(() => setStats({}));
+      .catch(() => setStats(Object.fromEntries(TYPE_PAGES.map((p) => [p.type, null]))));
   }, [notify]);
   useEffect(load, [load]);
 
@@ -58,7 +58,7 @@ export default function Overview({ meta, notify }: PageProps) {
       <Card className="mx-auto mt-12 max-w-md p-10 text-center">
         <h2 className="text-lg font-semibold">No scan yet</h2>
         <p className="mt-1 text-[13px] text-muted">Janitor lists your AMIs, snapshots, and volumes, then explains each status.</p>
-        <Button variant="primary" className="mt-5" loading={scanning} onClick={scan}>
+        <Button variant="primary" className="mt-5" loading={scanning || data.scanning} onClick={scan}>
           Run first scan
         </Button>
       </Card>
@@ -110,7 +110,13 @@ export default function Overview({ meta, notify }: PageProps) {
                     : "No data"}
                 </p>
                 <div className="mt-5 border-t border-line pt-4">
-                  {s && s.total > 0 ? <StatusDonut buckets={s.by_status} meta={meta} total={s.total} size={112} /> : <Skeleton className="h-28 w-full" />}
+                  {s === undefined ? (
+                    <Skeleton className="h-28 w-full" />
+                  ) : s && s.total > 0 ? (
+                    <StatusDonut buckets={s.by_status} meta={meta} total={s.total} size={112} />
+                  ) : (
+                    <p className="flex h-28 items-center justify-center text-[13px] text-muted">No breakdown yet</p>
+                  )}
                 </div>
               </Card>
             </Link>

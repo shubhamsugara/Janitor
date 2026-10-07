@@ -46,11 +46,11 @@ export default function ResourceTable({ meta, items, loading, sort, onSort, sele
   }
 
   return (
-    <Table>
-      <THead>
+    <Table sticky aria-busy={loading || undefined}>
+      <THead sticky>
         <tr>
           <Th className="w-10">
-            <input type="checkbox" className="size-4 accent-[var(--accent)]" checked={allOnPage} onChange={toggleAll} aria-label="Select all on this page" />
+            <input type="checkbox" className="size-4 accent-[var(--accent)]" checked={allOnPage} onChange={toggleAll} disabled={loading} aria-label="Select all on this page" />
           </Th>
           {COLUMNS.map((c) => (
             <Th
@@ -63,7 +63,7 @@ export default function ResourceTable({ meta, items, loading, sort, onSort, sele
           ))}
         </tr>
       </THead>
-      <TBody>
+      <TBody busy={loading && items.length > 0}>
         {loading && items.length === 0 ? (
           Array.from({ length: 8 }, (_, i) => (
             <Tr key={i}>
@@ -84,7 +84,7 @@ export default function ResourceTable({ meta, items, loading, sort, onSort, sele
           items.map((r) => (
             <Tr key={r.id} className={selectedIds.has(r.id) ? "[&>td]:bg-accent-soft/60" : undefined}>
               <Td>
-                <input type="checkbox" className="size-4 accent-[var(--accent)]" checked={selectedIds.has(r.id)} onChange={() => toggle(r)} aria-label={`Select ${r.name || r.id}`} />
+                <input type="checkbox" className="size-4 accent-[var(--accent)]" checked={selectedIds.has(r.id)} onChange={() => toggle(r)} disabled={loading} aria-label={`Select ${r.name || r.id}`} />
               </Td>
               <Td className="max-w-[340px]">
                 <div className="flex min-w-0 items-center gap-3">

@@ -58,7 +58,7 @@
 .react-flow__edge.edge-copied_to .react-flow__edge-path { stroke: #ed7100; stroke-dasharray: 6 4; }
 .react-flow__edge.edge-shared_with .react-flow__edge-path { stroke: #e7157b; stroke-dasharray: 2 4; }
 
-/* Cloudscape marks dark mode with this class on <body>. */
+/* Dark mode: theme.ts puts a `dark` class on <html>. */
 .dark .janitor-node.active .janitor-node-state { color: #34d399; }
 .janitor-diagram .react-flow {
   --xy-background-color: var(--card);

@@ -2,20 +2,23 @@ import type { HTMLAttributes, ReactNode, TdHTMLAttributes, ThHTMLAttributes } fr
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { cn } from "./cn";
 
-export function Table({ className, ...rest }: HTMLAttributes<HTMLTableElement>) {
-  return (
-    <div className="overflow-x-auto">
-      <table className={cn("w-full border-separate border-spacing-0 text-sm", className)} {...rest} />
-    </div>
-  );
+interface TableProps extends HTMLAttributes<HTMLTableElement> {
+  /** Page-level table whose header sticks below the top bar. A scroll wrapper would break that. */
+  sticky?: boolean;
 }
 
-export function THead({ children }: { children: ReactNode }) {
-  return <thead className="sticky top-0 z-10 bg-card">{children}</thead>;
+export function Table({ sticky, className, ...rest }: TableProps) {
+  const table = <table className={cn("w-full border-separate border-spacing-0 text-sm", className)} {...rest} />;
+  return sticky ? table : <div className="overflow-x-auto">{table}</div>;
 }
 
-export function TBody({ children }: { children: ReactNode }) {
-  return <tbody>{children}</tbody>;
+export function THead({ children, sticky }: { children: ReactNode; sticky?: boolean }) {
+  return <thead className={cn("bg-card", sticky && "sticky top-14 z-10")}>{children}</thead>;
+}
+
+/** `busy`: rows from the previous request, shown dimmed until the new ones arrive. */
+export function TBody({ children, busy }: { children: ReactNode; busy?: boolean }) {
+  return <tbody className={cn("transition-opacity", busy && "pointer-events-none opacity-45")}>{children}</tbody>;
 }
 
 export function Tr({ className, ...rest }: HTMLAttributes<HTMLTableRowElement>) {

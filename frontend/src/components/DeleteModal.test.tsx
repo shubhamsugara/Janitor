@@ -96,4 +96,12 @@ describe("DeleteModal", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it("long lists start collapsed and show they can be expanded", () => {
+    const many = Array.from({ length: 12 }, (_, i) => item(`ami-${i}`));
+    show(plan({ deletable: many }));
+    const summary = screen.getByText("Would be deleted (12)").closest("summary")!;
+    expect(summary.closest("details")!.open).toBe(false);
+    expect(summary.querySelector("svg")).toBeTruthy();
+  });
 });

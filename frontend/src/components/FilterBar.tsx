@@ -77,6 +77,8 @@ export default function FilterBar({ meta, filters, onChange, total }: Props) {
   // `typed` is what the user is typing; null means "show the filter as it is" (e.g. after Reset).
   const [typed, setTyped] = useState<string | null>(null);
   const q = typed ?? filters.q;
+  // Any outside change to the filters (Reset, a pill, navigation) wins over half-typed text.
+  useEffect(() => setTyped(null), [filters]);
   useEffect(() => {
     if (typed === null) return;
     const timer = setTimeout(() => {

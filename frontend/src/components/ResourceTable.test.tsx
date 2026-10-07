@@ -17,9 +17,9 @@ function vol(id: string): Resource {
   } as Resource;
 }
 
-function table(onSelect = vi.fn(), onOpen = vi.fn()) {
+function table(onSelect = vi.fn(), onOpen = vi.fn(), loading = false) {
   render(
-    <ResourceTable meta={meta} type="volume" items={[vol("vol-1"), vol("vol-2")]} loading={false} sort="-created_at"
+    <ResourceTable meta={meta} type="volume" items={[vol("vol-1"), vol("vol-2")]} loading={loading} sort="-created_at"
       onSort={() => {}} selected={[]} onSelect={onSelect} onOpen={onOpen} empty={<span>Nothing</span>} />,
   );
   return { onSelect, onOpen };
@@ -36,5 +36,19 @@ describe("ResourceTable", () => {
     const { onOpen } = table();
     fireEvent.click(screen.getByRole("button", { name: "name-vol-2" }));
     expect(onOpen).toHaveBeenCalledWith("vol-2");
+  });
+
+  it("while new results load, the old rows are marked busy and can't be selected", () => {
+    table(vi.fn(), vi.fn(), true);
+    expect(screen.getByRole("table").getAttribute("aria-busy")).toBe("true");
+    expect((screen.getByLabelText("Select name-vol-1") as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByLabelText("Select all on this page") as HTMLInputElement).disabled).toBe(true);
+  });
+
+  it("the header row sticks below the top bar instead of inside a scroll box", () => {
+    table();
+    const head = screen.getByRole("table").querySelector("thead")!;
+    expect(head.className).toContain("top-14");
+    expect(screen.getByRole("table").parentElement?.className ?? "").not.toContain("overflow-x-auto");
   });
 });

@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Info, TriangleAlert } from "lucide-react";
+import { ChevronRight, Info, TriangleAlert } from "lucide-react";
 import { api, type Meta, type Plan, type PlanItem, type SimulateResult } from "../api";
 import { formatGiB, formatUsd, plural } from "../format";
 import { Button } from "../ui/button";
@@ -31,7 +31,8 @@ function Callout({ tone, children }: { tone: "info" | "warning" | "error"; child
 function ItemList({ title, items, blocked }: { title: string; items: PlanItem[]; blocked: boolean }) {
   return (
     <details open={items.length <= 10} className="group rounded-xl border border-line">
-      <summary className="cursor-pointer list-none px-4 py-2.5 text-[13px] font-medium select-none">
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-2.5 text-[13px] font-medium select-none [&::-webkit-details-marker]:hidden">
+        <ChevronRight className="size-4 text-muted transition-transform group-open:rotate-90" aria-hidden />
         {`${title} (${items.length})`}
       </summary>
       <ul className="divide-y divide-line border-t border-line">
