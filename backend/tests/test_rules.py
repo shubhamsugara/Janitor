@@ -78,3 +78,15 @@ def test_explanations_use_live_config_values(config):
 
 def test_r4_protected_tag_key_is_case_insensitive():
     assert ids(res(tags={"Owner": "me", "Retain": "true"})) == {("R4", "block")}
+
+
+@pytest.mark.parametrize(
+    "tags",
+    [
+        {"owner": "me", "Retain": "true", "retain": "no"},
+        {"owner": "me", "retain": "no", "Retain": "true"},
+    ],
+)
+def test_r4_blocks_when_any_case_variant_of_the_key_matches(tags):
+    """AWS tag keys are case-sensitive, so one resource can carry both."""
+    assert ids(res(tags=tags)) == {("R4", "block")}

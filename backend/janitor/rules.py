@@ -68,12 +68,19 @@ def evaluate(
         hit("R2", r.status_reason)
     if r.status == "managed":
         hit("R3", r.status_reason)
-    tags = {k.lower(): (k, v) for k, v in r.tags.items()}  # AWS tag keys are often capitalized
-    for key, value in policy.protected_tags.items():
-        found = tags.get(key.lower())
-        if found and str(found[1]).lower() == value.lower():
-            hit("R4", f"Tagged {found[0]}={found[1]}.")
-            break
+    # Match keys in any case, and check every variant: AWS tag keys are case-sensitive, so
+    # one resource can carry both Retain=true and retain=no. Any matching variant protects it.
+    protected = next(
+        (
+            (k, v)
+            for key, value in policy.protected_tags.items()
+            for k, v in r.tags.items()
+            if k.lower() == key.lower() and str(v).lower() == value.lower()
+        ),
+        None,
+    )
+    if protected:
+        hit("R4", f"Tagged {protected[0]}={protected[1]}.")
     age = age_days(r.created_at, now)
     if age < policy.min_age_days:
         hit("R5", f"Created {age} days ago; the minimum age is {policy.min_age_days} days.")
