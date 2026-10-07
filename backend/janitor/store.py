@@ -331,6 +331,42 @@ class Store:
         )
         return [_resource(r) for r in rows]
 
+    def usage_for(self, scan_id: int, image_id: str, region: str) -> list[Usage]:
+        rows = self._q(
+            "SELECT image_id, account, region, ref_type, ref_id, ref_name, ref_state FROM usage "
+            "WHERE scan_id = ? AND image_id = ? AND region = ?",
+            (scan_id, image_id, region),
+        )
+        return [Usage(**dict(r)) for r in rows]
+
+    def snapshots_of_volume(
+        self, scan_id: int, account: str, region: str, volume_id: str
+    ) -> list[Resource]:
+        rows = self._q(
+            "SELECT * FROM resources WHERE scan_id = ? AND type = 'snapshot' AND account = ? "
+            "AND region = ? AND source_volume_id = ?",
+            (scan_id, account, region, volume_id),
+        )
+        return [_resource(r) for r in rows]
+
+    def snapshots_of_database(
+        self, scan_id: int, account: str, region: str, db_id: str
+    ) -> list[Resource]:
+        rows = self._q(
+            "SELECT * FROM resources WHERE scan_id = ? AND type = 'rds_snapshot' AND account = ? "
+            "AND region = ? AND source_db_id = ?",
+            (scan_id, account, region, db_id),
+        )
+        return [_resource(r) for r in rows]
+
+    def database(self, scan_id: int, account: str, region: str, db_id: str) -> Database | None:
+        rows = self._q(
+            "SELECT id, account, region, kind FROM databases WHERE scan_id = ? AND account = ? "
+            "AND region = ? AND id = ?",
+            (scan_id, account, region, db_id),
+        )
+        return Database(**dict(rows[0])) if rows else None
+
     def related(self, scan_id: int, r: Resource) -> dict:
         """Linked resources for the detail panel, computed from columns."""
         out: dict = {"links": [], "shares": [], "usage": []}

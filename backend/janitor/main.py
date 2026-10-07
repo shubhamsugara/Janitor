@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from janitor import definitions, plans
 from janitor.config import load_config
+from janitor.graph import build_graph
 from janitor.pricing import PriceTable
 from janitor.providers.mock import MockProvider
 from janitor.rules import RULES, strictest
@@ -153,6 +154,14 @@ def create_app(
             "stats": store.stats(current, filters),
             "scan_id": current,
         }
+
+    @app.get("/api/resources/{resource_id:path}/graph")
+    def resource_graph(resource_id: str):
+        current = scan_id()
+        result = build_graph(store, config, current, resource_id) if current else None
+        if result is None:
+            raise HTTPException(404, "That resource isn't in the latest scan. Reload the list.")
+        return result
 
     @app.get("/api/resources/{resource_id:path}")
     def resource_detail(resource_id: str):

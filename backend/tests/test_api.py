@@ -297,3 +297,21 @@ def test_volume_cost_has_a_breakdown(client):
     labels = [line["label"] for line in vol["cost_breakdown"]["lines"]]
     assert labels[0] == "Storage (io2)" and "Provisioned IOPS 32,001–40,000" in labels
     assert vol["est_monthly_cost"] == vol["cost_breakdown"]["total"]
+
+
+def test_graph_route(client):
+    ami = find(client, "ami", f"base-linux-{stamp(20)}")
+    body = client.get(f"/api/resources/{ami['id']}/graph").json()
+    assert body["root"] == ami["id"] and body["used_by"]["total"] == 4
+    assert client.get("/api/resources/ami-0000000000000dead/graph").status_code == 404
+
+
+def test_graph_route_with_arn(client):
+    rds = client.get("/api/resources", params={"type": "rds_snapshot", "q": "dev-orders"}).json()[
+        "items"
+    ][0]
+    assert client.get(f"/api/resources/{quote(rds['id'], safe='')}/graph").status_code == 200
+    assert (
+        client.get(f"/api/resources/{quote(rds['id'], safe='')}").json()["resource"]["id"]
+        == rds["id"]
+    )
