@@ -13,3 +13,4 @@ data/
 .private-terms
 frontend/node_modules/
 frontend/dist/
+frontend/public/aws-icons/

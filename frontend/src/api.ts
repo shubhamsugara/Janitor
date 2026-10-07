@@ -1,6 +1,32 @@
 export type ResourceType = "ami" | "snapshot" | "volume" | "rds_snapshot";
 export type Status = "in_use" | "managed" | "unknown" | "orphaned" | "idle";
 export type Outcome = "block" | "warn" | "pass";
+export type NodeKind =
+  | ResourceType
+  | "instance"
+  | "asg"
+  | "launch_template"
+  | "launch_config"
+  | "account"
+  | "database"
+  | "more";
+
+export interface CostLine {
+  label: string;
+  quantity: number;
+  unit: string;
+  rate: number;
+  amount: number;
+}
+
+export interface CostBreakdown {
+  region: string;
+  source_date: string | null;
+  estimate: string | null;
+  lines: CostLine[];
+  fallback: boolean;
+  total: number;
+}
 
 export interface Resource {
   id: string;
@@ -15,10 +41,24 @@ export interface Resource {
   snapshot_ids: string[];
   source_ami_id: string | null;
   managed_by: string | null;
+  attached_instance: string | null;
+  volume_type: string | null;
+  iops: number | null;
+  throughput: number | null;
+  encrypted: boolean | null;
+  storage_tier: string | null;
   est_monthly_cost: number | null;
+  cost_breakdown: CostBreakdown | null;
   status: Status;
   status_reason: string;
   outcome: Outcome;
+}
+
+export interface Bucket {
+  key: string;
+  count: number;
+  gib: number;
+  usd: number | null;
 }
 
 export interface Stats {
@@ -26,6 +66,14 @@ export interface Stats {
   orphaned: number;
   size_gib: number;
   est_monthly_usd: number | null;
+  orphaned_gib: number;
+  orphaned_usd: number | null;
+  blocked: number;
+  deletable: number;
+  by_status: Bucket[];
+  by_account: Bucket[];
+  by_region: Bucket[];
+  by_age: Bucket[];
 }
 
 export interface ResourcePage {
@@ -53,6 +101,8 @@ export interface Meta {
   provider: string;
   read_only: boolean;
   owner: { account: string; regions: string[] };
+  policy: { orphan_after_days: number; min_age_days: number; typed_confirm_min_items: number };
+  prices: { source_date: string | null; fallback: boolean };
   accounts: { id: string; name: string; owns: string[]; regions: string[] }[];
   definitions: {
     statuses: Record<Status, StatusDefinition>;
@@ -126,7 +176,7 @@ export interface Plan {
 
 export interface SimulateResult {
   would_delete: PlanItem[];
-  skipped: { id: string; name: string; reason: string }[];
+  skipped: { id: string; name: string; rule: string; reason: string }[];
   failed: { id: string; reason: string }[];
   totals: Totals;
 }
@@ -137,8 +187,46 @@ export interface ResourceDetail {
   related: {
     links: { relation: string; id: string; name: string; region: string; status: Status }[];
     shares: { principal_type: string; principal: string }[];
-    usage: { account: string; region: string; ref_type: string; ref_id: string; ref_name: string }[];
+    usage: { account: string; region: string; ref_type: string; ref_id: string; ref_name: string; ref_state: string }[];
   };
+}
+
+export interface GraphNode {
+  id: string;
+  kind: NodeKind;
+  label: string;
+  status: Status | null;
+  account: string;
+  account_name: string;
+  region: string;
+  active: boolean | null;
+  state: string;
+  depth: number;
+}
+
+export interface GraphEdge {
+  source: string;
+  target: string;
+  relation: string;
+}
+
+export interface Graph {
+  root: string;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  used_by: { active: number | null; total: number; summary: string };
+  truncated: boolean;
+}
+
+export interface ExportData {
+  items: Record<string, string | number | null>[];
+  total: number;
+  truncated: boolean;
+  limit: number;
+  stats: Stats;
+  filters: Record<string, string>;
+  generated_at: string;
+  provider: string;
 }
 
 export interface AuditEntry {
@@ -162,7 +250,10 @@ export const api = {
   meta: () => request<Meta>("/api/meta"),
   overview: () => request<OverviewData>("/api/overview"),
   resources: (params: URLSearchParams) => request<ResourcePage>(`/api/resources?${params}`),
+  stats: (params: URLSearchParams) => request<Stats | null>(`/api/stats?${params}`),
   resource: (id: string) => request<ResourceDetail>(`/api/resources/${encodeURIComponent(id)}`),
+  graph: (id: string) => request<Graph>(`/api/resources/${encodeURIComponent(id)}/graph`),
+  exportJson: (params: URLSearchParams) => request<ExportData>(`/api/resources/export.json?${params}`),
   startScan: () => request<{ started: boolean }>("/api/scans", { method: "POST" }),
   latestScan: () => request<{ scan: Scan | null; running: boolean }>("/api/scans/latest"),
   plan: (type: ResourceType, ids: string[]) =>
@@ -174,6 +265,10 @@ export const api = {
     }),
   audit: (page: number) => request<{ items: AuditEntry[]; total: number }>(`/api/audit?page=${page}&page_size=25`),
 };
+
+export function exportCsvUrl(params: URLSearchParams): string {
+  return `/api/resources/export.csv?${params}`;
+}
 
 /** Start a scan and wait until it finishes. */
 export async function runScan(): Promise<Scan | null> {

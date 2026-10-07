@@ -1,6 +1,6 @@
 PY := .venv/bin/python
 
-.PHONY: setup backend frontend dev test seed build run prices
+.PHONY: setup backend frontend dev test seed build run prices icons
 
 setup:
 	uv venv --python 3.12 .venv
@@ -22,6 +22,7 @@ test:
 	$(PY) -m ruff check backend scripts
 	$(PY) scripts/check_private.py
 	cd frontend && npm run typecheck
+	cd frontend && npm test
 
 seed:
 	$(PY) scripts/make_seed.py
@@ -34,3 +35,6 @@ run: build
 
 prices:
 	$(PY) scripts/fetch_prices.py
+
+icons:
+	$(PY) scripts/fetch_icons.py

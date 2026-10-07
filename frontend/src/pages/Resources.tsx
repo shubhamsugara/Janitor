@@ -10,7 +10,7 @@ import Table, { type TableProps } from "@cloudscape-design/components/table";
 import TextFilter from "@cloudscape-design/components/text-filter";
 import { api, type Plan, type Resource, type ResourcePage, type ResourceType, type Status } from "../api";
 import DeleteModal from "../components/DeleteModal";
-import ResourceDetailPanel from "../components/ResourceDetail";
+import { useDetail } from "../detail";
 import StatusBadge, { OutcomeBadge } from "../components/StatusBadge";
 import { accountName, formatDate, formatGiB, formatUsd, simulationSummary } from "../format";
 import type { PageProps } from "../nav";
@@ -35,7 +35,7 @@ export default function Resources({ meta, notify, type, title }: Props) {
   const [data, setData] = useState<ResourcePage | null>(null);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Resource[]>([]);
-  const [detailId, setDetailId] = useState<string | null>(null);
+  const { open } = useDetail();
   const [plan, setPlan] = useState<Plan | null>(null);
   const [planning, setPlanning] = useState(false);
 
@@ -100,7 +100,7 @@ export default function Resources({ meta, notify, type, title }: Props) {
           href={`#${r.id}`}
           onFollow={(e) => {
             e.preventDefault();
-            setDetailId(r.id);
+            open(r.id);
           }}
         >
           {r.name || r.id}
@@ -212,7 +212,6 @@ export default function Resources({ meta, notify, type, title }: Props) {
           </Box>
         }
       />
-      {detailId && <ResourceDetailPanel id={detailId} meta={meta} onClose={() => setDetailId(null)} />}
       {plan && (
         <DeleteModal
           plan={plan}
