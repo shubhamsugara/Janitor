@@ -107,10 +107,11 @@ I/O. `recompute_rules` builds it from the store, so policy edits still apply wit
 
 ## Walkthrough
 
-- Five steps, each anchored to an element with `data-tour="<step>"`: pick a type (sidebar),
+- Six steps, each anchored to an element with `data-tour="<step>"`: pick a type (sidebar),
   filter (filter bar), read a status (first status badge), select (row checkbox), plan (Plan
-  delete button, explaining the popup). Steps 2–5 navigate to the AMIs page first if needed.
-- A small in-repo component: a highlight ring around the anchor plus a card with step N of 5,
+  delete button, explaining the popup), see what is deployed (the Deployments grid). Steps 2–5
+  open the AMIs page first if needed; step 6 opens Deployments.
+- A small in-repo component: a highlight ring around the anchor plus a card with step N of 6,
   Back, Next/Done, and Skip. `Esc` skips. If an anchor is missing (e.g. no rows), the card shows
   centered without a ring.
 - Auto-opens once when `localStorage["janitor:tour"]` is unset, then sets it to `done` on finish

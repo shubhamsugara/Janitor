@@ -38,6 +38,12 @@ export const TOUR_STEPS: TourStep[] = [
     body: "Plan delete shows what would be deleted, what is blocked and why, and the monthly cost. It is a simulation: Janitor never deletes anything.",
     page: "/amis",
   },
+  {
+    id: "deployments",
+    title: "See what is deployed",
+    body: "Deployments shows each app by account and region, with its live version and how many instances or tasks run. Click a cell for its Auto Scaling group or ECS service.",
+    page: "/deployments",
+  },
 ];
 
 const KEY = "janitor:tour";

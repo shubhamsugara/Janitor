@@ -33,8 +33,8 @@ beforeEach(() => localStorage.clear());
 afterEach(() => vi.restoreAllMocks());
 
 describe("Walkthrough", () => {
-  it("has five steps", () => {
-    expect(TOUR_STEPS.map((s) => s.id)).toEqual(["type", "filter", "status", "select", "plan"]);
+  it("has six steps, ending on Deployments", () => {
+    expect(TOUR_STEPS.map((s) => s.id)).toEqual(["type", "filter", "status", "select", "plan", "deployments"]);
   });
 
   it("opens once on the first visit and remembers a skip", () => {
@@ -67,17 +67,19 @@ describe("Walkthrough", () => {
 
   it("Next and Back move between steps, and later steps open the AMIs page", () => {
     render(<Harness />);
-    expect(screen.getByText("Step 1 of 5")).toBeTruthy();
+    expect(screen.getByText("Step 1 of 6")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
-    expect(screen.getByText("Step 2 of 5")).toBeTruthy();
+    expect(screen.getByText("Step 2 of 6")).toBeTruthy();
     expect(screen.getByTestId("where").textContent).toBe("/amis");
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
-    expect(screen.getByText("Step 1 of 5")).toBeTruthy();
+    expect(screen.getByText("Step 1 of 6")).toBeTruthy();
   });
 
   it("ends with Done on the last step", () => {
     render(<Harness />);
-    for (let i = 0; i < 4; i++) fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    for (let i = 0; i < 5; i++) fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByText("Step 6 of 6")).toBeTruthy();
+    expect(screen.getByTestId("where").textContent).toBe("/deployments");
     fireEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(screen.queryByRole("dialog", { name: "Walkthrough" })).toBeNull();
   });
@@ -96,7 +98,7 @@ describe("Walkthrough", () => {
     localStorage.setItem("janitor:tour", "done");
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "Replay" }));
-    expect(screen.getByText("Step 1 of 5")).toBeTruthy();
+    expect(screen.getByText("Step 1 of 6")).toBeTruthy();
   });
 });
 

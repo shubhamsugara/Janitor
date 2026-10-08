@@ -52,7 +52,7 @@ Read this first, then the spec.
   rules R6 (keep the 3 newest per AMI name group), R7, W1, W2, W3, W5 from a per-scan rule
   context; manual RDS snapshot shares; name pattern, source AMI, and source DB filters;
   "Select all N matching" resolved on the server (up to 5,000); a help panel with Info links; and
-  a five-step first-run walkthrough, replayable from the Help menu.
+  a six-step first-run walkthrough (ending on Deployments), replayable from the Help menu.
 - Run it: `make setup` once, then `make run` → http://127.0.0.1:8080 (mock data), or
   `make run-aws` with a real `config/janitor.yaml` (see README).
 

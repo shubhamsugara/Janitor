@@ -21,7 +21,7 @@ interface Props {
 
 const HELP_ITEMS = [
   { id: "open", label: "Open help", description: "About this page" },
-  { id: "tour", label: "Replay walkthrough", description: "Five steps through Janitor" },
+  { id: "tour", label: "Replay walkthrough", description: "A short tour of Janitor" },
   { id: "how", label: "How Janitor decides", description: "Every status and rule" },
 ];
 

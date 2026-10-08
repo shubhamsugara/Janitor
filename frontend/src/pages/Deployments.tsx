@@ -164,7 +164,7 @@ export default function Deployments({ meta, notify }: PageProps) {
         />
       </div>
 
-      <Card>
+      <Card data-tour="deployments">
         {!data ? (
           <Spinner label="Loading deployments" className="justify-center py-16" />
         ) : all.length === 0 ? (
