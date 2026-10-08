@@ -44,9 +44,10 @@ export default function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  // Reloaded after each scan: accounts are discovered during scans, and the filters list them.
   useEffect(() => {
     api.meta().then(setMeta).catch((e: Error) => setError(e.message));
-  }, []);
+  }, [refreshKey]);
   useEffect(() => applyTheme(theme), [theme]);
   // The badge reflects the newest scan; it updates on load and after each scan.
   useEffect(() => {

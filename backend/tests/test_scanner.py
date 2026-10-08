@@ -197,3 +197,14 @@ def test_an_ami_only_templates_name_is_idle_and_warned(setup):
     assert web.status == "idle"
     assert web.referenced_by.startswith("Launch template prd-web v7 in prd")
     assert "W6" in rules_of(store, scan_id, web)
+
+
+def test_a_failed_admin_hop_points_at_the_admin_profile(config):
+    from janitor.models import Segment
+    from janitor.scanner import segment_message
+
+    seg = Segment("111111111111", "us-east-1", "ami", False, 0, "denied", "sts:AssumeRole")
+    assert segment_message(seg, config) == (
+        "Janitor can't assume the admin role from profile example-tools (its role_arn in your "
+        "AWS config). Check the role's trust policy and your MFA session, then Scan now."
+    )

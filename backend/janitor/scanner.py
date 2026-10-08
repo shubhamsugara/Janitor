@@ -30,6 +30,13 @@ def segment_message(seg: Segment, config: Config) -> str:
     where = f"{config.account_name(seg.account)} · {seg.region}"
     if seg.error_kind == "expired":
         return "AWS session expired. Refresh your MFA session, then Scan now."
+    if seg.error == "sts:AssumeRole" and seg.account == config.admin.account:
+        # The first hop, from the user's source profile: member_role isn't involved.
+        return (
+            f"Janitor can't assume the admin role from profile {config.admin.profile} (its "
+            "role_arn in your AWS config). Check the role's trust policy and your MFA session, "
+            "then Scan now."
+        )
     if seg.error == "sts:AssumeRole":  # the hop from admin into this account, for every region
         return (
             f"Janitor can't assume {config.member_role or 'the member role'} in "

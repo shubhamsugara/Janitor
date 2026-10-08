@@ -139,8 +139,11 @@ def used_by(store: Store, config: Config, scan_id: int, r: Resource) -> dict:
     summary = summarize(refs, via, config)
     instances = [u for u in refs if u.ref_type == "instance"]
     amis = [r] if r.type == "ami" else via or []
-    blind_spot = _blind_spot(store, config, scan_id, amis) if not refs else None
-    if blind_spot:
+    # Without an instance, "nothing uses it" needs proof; templates that name it aren't proof.
+    blind_spot = _blind_spot(store, config, scan_id, amis) if not instances else None
+    if blind_spot and refs:
+        summary = f"{summary} {blind_spot}"
+    elif blind_spot:
         backs = f"It backs {_join([f'{a.id} ({a.name})' for a in via])}. " if via else ""
         summary = f"{backs}Nothing in the scanned accounts uses it. {blind_spot}"
     return {

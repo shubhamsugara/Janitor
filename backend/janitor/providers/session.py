@@ -76,9 +76,8 @@ def check_profiles(config: Config) -> None:
         )
 
 
-def _assume(
-    source: boto3.Session, role_arn: str, policy: dict, region: str, **extra
-) -> boto3.Session:
+def _assume(sts, role_arn: str, policy: dict, region: str, **extra) -> boto3.Session:
+    """AssumeRole through an STS client (from a guarded session) with the session policy."""
     params = {
         "RoleArn": role_arn,
         "RoleSessionName": SESSION_NAME,
@@ -86,7 +85,7 @@ def _assume(
         "Policy": json.dumps(policy),
         **extra,
     }
-    creds = source.client("sts", config=CLIENT_CONFIG).assume_role(**params)["Credentials"]
+    creds = sts.assume_role(**params)["Credentials"]
     return boto3.Session(
         aws_access_key_id=creds["AccessKeyId"],
         aws_secret_access_key=creds["SecretAccessKey"],
@@ -102,16 +101,22 @@ def assume_admin(config: Config) -> boto3.Session:
     source = boto3.Session(profile_name=profile["source_profile"], region_name=region)
     guard.install(source, extra=frozenset({"AssumeRole"}))
     extra = {"ExternalId": profile["external_id"]} if profile.get("external_id") else {}
-    admin = _assume(source, profile["role_arn"], ADMIN_POLICY(config.member_role), region, **extra)
+    sts = source.client("sts", config=CLIENT_CONFIG)
+    admin = _assume(sts, profile["role_arn"], ADMIN_POLICY(config.member_role), region, **extra)
     guard.install(admin, extra=frozenset({"AssumeRole"}))
     return admin
 
 
-def assume_member(config: Config, admin: boto3.Session, account_id: str) -> boto3.Session:
-    """A guarded, Describe-only session in another account, reached from the admin session."""
+def assume_member(config: Config, admin: boto3.Session, account_id: str, sts=None) -> boto3.Session:
+    """A guarded, Describe-only session in another account, reached from the admin session.
+
+    Pass `sts` (a client made from `admin`) when hopping in parallel: boto3 Sessions aren't
+    thread-safe, clients are.
+    """
     if account_id == config.admin.account:
         return admin
     role_arn = f"arn:aws:iam::{account_id}:role/{config.member_role}"
-    member = _assume(admin, role_arn, SESSION_POLICY, config.regions[0])
+    sts = sts or admin.client("sts", config=CLIENT_CONFIG)
+    member = _assume(sts, role_arn, SESSION_POLICY, config.regions[0])
     guard.install(member)
     return member

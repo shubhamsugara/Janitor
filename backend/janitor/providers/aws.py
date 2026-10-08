@@ -308,11 +308,16 @@ class AwsProvider:
             except Exception as exc:
                 admin = exc
 
+        sts = None
+        if not isinstance(admin, Exception) and members:
+            with self._client_lock:  # one client, made once; the hops below share it
+                sts = admin.client("sts", config=session.CLIENT_CONFIG)
+
         def member(account: str) -> boto3.Session | Exception:
             if isinstance(admin, Exception):
                 return admin
             try:
-                return session.assume_member(config, admin, account)
+                return session.assume_member(config, admin, account, sts=sts)
             except Exception as exc:
                 return exc
 

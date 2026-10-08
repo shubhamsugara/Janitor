@@ -247,3 +247,45 @@ def test_used_by_admits_what_janitor_cant_see(scanned):
         f"It backs {partner.id} ({partner.name}). Nothing in the scanned accounts uses it. "
         "Janitor couldn't check 444444444444, so it may be used there."
     )
+
+
+def test_a_template_reference_doesnt_hide_an_account_janitor_couldnt_check(tmp_path, config):
+    from janitor.models import Inventory, Resource, Segment, Share, Usage
+
+    ami = Resource(
+        "ami-ref", "ami", "111111111111", "us-east-1", "ref", "2026-01-01T00:00:00Z", 8, tags={}
+    )
+    segments = [
+        Segment("111111111111", "us-east-1", "usage", ok=True),
+        Segment("666666666666", "us-east-1", "usage", ok=True),
+        Segment("444444444444", "us-east-1", "usage", ok=False, error_kind="denied"),
+    ]
+
+    class Provider:
+        name = "mock"
+
+        def list_inventory(self, on_segment=None):
+            for seg in segments:
+                on_segment(seg)
+            return Inventory(
+                [ami],
+                [
+                    Share("ami-ref", "account", "666666666666"),
+                    Share("ami-ref", "account", "444444444444"),
+                ],
+                [
+                    Usage(
+                        "ami-ref", "666666666666", "us-east-1", "launch_template", "lt-1", "uat-api"
+                    )
+                ],
+                [],
+                segments,
+            )
+
+    store = Store(tmp_path / "ref.db")
+    scan_id = Scanner(store, Provider(), config, clock=lambda: NOW).run()
+    summary = build_graph(store, config, scan_id, "ami-ref")["used_by"]["summary"]
+    assert summary == (
+        "No instance uses it. Named by 1 launch template in uat. "
+        "Janitor couldn't check 444444444444, so it may be used there."
+    )

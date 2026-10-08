@@ -41,10 +41,10 @@ def deny_member(monkeypatch, account: str) -> None:
 
     real = session.assume_member
 
-    def assume_member(config, admin, account_id):
+    def assume_member(config, admin, account_id, **kwargs):
         if account_id == account:
             raise ClientError({"Error": {"Code": "AccessDenied", "Message": "no"}}, "AssumeRole")
-        return real(config, admin, account_id)
+        return real(config, admin, account_id, **kwargs)
 
     monkeypatch.setattr(session, "assume_member", assume_member)
 
@@ -328,3 +328,22 @@ def test_an_account_found_only_in_launch_permissions_is_scanned_through_the_hub(
     }
     assert [(u.account, u.ref_id) for u in inventory.usage] == [(DEV, world["used_by"])]
     assert world["dev_volume"] in {r.id for r in inventory.resources}
+
+
+def test_member_hops_share_one_sts_client_from_the_admin_session(aws):
+    # boto3 Sessions aren't thread-safe; clients are. Parallel hops must not each build a client.
+    from janitor.providers import session
+
+    admin = session.assume_admin(make_config())
+    made = []
+    real_client = admin.client
+
+    def counting_client(service, *args, **kwargs):
+        made.append(service)
+        return real_client(service, *args, **kwargs)
+
+    admin.client = counting_client
+    members = ["222222222222", "333333333333", "555555555555", "666666666666", "777777777777"]
+    sessions = AwsProvider(make_config(), clock=lambda: NOW)._sessions(members, admin=admin)
+    assert made.count("sts") == 1
+    assert all(not isinstance(sessions[m], Exception) for m in members)
