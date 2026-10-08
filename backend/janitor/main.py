@@ -126,7 +126,7 @@ def create_app(
     clock = clock or (lambda: datetime.now(UTC))
     config = load_config(settings.config_path)
     provider = provider or make_provider(config, settings, clock)
-    store = Store(settings.db_path)
+    store = Store(settings.db_path, provider=provider.name)
     store.fail_running_scans()
     prices = PriceTable.load(settings.prices_path, config.pricing)
     scanner = Scanner(store, provider, config, clock, prices)

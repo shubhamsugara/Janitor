@@ -149,7 +149,9 @@ def _where(scan_id: int, filters: dict) -> tuple[str, list]:
 
 
 class Store:
-    def __init__(self, path: str | Path):
+    def __init__(self, path: str | Path, provider: str | None = None):
+        """With `provider`, readers see only that provider's scans (mock and AWS share data/)."""
+        self._provider = provider
         if str(path) != ":memory:":
             Path(path).parent.mkdir(parents=True, exist_ok=True)
         self._db = sqlite3.connect(str(path), check_same_thread=False)
@@ -195,13 +197,20 @@ class Store:
             (_now(),),
         )
 
+    def _mine(self) -> tuple[str, tuple]:
+        return ("provider = ?", (self._provider,)) if self._provider else ("1 = 1", ())
+
     def latest_scan(self) -> dict | None:
         """The newest scan readers should show: completed, possibly with failed checks."""
-        rows = self._q(f"SELECT * FROM scans WHERE {READABLE} ORDER BY id DESC LIMIT 1")
+        mine, params = self._mine()
+        rows = self._q(
+            f"SELECT * FROM scans WHERE {READABLE} AND {mine} ORDER BY id DESC LIMIT 1", params
+        )
         return _scan(rows[0]) if rows else None
 
     def last_scan(self) -> dict | None:
-        rows = self._q("SELECT * FROM scans ORDER BY id DESC LIMIT 1")
+        mine, params = self._mine()
+        rows = self._q(f"SELECT * FROM scans WHERE {mine} ORDER BY id DESC LIMIT 1", params)
         return _scan(rows[0]) if rows else None
 
     def set_notes(self, scan_id: int, notes: dict) -> None:
@@ -228,13 +237,21 @@ class Store:
         return [{k: row[k] for k in row.keys() if k != "scan_id"} for row in rows]
 
     def _prune(self) -> None:
-        keep = [
-            r["id"]
-            for r in self._q(f"SELECT id FROM scans WHERE {READABLE} ORDER BY id DESC LIMIT 2")
-        ]
+        keep = []
+        for (provider,) in self._q("SELECT DISTINCT provider FROM scans"):
+            keep += [
+                r["id"]
+                for r in self._q(
+                    f"SELECT id FROM scans WHERE {READABLE} AND provider = ? ORDER BY id DESC LIMIT 2",
+                    (provider,),
+                )
+            ]
+            # The newest scan's checks explain a failure even when its rows aren't kept.
+            keep += [
+                r["id"]
+                for r in self._q("SELECT MAX(id) AS id FROM scans WHERE provider = ?", (provider,))
+            ]
         keep += [r["id"] for r in self._q("SELECT id FROM scans WHERE status = 'running'")]
-        # The newest scan's checks explain a failure even when its rows aren't kept.
-        keep += [r["id"] for r in self._q("SELECT MAX(id) AS id FROM scans") if r["id"]]
         marks = _marks(keep) or "-1"
         with self._lock, self._db:
             for table in SCAN_TABLES:

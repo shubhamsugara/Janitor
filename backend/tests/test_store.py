@@ -268,3 +268,19 @@ def test_segments_and_notes_round_trip(tmp_path):
         12,
     )
     assert store.latest_scan()["notes"] == {"unresolved": [{"value": "resolve:ssm:/x"}]}
+
+
+def test_each_provider_reads_only_its_own_scans(tmp_path):
+    # Mock data must never show under the AWS badge (or the reverse) when both share data/.
+    from janitor.store import Store
+
+    path = tmp_path / "j.db"
+    mock = Store(path, provider="mock")
+    mock_scan = mock.start_scan("mock")
+    mock.finish_scan(mock_scan, "ok")
+    aws = Store(path, provider="aws")
+    assert aws.latest_scan() is None and aws.last_scan() is None
+    for _ in range(3):  # pruning keeps each provider's own newest scans
+        aws.finish_scan(aws.start_scan("aws"), "ok")
+    assert aws.latest_scan()["provider"] == "aws"
+    assert mock.latest_scan()["id"] == mock_scan

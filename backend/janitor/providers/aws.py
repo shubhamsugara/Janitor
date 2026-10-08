@@ -37,6 +37,7 @@ OPERATIONS = frozenset(
         "DescribeLaunchConfigurations",
     }
 )
+MAX_FILTER_VALUES = 200
 LIVE_STATES = ["pending", "running", "shutting-down", "stopping", "stopped"]
 
 
@@ -96,12 +97,18 @@ class AwsProvider:
                     rows.add(result)
             except Exception as exc:
                 seg.ok = False
-                seg.error_kind, seg.error = normalize.classify(exc)
-            seg.duration_ms = int((time.monotonic() - start) * 1000)
-            with lock:
-                segments.append(seg)
-            if on_segment:
-                on_segment(seg)
+                seg.error_kind, seg.error = "other", str(exc)
+                try:
+                    seg.error_kind, seg.error = normalize.classify(exc)
+                except Exception:
+                    pass  # keep "other": the check must still report as failed
+            finally:
+                # Always report: a check missing from the report would read as ok (fail-open).
+                seg.duration_ms = int((time.monotonic() - start) * 1000)
+                with lock:
+                    segments.append(seg)
+                if on_segment:
+                    on_segment(seg)
 
         listers = {
             "ami": self._amis,
@@ -179,14 +186,13 @@ class AwsProvider:
                 if isinstance(found, Exception):
                     raise found
                 ec2 = self._client(found, "ec2", region)
-                running = self._pages(
+                running = self._by_ids(
                     ec2,
                     "describe_instances",
                     "Reservations",
-                    Filters=[
-                        {"Name": "image-id", "Values": [i["id"] for i in here]},
-                        {"Name": "instance-state-name", "Values": LIVE_STATES},
-                    ],
+                    "image-id",
+                    [i["id"] for i in here],
+                    Filters=[{"Name": "instance-state-name", "Values": LIVE_STATES}],
                 )
                 for use in normalize.instance_usage(
                     list(running), account, region, {i["id"] for i in here}
@@ -219,11 +225,8 @@ class AwsProvider:
         if ids["volume"]:
             live = {
                 v["VolumeId"]: v
-                for v in self._pages(
-                    ec2,
-                    "describe_volumes",
-                    "Volumes",
-                    Filters=[{"Name": "volume-id", "Values": ids["volume"]}],
+                for v in self._by_ids(
+                    ec2, "describe_volumes", "Volumes", "volume-id", ids["volume"]
                 )
             }
             for vid in ids["volume"]:
@@ -234,24 +237,27 @@ class AwsProvider:
         if ids["snapshot"]:
             live = {
                 s["SnapshotId"]
-                for s in self._pages(
+                for s in self._by_ids(
                     ec2,
                     "describe_snapshots",
                     "Snapshots",
+                    "snapshot-id",
+                    ids["snapshot"],
                     OwnerIds=["self"],
-                    Filters=[{"Name": "snapshot-id", "Values": ids["snapshot"]}],
                 )
             }
             reasons |= {sid: gone for sid in ids["snapshot"] if sid not in live}
         if ids["ami"]:
             live = {
                 img["ImageId"]
-                for img in self._pages(
+                for img in self._by_ids(
                     ec2,
                     "describe_images",
                     "Images",
+                    "image-id",
+                    ids["ami"],
                     Owners=["self"],
-                    Filters=[{"Name": "image-id", "Values": ids["ami"]}],
+                    IncludeDisabled=True,  # a disabled AMI still owns its snapshots
                 )
             }
             for ami in (i for i in group if i["type"] == "ami"):
@@ -300,6 +306,13 @@ class AwsProvider:
         with self._client_lock:
             return sess.client(service, region_name=region, config=session.CLIENT_CONFIG)
 
+    def _by_ids(self, client, operation: str, key: str, name: str, ids: list[str], **params):
+        """Like _pages, filtered to `ids`; EC2 takes at most 200 values per filter."""
+        extra = params.pop("Filters", [])
+        for start in range(0, len(ids), MAX_FILTER_VALUES):
+            chunk = {"Name": name, "Values": ids[start : start + MAX_FILTER_VALUES]}
+            yield from self._pages(client, operation, key, Filters=[chunk, *extra], **params)
+
     def _pages(self, client, operation: str, key: str, **params):
         config = {"PageSize": self._page_size} if self._page_size else {}
         for page in client.get_paginator(operation).paginate(**params, PaginationConfig=config):
@@ -312,7 +325,9 @@ class AwsProvider:
         rows = _Rows()
         rows.resources = [
             normalize.image(raw, account, region)
-            for raw in self._pages(ec2, "describe_images", "Images", Owners=["self"])
+            for raw in self._pages(
+                ec2, "describe_images", "Images", Owners=["self"], IncludeDisabled=True
+            )
         ]
 
         def permissions(ami: Resource) -> list[Share]:

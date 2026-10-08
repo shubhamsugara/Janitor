@@ -281,3 +281,46 @@ def test_recheck_reports_accounts_it_cant_reach(aws):
         [item("vol-0abc", "volume", DEV)]
     )
     assert reasons["vol-0abc"].startswith("Janitor couldn't re-check it live: ")
+
+
+def test_disabled_amis_are_listed_so_their_snapshots_stay_in_use(aws, monkeypatch):
+    # DescribeImages hides disabled AMIs unless asked; a hidden AMI would orphan its snapshots.
+    world = build_world()
+    calls = record_calls(monkeypatch)
+    provider = AwsProvider(make_config(), clock=lambda: NOW)
+    provider.list_inventory()
+    provider.recheck([item(world["ami"], "ami", TOOLS, shares=[])])
+    image_calls = [p for op, p in calls if op == "DescribeImages"]
+    assert image_calls and all(p.get("IncludeDisabled") is True for p in image_calls)
+
+
+def test_recheck_sends_at_most_200_filter_values_per_call(aws, monkeypatch):
+    ids = [f"vol-{n:017x}" for n in range(450)]
+    calls = record_calls(monkeypatch)
+    reasons = AwsProvider(make_config(), clock=lambda: NOW).recheck(
+        [item(i, "volume", DEV) for i in ids]
+    )
+    sizes = [len(p["Filters"][0]["Values"]) for op, p in calls if op == "DescribeVolumes"]
+    assert sizes and max(sizes) <= 200 and sum(sizes) == 450
+    assert reasons == {i: "It no longer exists." for i in ids}
+
+
+def test_a_check_that_fails_while_reporting_still_reports_as_failed(aws, monkeypatch):
+    # A check missing from the report would read as ok and could make snapshots look orphaned.
+    from janitor.providers import aws as aws_module
+
+    def broken(exc):
+        raise TypeError("classify broke")
+
+    monkeypatch.setattr(aws_module.normalize, "classify", broken)
+    monkeypatch.setattr(
+        aws_module.session,
+        "assume",
+        lambda config, account: (_ for _ in ()).throw(RuntimeError("no")),
+    )
+    inventory = AwsProvider(make_config(), clock=lambda: NOW).list_inventory()
+    planned = (
+        2 * 3 + 2 * 4
+    )  # tools: ami, snapshot, volume; dev: snapshot, volume, rds_snapshot, database
+    assert len(inventory.segments) >= planned
+    assert all(not s.ok and s.error_kind == "other" for s in inventory.segments)

@@ -545,3 +545,15 @@ def test_live_recheck_skips_a_changed_ami_and_keeps_its_snapshots(tmp_path, conf
     assert reasons[snap][1] == f"Kept because {ami.id} is now blocked."
     entry = store.list_audit(1, 1)[0][0]
     assert {i["id"]: i["outcome"] for i in entry["payload"]["items"]}[ami.id] == "skipped"
+
+
+def test_switching_to_aws_does_not_show_mock_data(tmp_path):
+    create_app(_settings(tmp_path), clock=lambda: NOW)  # mock scan into the shared database
+
+    class AwsNamed(FakeAws):
+        name = "aws"
+
+    app = create_app(_settings(tmp_path), clock=lambda: NOW, provider=AwsNamed())
+    app.state.scanner.join(timeout=10)  # with no AWS scan yet, one starts in the background
+    overview = TestClient(app).get("/api/overview").json()
+    assert overview["last_scan"]["provider"] == "aws"
