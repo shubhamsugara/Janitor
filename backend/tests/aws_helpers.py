@@ -20,6 +20,9 @@ def write_aws_config(tmp_path, monkeypatch, admin: str = "111111111111", extra: 
         "[profile example-tools]",
         f"role_arn = arn:aws:iam::{admin}:role/{ADMIN_ROLE}",
         "source_profile = example-base",
+        "[profile example-sbx]",  # the example config names this profile for sbx
+        f"role_arn = arn:aws:iam::555555555555:role/{MEMBER_ROLE}",
+        "source_profile = example-base",
     ]
     config = tmp_path / "aws-config"
     config.write_text("\n".join(lines) + "\n" + extra)
