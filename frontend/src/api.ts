@@ -112,6 +112,12 @@ export interface Meta {
     rules: RuleDefinition[];
     precedence: Status[];
     notes: string[];
+    deployments: {
+      summary: string;
+      sources: { title: string; text: string }[];
+      run: { label: string; meaning: string }[];
+      notes: string[];
+    };
   };
 }
 

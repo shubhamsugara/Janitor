@@ -1,10 +1,27 @@
-import { ShieldCheck } from "lucide-react";
+import { Rocket, ShieldCheck } from "lucide-react";
 import type { Status } from "../api";
 import StatusBadge from "../components/StatusBadge";
 import { TYPE_PAGES, type PageProps } from "../nav";
 import { Badge } from "../ui/badge";
 import { Card, CardBody, CardHeader } from "../ui/card";
 import { Table, TBody, Td, Th, THead, Tr } from "../ui/table";
+
+/** Server text marks tag names with backticks; show them as code. */
+function WithCode({ text }: { text: string }) {
+  return (
+    <>
+      {text.split("`").map((part, i) =>
+        i % 2 ? (
+          <code key={i} className="rounded bg-subtle px-1 py-0.5 font-mono text-xs text-ink">
+            {part}
+          </code>
+        ) : (
+          part
+        ),
+      )}
+    </>
+  );
+}
 
 export default function HowItWorks({ meta }: PageProps) {
   const defs = meta.definitions;
@@ -94,6 +111,47 @@ export default function HowItWorks({ meta }: PageProps) {
           </Table>
         </CardBody>
       </Card>
+      {defs.deployments && (
+        <Card>
+          <CardHeader
+            title={
+              <span className="inline-flex items-center gap-2">
+                <Rocket className="size-4 text-accent" aria-hidden />
+                Deployments
+              </span>
+            }
+            description={defs.deployments.summary}
+          />
+          <CardBody className="space-y-5 pt-3">
+            <div className="grid gap-4 lg:grid-cols-3">
+              {defs.deployments.sources.map((s) => (
+                <div key={s.title} className="rounded-lg border border-line p-4">
+                  <h3 className="text-[13px] font-semibold">{s.title}</h3>
+                  <p className="mt-1 text-[13px] text-muted">
+                    <WithCode text={s.text} />
+                  </p>
+                </div>
+              ))}
+            </div>
+            <div>
+              <h3 className="text-[13px] font-semibold">Run status, beside the deploy state</h3>
+              <dl className="mt-2 grid gap-x-6 gap-y-1.5 text-[13px] sm:grid-cols-[max-content_1fr]">
+                {defs.deployments.run.map((r) => (
+                  <div key={r.label} className="contents">
+                    <dt className="font-medium">{r.label}</dt>
+                    <dd className="text-muted">{r.meaning}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+            <ul className="list-disc space-y-1.5 pl-5 text-[13px] text-muted">
+              {defs.deployments.notes.map((note) => (
+                <li key={note}>{note}</li>
+              ))}
+            </ul>
+          </CardBody>
+        </Card>
+      )}
       <Card>
         <CardHeader title="Notes" />
         <CardBody className="pt-3">

@@ -7,6 +7,64 @@ from janitor.config import Config
 from janitor.rules import RULES, explain
 
 
+def _tags(keys: list[str]) -> str:
+    return " or ".join(f"`{k}`" for k in keys)
+
+
+def deployments(config: Config) -> dict:
+    """What the Deployments page reads, with the configured tag names."""
+    tags = config.deployments.tags
+    return {
+        "summary": (
+            "A grid of apps by account and region, from the same read-only scan: which version "
+            "runs where, and whether it is actually running. Nothing here is judged or deleted."
+        ),
+        "sources": [
+            {
+                "title": "Auto Scaling groups",
+                "text": (
+                    f"Groups your deploy tool tagged with `{tags.state}` (deploying, deployed, "
+                    f"undeploying, undeployed). App from {_tags(tags.app)}, version from "
+                    f"{_tags(tags.version)}, plus the launch template version the group pins and "
+                    "its AMI. Untagged groups are skipped. Undeployed groups are earlier versions "
+                    "kept at zero until someone removes them."
+                ),
+            },
+            {
+                "title": "Standalone instances",
+                "text": (
+                    "Instances in no Auto Scaling group, such as bastions, hand-built servers, or "
+                    f"a DR server kept stopped. App from {_tags(tags.app)}, else the Name tag."
+                ),
+            },
+            {
+                "title": "ECS services",
+                "text": (
+                    "Every service in every cluster, with the version from its task definition's "
+                    f"{_tags(tags.version)} tag, else the image tag. A service scaled to 0, like "
+                    "the standby side of a blue/green pair, is an earlier version."
+                ),
+            },
+        ],
+        "run": [
+            {"label": "Stopped", "meaning": "Scaled to 0: nothing is meant to run."},
+            {
+                "label": "No instances or tasks running",
+                "meaning": "It should run but nothing does, for example tasks that keep failing.",
+            },
+            {"label": "N of M running", "meaning": "Partly up: fewer running than desired."},
+            {"label": "Stopping", "meaning": "Scaled to 0, but some still run."},
+        ],
+        "notes": [
+            "Columns are accounts, not env tags: ECS services rarely carry an env tag, so the "
+            "account is what every row shares. The env tag shows in the details.",
+            "The deploy state is the deploy tool's label; the run status comes from desired and "
+            "running counts, so a deployed group scaled to 0 shows Stopped.",
+            "Amber versions are behind the newest version of that app elsewhere.",
+        ],
+    }
+
+
 def build(config: Config) -> dict:
     days = config.policy.orphan_after_days
     return {
@@ -82,4 +140,5 @@ def build(config: Config) -> dict:
             "Volume age counts from creation. AWS doesn't record when a volume was detached.",
             "Costs are estimates (size × rate). Snapshots are incremental, so deleting one may free less.",
         ],
+        "deployments": deployments(config),
     }
