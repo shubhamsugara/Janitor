@@ -50,6 +50,20 @@ An AMI is **in use** only when an instance (running or stopped) was launched fro
 template, Auto Scaling group, or launch configuration that only names it adds a **Referenced**
 warning, and deleting it then requires typing `delete`.
 
+### Delete rules you can tune
+
+Under `policy` in `janitor.yaml`:
+
+- `keep_newest_per_name_group` (default 3): R6 never offers the newest AMIs of a name group, per
+  account and region. A group is the name minus a trailing date or version
+  (`ami_name_group_pattern`); a name without one is its own group.
+- `keep_name_patterns`: regexes; R7 keeps any AMI whose name matches one.
+- `source_with_live_copies` and `rds_last_copy` (`warn` or `block`): W1 for an AMI copied to
+  other regions, W2 for the newest snapshot of a deleted database.
+
+W5 reads who can restore each manual RDS snapshot (`rds:DescribeDBSnapshotAttributes` and
+`rds:DescribeDBClusterSnapshotAttributes`, inside `rds:Describe*`).
+
 ### Deployments
 
 The Deployments page is a grid of apps by env and region, from the same scan:

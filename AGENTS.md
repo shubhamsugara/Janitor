@@ -45,7 +45,8 @@ provider.list_inventory()      mock.py (fixtures/seed.json) | aws.py -> normaliz
   -> linker.references()       W6 "Referenced" text for AMIs that templates/ASGs only name
   -> pricing.apply_costs()     rates from fixtures/prices.json, fallback config.pricing
   -> store.save_inventory()    SQLite, every row keyed by scan_id
-  -> scanner.recompute_rules() rules.evaluate(); also run at startup, so config edits apply without a rescan
+  -> scanner.recompute_rules() rules.context() once per scan (R6/W1/W2/W3 compare resources), then
+                               rules.evaluate(); also run at startup, so config edits apply without a rescan
   -> main.py (FastAPI /api/*)  -> frontend/src/api.ts
 ```
 
@@ -66,8 +67,9 @@ kind is a `Segment`; a failed segment makes the affected resources `unknown`.
 | Status precedence | `in_use > managed > unknown > orphaned > idle` | `linker.py` |
 | AMI in use | An instance (running or stopped) launched from it, in a permitted account, **in its own region**. Launch permissions are region-scoped; a copy is a new AMI ID with its own snapshots. | `linker.py` |
 | Rule outcome | Strictest wins: `block > warn > pass`. Only block/warn results are stored. | `rules.py` |
-| Blocks | R1 in use, R2 unknown, R3 AWS-managed, R4 protected tag (case-insensitive key and value), R5 younger than `min_age_days` | `rules.py` |
-| Warns | W4 no `owner` tag, W6 referenced by template/ASG/launch config, W7 shared with an `ignore_accounts` account (it would otherwise be `unknown`) | `rules.py` |
+| Blocks | R1 in use, R2 unknown, R3 AWS-managed, R4 protected tag (case-insensitive key and value), R5 younger than `min_age_days`, R6 among the `keep_newest_per_name_group` newest AMIs of its name group (name minus a trailing date/version) per account and region, R7 name matches `keep_name_patterns` | `rules.py` |
+| Warns | W1 source of copies in other regions, W2 newest snapshot of a deleted DB (W1/W2 block when `policy` says so), W3 newest snapshot of a live volume, W4 no `owner` tag, W5 manual RDS snapshot shared with other accounts or public, W6 referenced by template/ASG/launch config, W7 shared with an `ignore_accounts` account (it would otherwise be `unknown`) | `rules.py` |
+| Plan selection | Explicit `ids`, or `{filter, exclude}` resolved on the server with the list route's filters; at most 5,000 items | `plans.py`, `main.py` |
 | Typed confirm | Typing `delete` is required when the plan has at least `typed_confirm_min_items` deletable items, any warn result, or an `env=prod` tag | `plans.py` `_needs_typing` |
 | Readable scans | Readers use the newest `ok` **or `partial`** scan (`READABLE`); only the two newest scans' data are kept; the audit log is never pruned | `store.py` |
 | Simulate | Returns 409 if the scan **or the config** changed since the plan; AWS mode re-checks items live first | `plans.py`, `aws.py` |

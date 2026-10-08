@@ -47,15 +47,20 @@ Read this first, then the spec.
   Janitor decides. **Follow-ups, not built:** target group membership for instances (needs
   `elasticloadbalancing:Describe*`, the user's call), ECS rolling history from earlier task
   definition revisions, and scheduled/task-only apps (needs `events:List*`).
+- **Phase 3b** on branch `phase-3b` from
+  [`docs/superpowers/plans/2026-10-08-phase-3b.md`](superpowers/plans/2026-10-08-phase-3b.md):
+  rules R6 (keep the 3 newest per AMI name group), R7, W1, W2, W3, W5 from a per-scan rule
+  context; manual RDS snapshot shares; name pattern, source AMI, and source DB filters;
+  "Select all N matching" resolved on the server (up to 5,000); a help panel with Info links; and
+  a five-step first-run walkthrough, replayable from the Help menu.
 - Run it: `make setup` once, then `make run` → http://127.0.0.1:8080 (mock data), or
   `make run-aws` with a real `config/janitor.yaml` (see README).
 
 ## Next step
 
-1. Phase 2 is built on branch `phase-2`; the user decides how to integrate it.
-2. The user has run real scans and accepted the views. Next: decide how to integrate
-   `phase-3`, then plan phase 3b. `make prices` and
-   `make icons` refresh the price list and the local AWS icons.
+1. Phases 1–3 and Deployments are merged to `main` (not pushed). Phase 3b is on `phase-3b`.
+2. Next: try phase 3b on a real scan (`make run-aws`), decide how to integrate it, then plan
+   phase 4. `make prices` and `make icons` refresh the price list and the local AWS icons.
 3. Behind a TLS-inspecting proxy, Python alone fails with `CERTIFICATE_VERIFY_FAILED`. On macOS,
    `make prices` and `make icons` handle it: they export the system keychain's certificates to
    `.venv/trusted-certs.pem` and point `SSL_CERT_FILE` at it (verification stays on). Elsewhere,
