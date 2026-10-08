@@ -227,8 +227,10 @@ def test_an_ami_only_a_launch_template_names_is_not_in_use_but_is_referenced():
     assert "No instance uses it" in result["ami-1"][1]
     inv = Inventory([ami], shared, named, [])
     text = references(inv, CTX)["ami-1"]
-    assert text.startswith("Launch template uat-api v3 in dev")
-    assert "Auto Scaling group web-asg" in text and "next launch would fail" in text
+    assert text == (
+        "Launch template uat-api v3 in dev and Auto Scaling group web-asg in dev still name it, "
+        "so their next launch would fail."
+    )
 
 
 def test_a_stopped_instance_in_a_member_account_is_use():

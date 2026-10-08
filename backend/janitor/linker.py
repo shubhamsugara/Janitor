@@ -117,15 +117,19 @@ def references(inventory: Inventory, ctx: LinkContext) -> dict[str, str]:
             found[ami.id].append(u)
     out = {}
     for ami_id, refs in found.items():
-        names = ", ".join(
+        named = [
             f"{REFERENCE_NOUNS[u.ref_type]} {u.ref_name or u.ref_id} in {ctx.name(u.account)}"
             for u in refs[:2]
-        )
+        ]
         if len(refs) == 1:
-            out[ami_id] = f"{names} still names it, so its next launch would fail."
+            out[ami_id] = f"{named[0]} still names it, so its next launch would fail."
         else:
-            more = f" and {len(refs) - 2} more" if len(refs) > 2 else ""
-            out[ami_id] = f"{names}{more} still name it, so their next launch would fail."
+            names = (
+                f"{named[0]}, {named[1]}, and {len(refs) - 2} more"
+                if len(refs) > 2
+                else (f"{named[0]} and {named[1]}")
+            )
+            out[ami_id] = f"{names} still name it, so their next launch would fail."
     return out
 
 
