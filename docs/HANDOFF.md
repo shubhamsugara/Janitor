@@ -40,8 +40,13 @@ Read this first, then the spec.
   a read-only page (sidebar, below Resources) of apps × env · region showing the live version.
   EC2 apps are ASGs tagged with a deploy state (read from the usage check's pages, with launch
   template version and AMI); ECS apps are services (new `ecs` check; the session policy adds
-  `ecs:Describe*`/`ecs:List*`). Tag names live under `deployments.tags`. Tested on moto and mock
-  data; **not yet run against real accounts**, whose roles may lack the ECS permissions.
+  `ecs:Describe*`/`ecs:List*`). Tag names live under `deployments.tags`. Checked by the user on a
+  real scan, then fixed: columns are account · region (not the env tag), a run status beside the
+  deploy state, instances in no ASG listed as standalone, counts in every cell, even column
+  widths, a lone ECS service at 0 is Stopped (not an earlier version), and a glossary on How
+  Janitor decides. **Follow-ups, not built:** target group membership for instances (needs
+  `elasticloadbalancing:Describe*`, the user's call), ECS rolling history from earlier task
+  definition revisions, and scheduled/task-only apps (needs `events:List*`).
 - Run it: `make setup` once, then `make run` → http://127.0.0.1:8080 (mock data), or
   `make run-aws` with a real `config/janitor.yaml` (see README).
 
