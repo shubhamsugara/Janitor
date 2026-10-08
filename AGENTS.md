@@ -1,6 +1,7 @@
 # Janitor - finds unused AWS AMIs, EBS snapshots, EBS volumes, and RDS snapshots
 
 Explains why each is or isn't safe to delete and walks a **simulated** delete. It never deletes.
+A read-only **Deployments** page shows which app version runs in each env (tagged ASGs, ECS services).
 Python 3.12 + FastAPI + boto3 + SQLite (`backend/`); React 19 + TS + Vite + Tailwind 4 + Radix
 (`frontend/`). Read `docs/HANDOFF.md` first for current status and the next step.
 
@@ -26,9 +27,9 @@ Without `config/janitor.yaml` the app runs in mock mode on `config/janitor.examp
    (`YYYYMMDDhhmmss`) so they never look like account IDs. Real settings live only in the
    gitignored `config/janitor.yaml`: never copy values from it into tracked files.
 2. **Read-only, three locks. Never add a write call.** Lock 1: `providers/base.py` `CloudProvider`
-   has read methods only. Lock 2: `providers/session.py` assumes every role with a session
-   policy that allows only `ec2/autoscaling/rds:Describe*`. Lock 3: `providers/guard.py` rejects
-   any operation not named `Describe*`/`List*`/`Get*` before it is sent. Each lock has a test.
+   has read methods only. Lock 2: `providers/session.py` assumes every role with a session policy
+   that allows only `ec2/autoscaling/rds/ecs:Describe*` and `ecs:List*`. Lock 3:
+   `providers/guard.py` rejects any operation not named `Describe*`/`List*`/`Get*` before it is sent. Each lock has a test.
    Deletes exist only as plans and audit entries (`plans.py`).
 3. **Ask before** adding a dependency (all pins are exact), pushing, or merging.
 4. **The base spec is partly superseded.** `docs/superpowers/specs/2026-10-06-*` still says

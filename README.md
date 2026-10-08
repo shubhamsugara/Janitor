@@ -1,7 +1,8 @@
 # Janitor
 
 Finds unused AMIs, EBS snapshots, EBS volumes, and RDS snapshots, explains why each one is
-or isn't safe to delete, and walks a simulated delete flow. It never deletes anything.
+or isn't safe to delete, and walks a simulated delete flow. It never deletes anything. Its
+Deployments page shows which version of each app runs in each env.
 
 It runs on mock data with fake account IDs, or reads real AWS accounts read-only. See
 [`docs/superpowers/plans/2026-10-07-janitor-roadmap.md`](docs/superpowers/plans/2026-10-07-janitor-roadmap.md).
@@ -24,9 +25,9 @@ Janitor needs one AWS profile: the admin account's, which owns the AMIs. Like yo
 config, it starts every hop from that profile's source login (your MFA session): the admin role,
 and `member_role` in every other account (an account can name its own `role`). It finds those
 accounts in the AMIs' launch permissions, plus any you list. Every session carries a policy that
-allows only `ec2:Describe*`, `autoscaling:Describe*`, and `rds:Describe*`, so no Janitor session
-can assume anything further, and a runtime guard stops any call that isn't a Describe, List, or
-Get before it is sent.
+allows only `ec2:Describe*`, `autoscaling:Describe*`, `rds:Describe*`, `ecs:Describe*`, and
+`ecs:List*`, so no Janitor session can assume anything further, and a runtime guard stops any
+call that isn't a Describe, List, or Get before it is sent.
 
 1. Copy `config/janitor.example.yaml` to `config/janitor.yaml` (gitignored). Set `admin` (account
    ID, display name, profile, regions) and `member_role`. `accounts` is optional: display names,
@@ -48,6 +49,22 @@ it, and those AMIs get warning W7 instead of being held back.
 An AMI is **in use** only when an instance (running or stopped) was launched from it. A launch
 template, Auto Scaling group, or launch configuration that only names it adds a **Referenced**
 warning, and deleting it then requires typing `delete`.
+
+### Deployments
+
+The Deployments page is a grid of apps by env and region, from the same scan:
+
+- **EC2 apps** are Auto Scaling groups your deploy tool tagged with a state (`deploy-state` by
+  default: `deploying`, `deployed`, `undeploying`, `undeployed`). Janitor reads their app, env,
+  version, and deployment ID tags, the launch template version they pin, and its AMI. Other
+  groups are ignored.
+- **ECS apps** are services, with the version from their task definition's tags (or the image
+  tag). A service scaled to 0, like the standby side of a blue/green pair, is an earlier version.
+
+The tag names are set under `deployments.tags` in `janitor.yaml`. For ECS, each role Janitor
+assumes needs `ecs:ListClusters`, `ecs:ListServices`, `ecs:DescribeServices`, and
+`ecs:DescribeTaskDefinition`. Without them only ECS shows a failed check; AMI results don't
+change.
 
 Behind a TLS-inspecting proxy, `make run-aws` on macOS trusts the system keychain's certificates
 (through `AWS_CA_BUNDLE`). Elsewhere, set `AWS_CA_BUNDLE` to your organization's CA bundle.

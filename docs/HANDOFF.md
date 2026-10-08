@@ -35,6 +35,13 @@ Read this first, then the spec.
   never contacted and don't hold an AMI back (warning W7 instead). An account listed twice in
   janitor.yaml is refused with the line number. Each page's Account filter lists only accounts
   that have that type, and hides when there is one.
+- **Deployments** on branch `deployments` from
+  [`docs/superpowers/plans/2026-10-08-deployments.md`](superpowers/plans/2026-10-08-deployments.md):
+  a read-only page (sidebar, below Resources) of apps × env · region showing the live version.
+  EC2 apps are ASGs tagged with a deploy state (read from the usage check's pages, with launch
+  template version and AMI); ECS apps are services (new `ecs` check; the session policy adds
+  `ecs:Describe*`/`ecs:List*`). Tag names live under `deployments.tags`. Tested on moto and mock
+  data; **not yet run against real accounts**, whose roles may lack the ECS permissions.
 - Run it: `make setup` once, then `make run` → http://127.0.0.1:8080 (mock data), or
   `make run-aws` with a real `config/janitor.yaml` (see README).
 
