@@ -65,7 +65,8 @@ class MockProvider:
         for u in inv.usage:
             counts[(u.account, u.region, "usage")] += 1
         members = member_accounts(config, inv.shares)
-        planned = first_phase(config) + second_phase(config, members)
+        amis = [r for r in inv.resources if r.type == "ami"]
+        planned = first_phase(config) + second_phase(config, members, amis, inv.shares)
         unreachable = set(self._seed.get("unreachable", []))
         return [
             Segment(a, r, k, ok=False, error_kind="denied", error="sts:AssumeRole")

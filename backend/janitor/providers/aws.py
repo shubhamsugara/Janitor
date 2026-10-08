@@ -124,7 +124,7 @@ class AwsProvider:
             return self._usage(sess, account, region, ami_ids)
 
         with ThreadPoolExecutor(config.scan.concurrency) as pool:
-            for account, region, kind in second_phase(config, members):
+            for account, region, kind in second_phase(config, members, amis, rows.shares):
                 work = usage if kind == "usage" else self._listers[kind]
                 pool.submit(run, account, region, kind, work)
 

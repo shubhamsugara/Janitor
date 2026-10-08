@@ -4,7 +4,7 @@ admin:                    # owns the AMIs and shares them with the other account
   account: "111111111111"
   name: tools
   profile: example-tools  # needs role_arn and source_profile in your AWS config
-  regions: [us-east-1, us-west-2, eu-west-1]   # every account is scanned in these
+  regions: [us-east-1, us-west-2, eu-west-1]   # admin's regions; the default for other accounts
 member_role: example-janitor-read   # the role assumed in every other account, from the same login
 accounts:                 # optional display names; accounts in AMI launch permissions are found anyway
   "555555555555": { name: sbx, profile: example-sbx }   # use this AWS profile's role_arn and
@@ -12,7 +12,7 @@ accounts:                 # optional display names; accounts in AMI launch permi
   "222222222222": { name: dev }
   "666666666666": { name: uat }
   "777777777777": { name: qas }                         # or { name: qas, role: example-qas-read }
-  "333333333333": { name: prd }
+  "333333333333": { name: prd, regions: [us-east-1, us-west-2] }   # only where it has resources
 policy:
   orphan_after_days: 90
   min_age_days: 30

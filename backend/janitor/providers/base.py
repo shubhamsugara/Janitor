@@ -7,7 +7,7 @@ from collections.abc import Callable
 from typing import Protocol
 
 from janitor.config import Config
-from janitor.models import Inventory, Segment, Share
+from janitor.models import Inventory, Resource, Segment, Share
 
 OnSegment = Callable[[Segment], None]
 
@@ -43,12 +43,26 @@ def member_accounts(config: Config, shares: list[Share]) -> list[str]:
     return sorted(found - {config.admin.account})
 
 
-def second_phase(config: Config, members: list[str]) -> list[tuple[str, str, str]]:
-    """Usage in the admin account, then each member's lists and usage, in every region."""
-    admin = [(config.admin.account, region, "usage") for region in config.regions]
-    return admin + [
-        (account, region, kind)
-        for account in members
-        for region in config.regions
-        for kind in MEMBER_KINDS
-    ]
+def second_phase(
+    config: Config, members: list[str], amis: list[Resource], shares: list[Share]
+) -> list[tuple[str, str, str]]:
+    """Usage in the admin account, then each member's lists and usage.
+
+    A member's resources are listed in its own regions. Its usage is also checked wherever an
+    admin AMI is shared with it: launch permissions are region-scoped, so an AMI in us-east-1
+    shared with an EU-only account can still be launched there, and only a check proves it isn't.
+    """
+    shared_in: dict[str, set[str]] = {}
+    region_of = {a.id: a.region for a in amis}
+    for share in shares:
+        if share.principal_type == "account" and share.image_id in region_of:
+            shared_in.setdefault(share.principal, set()).add(region_of[share.image_id])
+    plan = [(config.admin.account, region, "usage") for region in config.regions]
+    for account in members:
+        own = config.regions_for(account)
+        plan += [(account, region, kind) for region in own for kind in MEMBER_KINDS]
+        plan += [
+            (account, region, "usage")
+            for region in sorted(shared_in.get(account, set()) - set(own))
+        ]
+    return plan

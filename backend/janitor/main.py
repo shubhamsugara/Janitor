@@ -167,7 +167,7 @@ def create_app(
                 {
                     "id": account_id,
                     "name": config.account_name(account_id),
-                    "regions": config.regions,
+                    "regions": config.regions_for(account_id),
                 }
                 for account_id in known_accounts()
             ],

@@ -125,3 +125,14 @@ def test_an_account_can_name_its_profile(tmp_path):
         _variant(tmp_path, lambda d: d["accounts"]["222222222222"].update(profile="example-dev"))
     )
     assert config.accounts["222222222222"].profile == "example-dev"
+
+
+def test_an_account_can_list_its_own_regions(tmp_path):
+    config = load_config(
+        _variant(tmp_path, lambda d: d["accounts"]["333333333333"].update(regions=["eu-west-1"]))
+    )
+    assert config.regions_for("333333333333") == ["eu-west-1"]
+    assert config.regions_for("222222222222") == config.regions  # default: the admin's
+    empty = _variant(tmp_path, lambda d: d["accounts"]["333333333333"].update(regions=[]))
+    with pytest.raises(ValidationError, match="regions"):
+        load_config(empty)

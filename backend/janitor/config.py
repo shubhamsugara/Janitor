@@ -37,6 +37,9 @@ class AccountName(_Strict):
     name: str
     role: str = ""  # overrides member_role for this account
     profile: str = ""  # an AWS profile for this account: its role_arn and role_session_name win
+    regions: list[str] | None = Field(
+        None, min_length=1
+    )  # where it has resources; default: admin's
 
     @field_validator("role")
     @classmethod
@@ -124,6 +127,13 @@ class Config(_Strict):
     def regions(self) -> list[str]:
         """Every account is scanned in the admin's regions."""
         return self.admin.regions
+
+    def regions_for(self, account_id: str) -> list[str]:
+        """Where an account's resources are listed: its own regions, else the admin's."""
+        if account_id == self.admin.account:
+            return self.admin.regions
+        account = self.accounts.get(account_id)
+        return (account.regions if account else None) or self.admin.regions
 
     def role_for(self, account_id: str) -> str:
         """The role Janitor assumes in an account: its own override, else member_role."""
