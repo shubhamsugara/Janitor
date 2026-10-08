@@ -11,13 +11,17 @@ AWS_TRUSTED_CERTS = security find-certificate -a -p /Library/Keychains/System.ke
 	export AWS_CA_BUNDLE=$${AWS_CA_BUNDLE:-$(CURDIR)/.venv/trusted-certs.pem} &&
 endif
 
-.PHONY: setup backend frontend dev test seed build run run-aws prices icons
+.PHONY: setup doctor backend frontend dev test seed build run run-aws prices icons
 
 setup:
 	uv venv --python 3.12 .venv
 	uv pip install --python $(PY) -e "./backend[dev]"
 	cd frontend && npm install
 	git config core.hooksPath .githooks
+
+# Says what isn't ready on this machine and how to fix it. System python3: .venv may be broken.
+doctor:
+	@python3 scripts/doctor.py
 
 backend:
 	$(PY) -m uvicorn janitor.main:create_app --factory --reload --host 127.0.0.1 --port 8080

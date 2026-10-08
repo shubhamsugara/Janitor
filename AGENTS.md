@@ -9,7 +9,7 @@ Python 3.12 + FastAPI + boto3 + SQLite (`backend/`); React 19 + TS + Vite + Tail
 
 | Task | Command |
 |------|---------|
-| First setup (venv, deps, git hooks) | `make setup` |
+| First setup (venv, deps, git hooks) / what's broken on this machine | `make setup` / `make doctor` |
 | Dev: API with reload :8080, UI :5173 | `make dev` |
 | Built app on mock data / real AWS (read-only) | `make run` / `make run-aws` |
 | Everything CI checks (pytest, ruff, leak check, tsc, vitest) | `make test` |
@@ -90,6 +90,7 @@ kind is a `Segment`; a failed segment makes the affected resources `unknown`.
 
 ## Related Context
 
+- `docs/GUIDE.md` - flow diagrams and "where do I change..." map; `.claude/skills/troubleshoot/` - known errors and fixes
 - `README.md` - running against AWS, config layout (`admin`, `member_role`, `accounts`, `ignore_accounts`)
 - `docs/HANDOFF.md` - status, next step, verified dependency pins
 - `docs/superpowers/specs/` - design specs; the newest phase spec wins over older ones

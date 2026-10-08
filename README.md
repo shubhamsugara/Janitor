@@ -19,6 +19,10 @@ http://127.0.0.1:5173. `make test` runs the backend tests, lint, leak check, and
 
 Without `config/janitor.yaml`, Janitor uses `config/janitor.example.yaml` in mock mode.
 
+New here? [`docs/GUIDE.md`](docs/GUIDE.md) shows how the app works, with diagrams, and where to
+change each thing. If setup, a build, or a scan fails, run `make doctor`; in Claude Code,
+`/troubleshoot` knows Janitor's error messages and their fixes.
+
 ## Run it against AWS (read-only)
 
 Janitor needs one AWS profile: the admin account's, which owns the AMIs. Like your own AWS
