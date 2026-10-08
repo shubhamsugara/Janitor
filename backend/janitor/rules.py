@@ -241,7 +241,8 @@ def evaluate(
             f"It was copied to {_join(regions)} ({len(copies)} AMI{plural}). The copies keep "
             "working, but this is their source.",
         )
-    if r.id in ctx.last_db_copy:
+    # An unknown snapshot's database check failed: Janitor can't say the database is gone.
+    if r.id in ctx.last_db_copy and r.status != "unknown":
         hit(
             "W2",
             f"Database {ctx.last_db_copy[r.id]} is gone, and this is its newest snapshot. It may "

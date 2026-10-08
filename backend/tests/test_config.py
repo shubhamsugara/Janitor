@@ -231,3 +231,11 @@ def test_keep_newest_is_at_least_one(tmp_path):
     path = _variant(tmp_path, lambda d: d["policy"].update(keep_newest_per_name_group=0))
     with pytest.raises(ValidationError, match="keep_newest_per_name_group"):
         load_config(path)
+
+
+@pytest.mark.parametrize("field", ["keep_name_patterns", "ami_name_group_pattern"])
+def test_an_overflowing_pattern_is_a_config_error(tmp_path, field):
+    value = ["a{4294967296}"] if field == "keep_name_patterns" else "(?P<group>a{4294967296})"
+    path = _variant(tmp_path, lambda d: d["policy"].update({field: value}))
+    with pytest.raises(ValidationError, match=field):
+        load_config(path)

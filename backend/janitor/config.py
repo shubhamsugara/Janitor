@@ -74,7 +74,7 @@ class Policy(_Strict):
     def _group_pattern(cls, pattern: str) -> str:
         try:
             compiled = re.compile(pattern)
-        except re.error as e:
+        except (re.error, OverflowError) as e:
             raise ValueError(
                 f"ami_name_group_pattern: {pattern!r} isn't a valid regular expression ({e})"
             ) from None
@@ -88,7 +88,7 @@ class Policy(_Strict):
         for pattern in patterns:
             try:
                 re.compile(pattern)
-            except re.error as e:
+            except (re.error, OverflowError) as e:
                 raise ValueError(
                     f"keep_name_patterns: {pattern!r} isn't a valid regular expression ({e})"
                 ) from None

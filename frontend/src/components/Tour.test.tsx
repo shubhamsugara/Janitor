@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter, useLocation } from "react-router";
+import { MemoryRouter, useLocation, useNavigate } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TOUR_STEPS, useTour } from "../tour";
 import Tour from "./Tour";
@@ -8,11 +8,18 @@ function Where() {
   return <span data-testid="where">{useLocation().pathname}</span>;
 }
 
+let goto: (to: string) => void = () => {};
+function Nav() {
+  goto = useNavigate();
+  return null;
+}
+
 function Harness({ anchors = false }: { anchors?: boolean }) {
   const tour = useTour();
   return (
     <MemoryRouter>
       <Where />
+      <Nav />
       {anchors && <div data-tour="type">types</div>}
       <button type="button" onClick={tour.start}>
         Replay
@@ -90,5 +97,15 @@ describe("Walkthrough", () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "Replay" }));
     expect(screen.getByText("Step 1 of 5")).toBeTruthy();
+  });
+});
+
+describe("Walkthrough navigation", () => {
+  it("doesn't pull the user back when they go to another page mid-tour", () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByTestId("where").textContent).toBe("/amis");
+    act(() => goto("/audit"));
+    expect(screen.getByTestId("where").textContent).toBe("/audit");
   });
 });

@@ -10,11 +10,11 @@ interface Props {
   onClose: () => void;
 }
 
-/** The help drawer: opens over the details drawer, and closing it leaves that drawer open. */
+/** The help drawer: above the details drawer and the plan popup (z-50), below toasts (z-60). */
 export default function HelpPanel({ topic, meta, onClose }: Props) {
   const content = helpContent(meta, topic);
   return (
-    <Sheet open onClose={onClose} title="Help" closeLabel="Close help" className="z-40 w-[min(440px,94vw)]">
+    <Sheet open onClose={onClose} title="Help" closeLabel="Close help" className="z-[55] w-[min(440px,94vw)]">
       <div className="space-y-5 text-[13px]">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-lg font-semibold tracking-tight">{content.title}</h2>

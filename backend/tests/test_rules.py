@@ -271,3 +271,9 @@ def test_explain_renders_live_values():
     assert "3 newest" in explain(RULES_BY_ID["R6"], POLICY)
     assert "none configured" in explain(RULES_BY_ID["R7"], POLICY)
     assert "^golden-" in explain(RULES_BY_ID["R7"], policy)
+
+
+def test_w2_silent_when_the_database_check_failed():
+    # A failed database check makes the snapshot unknown (R2); W2 mustn't claim the DB is gone.
+    new = rds("snap-new", 100, status="unknown", status_reason="Couldn't list databases.")
+    assert "W2" not in hits(new, [new])

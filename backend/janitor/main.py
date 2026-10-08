@@ -130,7 +130,7 @@ def _check_pattern(pattern: str) -> None:
         )
     try:
         re.compile(pattern)
-    except re.error as e:
+    except (re.error, OverflowError) as e:  # OverflowError: a repeat count like a{4294967296}
         raise HTTPException(
             400, f"That name pattern isn't a valid regular expression: {e}."
         ) from None

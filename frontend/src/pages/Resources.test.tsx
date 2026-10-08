@@ -74,12 +74,13 @@ describe("Select all matching", () => {
     expect(vi.mocked(api.planMatching).mock.calls.at(-1)?.[2]).toEqual(["vol-2"]);
   });
 
-  it("changing a filter leaves all-matching mode", async () => {
+  it("changing a filter clears the all-matching selection, not just the mode", async () => {
     renderPage();
     await selectPage();
     fireEvent.click(screen.getByRole("button", { name: "Select all 120 matching" }));
+    fireEvent.click(screen.getByLabelText("Select vol-2"));
     goto("/volumes?region=eu-west-1");
-    await waitFor(() => expect(screen.queryByText(/matching selected/)).toBeNull());
+    await waitFor(() => expect(screen.queryByText(/selected/)).toBeNull());
   });
 
   it("clear leaves all-matching mode", async () => {

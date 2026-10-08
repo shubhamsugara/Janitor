@@ -14,7 +14,7 @@ interface Props {
 
 /** A drawer that slides in from the right: resource details, and help on top of them. */
 export function Sheet({ open, onClose, title, children, closeLabel = "Close details", className }: Props) {
-  const layer = className?.match(/\bz-\d+\b/)?.[0] ?? "z-30";
+  const layer = className?.match(/(?:^|\s)(z-(?:\[\d+\]|\d+))(?=\s|$)/)?.[1] ?? "z-30";
   return (
     <D.Root open={open} onOpenChange={(next) => !next && onClose()}>
       <D.Portal>

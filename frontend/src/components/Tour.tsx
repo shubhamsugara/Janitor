@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { TOUR_STEPS } from "../tour";
 import { Button } from "../ui/button";
@@ -37,9 +37,14 @@ export default function Tour({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
   const rect = useAnchor(step.id);
 
+  // Open the step's page when the step changes, not on every navigation: the user may browse away.
+  // useNavigate() returns a new function after each navigation, so both live in a ref.
+  const latest = useRef({ path: location.pathname, navigate });
+  latest.current = { path: location.pathname, navigate };
   useEffect(() => {
-    if (step.page && location.pathname !== step.page) navigate(step.page);
-  }, [step, location.pathname, navigate]);
+    const page = TOUR_STEPS[index].page;
+    if (page && latest.current.path !== page) latest.current.navigate(page);
+  }, [index]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     document.addEventListener("keydown", onKey);

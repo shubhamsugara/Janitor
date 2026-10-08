@@ -715,7 +715,7 @@ def test_meta_rule_outcome_follows_policy(tmp_path):
     assert "3 newest" in rules["R6"]["explanation"]
 
 
-@pytest.mark.parametrize("pattern", ["(unclosed", "x" * 201])
+@pytest.mark.parametrize("pattern", ["(unclosed", "x" * 201, "a{4294967296}"])
 def test_bad_name_regex_is_400(client, pattern):
     for route in ("/api/resources", "/api/stats", "/api/resources/export.json"):
         response = client.get(route, params={"name_regex": pattern})
@@ -794,4 +794,5 @@ def test_plan_needs_exactly_one_of_ids_or_selection(client, body):
 
 def test_selection_filter_is_validated(client):
     assert plan_matching(client, {"name_regex": "(bad"}).status_code == 400
+    assert plan_matching(client, {"name_regex": "a{4294967296}"}).status_code == 400
     assert plan_matching(client, {"created_from": "yesterday"}).status_code == 422

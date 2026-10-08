@@ -206,7 +206,15 @@ export default function Resources({ meta, notify, type, title }: Props) {
                 : `All ${all.total.toLocaleString()} matching selected`}
           </span>
           {canSelectAll && (
-            <Button size="sm" variant="secondary" onClick={() => setAll({ total: data!.total, exclude: new Set() })}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                // All-matching replaces the page picks, so leaving it can't bring back unchecked rows.
+                setPicked([]);
+                setAll({ total: data!.total, exclude: new Set() });
+              }}
+            >
               {`Select all ${data!.total.toLocaleString()} matching`}
             </Button>
           )}

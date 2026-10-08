@@ -124,3 +124,26 @@ describe("Help over the drawer", () => {
     expect(screen.getByText("Drawer body")).toBeTruthy();
   });
 });
+
+describe("Help over the plan popup", () => {
+  it("stacks above the dialog layer", async () => {
+    const { Dialog } = await import("../ui/dialog");
+    render(
+      <MemoryRouter>
+        <Dialog open onClose={() => {}} title="Plan">
+          <p>Plan body</p>
+        </Dialog>
+      </MemoryRouter>,
+    );
+    const z = (el: Element | null) => Number(/\bz-(?:\[)?(\d+)/.exec(el?.className ?? "")?.[1] ?? 0);
+    const dialogZ = z(screen.getByText("Plan body").closest("[role=dialog]"));
+    render(
+      <MemoryRouter>
+        <HelpPanel topic="status:orphaned" meta={meta} onClose={() => {}} />
+      </MemoryRouter>,
+    );
+    const helpZ = z(screen.getByText("Nothing uses it and it is old.").closest("[role=dialog]"));
+    expect(dialogZ).toBeGreaterThan(0);
+    expect(helpZ).toBeGreaterThan(dialogZ);
+  });
+});
