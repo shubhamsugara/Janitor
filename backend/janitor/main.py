@@ -151,6 +151,12 @@ def create_app(
     def health():
         return {"status": "ok"}
 
+    def known_accounts() -> list[str]:
+        """The admin, the named accounts, then any account the shown scan discovered."""
+        scan = store.latest_scan()
+        seen = [s["account"] for s in store.segments(scan["id"])] if scan else []
+        return list(dict.fromkeys([config.admin.account, *config.accounts, *sorted(seen)]))
+
     @app.get("/api/meta")
     def meta():
         return {
@@ -163,7 +169,7 @@ def create_app(
                     "name": config.account_name(account_id),
                     "regions": config.regions,
                 }
-                for account_id in [config.admin.account, *config.accounts]
+                for account_id in known_accounts()
             ],
             "policy": {
                 "orphan_after_days": config.policy.orphan_after_days,

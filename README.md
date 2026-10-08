@@ -20,17 +20,25 @@ Without `config/janitor.yaml`, Janitor uses `config/janitor.example.yaml` in moc
 
 ## Run it against AWS (read-only)
 
-Janitor reaches each account through `sts:AssumeRole` with a session policy that allows only
-`ec2:Describe*`, `autoscaling:Describe*`, and `rds:Describe*`, so even an admin role can only
-describe. A runtime guard also stops any call that isn't a Describe, List, or Get before it is sent.
+Janitor needs one AWS profile: the admin account's, which owns the AMIs. From there it assumes one
+role name (`member_role`) in every other account. It finds those accounts in the AMIs' launch
+permissions, plus any you list. Every hop carries a session policy that allows only
+`ec2:Describe*`, `autoscaling:Describe*`, and `rds:Describe*`; the admin hop may also assume
+`member_role`, and nothing else. A runtime guard stops any call that isn't a Describe, List, or Get
+before it is sent.
 
-1. Copy `config/janitor.example.yaml` to `config/janitor.yaml` (gitignored) and fill in your
-   account IDs, regions, and AWS profile names.
-2. Each profile in your AWS config needs `role_arn` and `source_profile`. Janitor refuses to start
-   and names any profile that doesn't have them.
+1. Copy `config/janitor.example.yaml` to `config/janitor.yaml` (gitignored). Set `admin` (account
+   ID, display name, profile, regions) and `member_role`. `accounts` is optional: display names,
+   and accounts to scan even if no AMI is shared with them.
+2. The admin profile in your AWS config needs `role_arn` and `source_profile`. `member_role` must
+   exist in each account and trust the admin role.
 3. Refresh your MFA session for the source profile as usual.
-4. `make run-aws`. The first scan starts in the background; the Overview shows progress and any
-   checks that failed. Resources that depend on a failed check show as Unknown and can't be deleted.
+4. `make run-aws`. The first scan runs in the background. An account whose role can't be assumed
+   shows as a failed check, and AMIs shared with it show as Unknown.
+
+An AMI is **in use** only when an instance (running or stopped) was launched from it. A launch
+template, Auto Scaling group, or launch configuration that only names it adds a **Referenced**
+warning, and deleting it then requires typing `delete`.
 
 Behind a TLS-inspecting proxy, `make run-aws` on macOS trusts the system keychain's certificates
 (through `AWS_CA_BUNDLE`). Elsewhere, set `AWS_CA_BUNDLE` to your organization's CA bundle.

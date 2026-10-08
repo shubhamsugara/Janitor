@@ -7,8 +7,8 @@ import FilterBar from "./FilterBar";
 const meta = {
   owner: { account: "111111111111", regions: ["us-east-1"] },
   accounts: [
-    { id: "111111111111", name: "tools", owns: [], regions: ["us-east-1"] },
-    { id: "333333333333", name: "prd", owns: [], regions: ["us-east-1", "eu-west-1"] },
+    { id: "111111111111", name: "tools", regions: ["us-east-1"] },
+    { id: "333333333333", name: "prd", regions: ["us-east-1", "eu-west-1"] },
   ],
   definitions: { statuses: { orphaned: { label: "Orphaned" }, idle: { label: "Idle" }, in_use: { label: "In use" }, managed: { label: "Managed" }, unknown: { label: "Unknown" } } },
 } as unknown as Meta;

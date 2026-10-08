@@ -4,7 +4,7 @@ import type { Meta, Resource } from "../api";
 import ResourceTable from "./ResourceTable";
 
 const meta = {
-  accounts: [{ id: "111111111111", name: "tools", owns: [], regions: [] }],
+  accounts: [{ id: "111111111111", name: "tools", regions: [] }],
   definitions: { statuses: { orphaned: { label: "Orphaned", blocks: false, meaning: "", what_to_do: "" } }, by_type: { volume: {} } },
 } as unknown as Meta;
 

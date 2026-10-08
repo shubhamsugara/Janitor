@@ -3,7 +3,7 @@ import type { ExportData, Meta } from "../api";
 import { buildReport } from "./pdfReport";
 
 const meta = {
-  accounts: [{ id: "333333333333", name: "prd", owns: [], regions: [] }],
+  accounts: [{ id: "333333333333", name: "prd", regions: [] }],
   definitions: { statuses: { orphaned: { label: "Orphaned" } } },
 } as unknown as Meta;
 const stats = { total: 7000, orphaned: 10, orphaned_gib: 100, orphaned_usd: 5, blocked: 2 } as unknown as ExportData["stats"];

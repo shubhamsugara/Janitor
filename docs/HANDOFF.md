@@ -22,6 +22,13 @@ Read this first, then the spec.
   segments with partial failures, `unknown` from failed checks, live re-check before a simulated
   delete, and scan-health UI. Tested on moto; **the first real scan is the user's** (`make run-aws`).
   Rules R6/R7/W1/W2/W3/W5, select-all-matching, help panel, and walkthrough are phase 3b.
+- **Phase 3 fixes** (same branch) from
+  [`docs/superpowers/plans/2026-10-08-phase-3-hub-and-usage.md`](superpowers/plans/2026-10-08-phase-3-hub-and-usage.md),
+  after the first real scan: config is now `admin` + `member_role` + optional `accounts` names
+  (the old `owner`/`owns` layout is rejected with a migration message); accounts are discovered
+  from launch permissions and reached through the admin hub; only instances make an AMI in use
+  (templates, ASGs, launch configs add warning W6 "Referenced"); the diagram shows an AMI's own
+  links, with usage grouped under accounts.
 - Run it: `make setup` once, then `make run` → http://127.0.0.1:8080 (mock data), or
   `make run-aws` with a real `config/janitor.yaml` (see README).
 

@@ -103,7 +103,7 @@ export interface Meta {
   owner: { account: string; regions: string[] };
   policy: { orphan_after_days: number; min_age_days: number; typed_confirm_min_items: number };
   prices: { source_date: string | null; fallback: boolean };
-  accounts: { id: string; name: string; owns: string[]; regions: string[] }[];
+  accounts: { id: string; name: string; regions: string[] }[];
   definitions: {
     statuses: Record<Status, StatusDefinition>;
     by_type: Record<ResourceType, Partial<Record<Status, string>>>;

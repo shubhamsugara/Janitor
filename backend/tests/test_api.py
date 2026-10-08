@@ -47,7 +47,8 @@ def test_health_and_meta(client):
     assert client.get("/health").json() == {"status": "ok"}
     meta = client.get("/api/meta").json()
     assert meta["provider"] == "mock" and meta["read_only"] is True
-    assert {a["name"] for a in meta["accounts"]} == {"tools", "sbx", "dev", "uat", "qas", "prd"}
+    names = {a["name"] for a in meta["accounts"]}
+    assert names == {"tools", "sbx", "dev", "uat", "qas", "prd", "444444444444"}  # 444 discovered
     assert "older than 90 days" in meta["definitions"]["statuses"]["orphaned"]["meaning"]
 
 
@@ -605,3 +606,20 @@ def test_share_impact_follows_the_usage_check_not_the_config(tmp_path, config):
     scan_id = Scanner(store, Provider(), config, clock=lambda: NOW).run()
     impact = plans._share_impact(store, config, scan_id, {"id": "ami-a", "region": "us-east-1"})
     assert impact["accounts"] == [{"id": "222222222222", "name": "dev", "scanned": False}]
+
+
+def test_meta_lists_accounts_discovered_during_the_scan(tmp_path):
+    from janitor.models import Segment
+
+    class Discovering(FakeAws):
+        def list_inventory(self, on_segment=None):
+            seg = Segment("444444444444", "us-east-1", "volume", ok=True)
+            on_segment(seg)
+            return Inventory([_r("vol-1", "volume")], [], [], [], segments=[seg])
+
+    client = TestClient(create_app(_settings(tmp_path), clock=lambda: NOW, provider=Discovering()))
+    accounts = {a["id"]: a for a in client.get("/api/meta").json()["accounts"]}
+    assert accounts["444444444444"]["name"] == "444444444444"
+    assert accounts["111111111111"]["name"] == "tools"  # the admin comes first
+    assert list(accounts)[0] == "111111111111"
+    assert "owns" not in accounts["111111111111"]
