@@ -157,7 +157,7 @@ export default function Resources({ meta, notify, type, title }: Props) {
               { id: "pdf", label: "PDF report", description: "Up to 5,000 rows" },
             ]}
           />
-          <Button variant="primary" disabled={count === 0} loading={planning} onClick={planDelete}>
+          <Button variant="primary" disabled={count === 0} loading={planning} onClick={planDelete} data-tour="plan">
             {count ? `Plan delete (${count.toLocaleString()})` : "Plan delete"}
           </Button>
         </div>

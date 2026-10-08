@@ -5,6 +5,7 @@ import HelpPanel from "./components/HelpPanel";
 import ResourcePanel from "./components/ResourcePanel";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
+import Tour from "./components/Tour";
 import { DetailContext, type DetailApi } from "./detail";
 import { HelpContext, type HelpApi, type HelpTopic } from "./help";
 import { TYPE_PAGES } from "./nav";
@@ -14,6 +15,7 @@ import HowItWorks from "./pages/HowItWorks";
 import Overview from "./pages/Overview";
 import Resources from "./pages/Resources";
 import { applyTheme, savedTheme, type Theme } from "./theme";
+import { useTour } from "./tour";
 import { Card, CardBody } from "./ui/card";
 import { Sheet } from "./ui/sheet";
 import { Spinner } from "./ui/spinner";
@@ -50,6 +52,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [helpTopic, setHelpTopic] = useState<HelpTopic | null>(null);
   const helpApi: HelpApi = useMemo(() => ({ open: setHelpTopic }), []);
+  const tour = useTour();
 
   // Reloaded after each scan: accounts are discovered during scans, and the filters list them.
   useEffect(() => {
@@ -84,6 +87,7 @@ export default function App() {
 
   function onHelp(id: "open" | "tour" | "how") {
     if (id === "how") navigate("/how-it-works");
+    if (id === "tour") tour.start();
     if (id === "open") {
       const page = TYPE_PAGES.find((p) => p.path === location.pathname);
       setHelpTopic(page ? `page:${page.type}` : "page:overview");
@@ -154,6 +158,7 @@ export default function App() {
       <Sheet open={Boolean(selectedId && meta)} onClose={() => setSelectedId(null)} title="Resource details">
         {selectedId && meta && <ResourcePanel id={selectedId} meta={meta} dark={theme === "dark"} onSelect={setSelectedId} />}
       </Sheet>
+      {tour.open && meta && !error && <Tour key={tour.run} onClose={tour.close} />}
       {helpTopic && meta && <HelpPanel topic={helpTopic} meta={meta} onClose={() => setHelpTopic(null)} />}
     </DetailContext.Provider>
     </HelpContext.Provider>

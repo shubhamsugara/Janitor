@@ -43,9 +43,11 @@ export default function Sidebar({ collapsed, onToggle }: { collapsed: boolean; o
       <nav aria-label="Main" className="flex-1 overflow-y-auto px-2 py-3">
         <Item to="/" icon={LayoutDashboard} label="Overview" collapsed={collapsed} />
         <Section label="Resources" collapsed={collapsed} />
-        {TYPE_PAGES.map((p) => (
-          <Item key={p.type} to={p.path} icon={TYPE_ICONS[p.type]} label={p.title} collapsed={collapsed} />
-        ))}
+        <div data-tour="type">
+          {TYPE_PAGES.map((p) => (
+            <Item key={p.type} to={p.path} icon={TYPE_ICONS[p.type]} label={p.title} collapsed={collapsed} />
+          ))}
+        </div>
         <Section label="Deployments" collapsed={collapsed} />
         <Item to="/deployments" icon={Rocket} label="Deployments" collapsed={collapsed} />
         <Section label="Activity" collapsed={collapsed} />

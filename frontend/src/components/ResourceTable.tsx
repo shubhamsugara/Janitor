@@ -49,7 +49,7 @@ export default function ResourceTable({ meta, items, loading, sort, onSort, sele
     <Table sticky aria-busy={loading || undefined}>
       <THead sticky>
         <tr>
-          <Th className="w-10">
+          <Th className="w-10" data-tour="select">
             <input type="checkbox" className="size-4 accent-[var(--accent)]" checked={allOnPage} onChange={toggleAll} disabled={loading} aria-label="Select all on this page" />
           </Th>
           {COLUMNS.map((c) => (
@@ -81,7 +81,7 @@ export default function ResourceTable({ meta, items, loading, sort, onSort, sele
             </td>
           </tr>
         ) : (
-          items.map((r) => (
+          items.map((r, i) => (
             <Tr key={r.id} className={selectedIds.has(r.id) ? "[&>td]:bg-accent-soft/60" : undefined}>
               <Td>
                 <input type="checkbox" className="size-4 accent-[var(--accent)]" checked={selectedIds.has(r.id)} onChange={() => toggle(r)} disabled={loading} aria-label={`Select ${r.name || r.id}`} />
@@ -99,7 +99,7 @@ export default function ResourceTable({ meta, items, loading, sort, onSort, sele
                   </div>
                 </div>
               </Td>
-              <Td>
+              <Td data-tour={i === 0 ? "status" : undefined}>
                 <StatusBadge meta={meta} type={r.type} status={r.status} reason={r.status_reason} />
               </Td>
               <Td>
