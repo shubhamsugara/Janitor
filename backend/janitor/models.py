@@ -35,6 +35,7 @@ class Resource:
     cost_breakdown: dict | None = None  # see janitor.pricing
     status: str = ""
     status_reason: str = ""
+    referenced_by: str | None = None  # AMI: templates, ASGs, launch configs that name it (W6)
 
 
 @dataclass

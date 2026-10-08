@@ -208,3 +208,40 @@ def test_manual_rds_snapshot_is_unknown_when_its_database_list_failed():
         ctx=ctx,
     )
     assert statuses == {"rds-manual": "unknown", "rds-auto": "managed"}
+
+
+# Only instances are use; launch templates, ASGs, and launch configs are references (W6).
+
+
+def test_an_ami_only_a_launch_template_names_is_not_in_use_but_is_referenced():
+    from janitor.linker import references
+
+    ami = res("ami-1", "ami")
+    shared = [Share("ami-1", "account", DEV)]
+    named = [
+        Usage("ami-1", DEV, "us-east-1", "launch_template", "lt-1", "uat-api v3"),
+        Usage("ami-1", DEV, "us-east-1", "asg", "web-asg", "web-asg", "inactive"),
+    ]
+    statuses, result = status([ami], shared, named)
+    assert statuses["ami-1"] == "orphaned"
+    assert "No instance uses it" in result["ami-1"][1]
+    inv = Inventory([ami], shared, named, [])
+    text = references(inv, CTX)["ami-1"]
+    assert text.startswith("Launch template uat-api v3 in dev")
+    assert "Auto Scaling group web-asg" in text and "next launch would fail" in text
+
+
+def test_a_stopped_instance_in_a_member_account_is_use():
+    stopped = [Usage("ami-1", DEV, "us-east-1", "instance", "i-1", "dev-api", "stopped")]
+    statuses, _ = status([res("ami-1", "ami")], [Share("ami-1", "account", DEV)], stopped)
+    assert statuses["ami-1"] == "in_use"
+
+
+def test_references_outside_permissions_or_region_dont_count():
+    from janitor.linker import references
+
+    named = [
+        Usage("ami-1", DEV, "us-east-1", "launch_template", "lt-1", "x"),  # dev not permitted
+        Usage("ami-1", TOOLS, "eu-west-1", "launch_config", "lc-1", "y"),  # another region
+    ]
+    assert references(Inventory([res("ami-1", "ami")], [], named, []), CTX) == {}

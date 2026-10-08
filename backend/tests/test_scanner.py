@@ -1,5 +1,5 @@
 import pytest
-from helpers import NOW, SEED
+from helpers import NOW, SEED, stamp
 
 from janitor.models import Inventory
 from janitor.providers.mock import MockProvider
@@ -188,3 +188,12 @@ def test_segment_messages(config):
     assert msg("other", "Endpoint unreachable") == (
         "Endpoint unreachable. Scan again; if it repeats, check the server log."
     )
+
+
+def test_an_ami_only_templates_name_is_idle_and_warned(setup):
+    store, scanner = setup
+    scan_id = scanner.run()
+    web = by_name(store, scan_id, f"app-web-{stamp(10)}", type="ami")
+    assert web.status == "idle"
+    assert web.referenced_by.startswith("Launch template prd-web v7 in prd")
+    assert "W6" in rules_of(store, scan_id, web)

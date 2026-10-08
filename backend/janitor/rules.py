@@ -43,6 +43,13 @@ RULES = [
         "It is younger than {min_age_days} days, so it gets time to be adopted.",
     ),
     Rule("W4", "No owner tag", "warn", "It has no owner tag, so there's nobody to ask first."),
+    Rule(
+        "W6",
+        "Referenced",
+        "warn",
+        "No instance runs it, but a launch template, Auto Scaling group, or launch configuration "
+        "still names it. Deleting it makes their next launch fail.",
+    ),
 ]
 RULES_BY_ID = {rule.id: rule for rule in RULES}
 
@@ -86,6 +93,8 @@ def evaluate(
         hit("R5", f"Created {age} days ago; the minimum age is {policy.min_age_days} days.")
     if not any(key.lower() == "owner" for key in r.tags):
         hit("W4", "It has no owner tag.")
+    if r.referenced_by:
+        hit("W6", r.referenced_by)
     return hits
 
 

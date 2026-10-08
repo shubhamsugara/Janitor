@@ -88,6 +88,47 @@ def link(inventory: Inventory, ctx: LinkContext) -> dict[str, tuple[str, str]]:
     return result
 
 
+REFERENCE_NOUNS = {
+    "launch_template": "Launch template",
+    "asg": "Auto Scaling group",
+    "launch_config": "Launch configuration",
+}
+
+
+def references(inventory: Inventory, ctx: LinkContext) -> dict[str, str]:
+    """{ami_id: sentence} for AMIs that templates, ASGs, or launch configs still name (W6).
+
+    Only references a permitted account could launch, in the AMI's own region, count.
+    """
+    amis = {r.id: r for r in inventory.resources if r.type == "ami"}
+    permitted: dict[str, set[str]] = {i: {a.account} for i, a in amis.items()}
+    for share in inventory.shares:
+        if share.principal_type == "account" and share.image_id in permitted:
+            permitted[share.image_id].add(share.principal)
+    found: dict[str, list[Usage]] = defaultdict(list)
+    for u in inventory.usage:
+        ami = amis.get(u.image_id)
+        if (
+            ami
+            and u.ref_type in REFERENCE_NOUNS
+            and u.region == ami.region
+            and u.account in permitted[ami.id]
+        ):
+            found[ami.id].append(u)
+    out = {}
+    for ami_id, refs in found.items():
+        names = ", ".join(
+            f"{REFERENCE_NOUNS[u.ref_type]} {u.ref_name or u.ref_id} in {ctx.name(u.account)}"
+            for u in refs[:2]
+        )
+        if len(refs) == 1:
+            out[ami_id] = f"{names} still names it, so its next launch would fail."
+        else:
+            more = f" and {len(refs) - 2} more" if len(refs) > 2 else ""
+            out[ami_id] = f"{names}{more} still name it, so their next launch would fail."
+    return out
+
+
 def _managed(r: Resource) -> tuple[str, str]:
     return "managed", MANAGED_REASONS.get(r.managed_by, "Created by an AWS-managed service.")
 
@@ -95,7 +136,7 @@ def _managed(r: Resource) -> tuple[str, str]:
 def _ami(r: Resource, shares: list[Share], usage: list[Usage], ctx: LinkContext) -> tuple[str, str]:
     # Launch permissions are region-scoped, so only usage in the AMI's own region counts.
     permitted = {r.account} | {s.principal for s in shares if s.principal_type == "account"}
-    refs = [u for u in usage if u.account in permitted]
+    refs = [u for u in usage if u.account in permitted and u.ref_type == "instance"]
     if refs:
         first = refs[0]
         more = f" and {len(refs) - 1} more" if len(refs) > 1 else ""
@@ -127,8 +168,8 @@ def _ami(r: Resource, shares: list[Share], usage: list[Usage], ctx: LinkContext)
             )
     age = age_days(r.created_at, ctx.now)
     if age >= ctx.orphan_after_days:
-        return "orphaned", f"Nothing uses it in {r.region}, and it is {age} days old."
-    return "idle", f"Nothing uses it in {r.region}, but it is only {age} days old."
+        return "orphaned", f"No instance uses it in {r.region}, and it is {age} days old."
+    return "idle", f"No instance uses it in {r.region}, but it is only {age} days old."
 
 
 def _snapshot(

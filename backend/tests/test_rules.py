@@ -73,7 +73,7 @@ def test_explanations_use_live_config_values(config):
     defs = build(config)
     assert "older than 90 days" in defs["statuses"]["orphaned"]["meaning"]
     assert set(defs["by_type"]) == {"ami", "snapshot", "volume", "rds_snapshot"}
-    assert [r["id"] for r in defs["rules"]] == ["R1", "R2", "R3", "R4", "R5", "W4"]
+    assert [r["id"] for r in defs["rules"]] == ["R1", "R2", "R3", "R4", "R5", "W4", "W6"]
 
 
 def test_r4_protected_tag_key_is_case_insensitive():
@@ -90,3 +90,12 @@ def test_r4_protected_tag_key_is_case_insensitive():
 def test_r4_blocks_when_any_case_variant_of_the_key_matches(tags):
     """AWS tag keys are case-sensitive, so one resource can carry both."""
     assert ids(res(tags=tags)) == {("R4", "block")}
+
+
+def test_w6_referenced_warns_with_what_names_it():
+    text = "Launch template uat-api v3 in uat still names it, so its next launch would fail."
+    ami = res(type="ami", referenced_by=text)
+    hits = evaluate(ami, POLICY, NOW)
+    assert ("W6", "warn") in {(h.rule_id, h.outcome) for h in hits}
+    assert next(h.message for h in hits if h.rule_id == "W6") == text
+    assert ("W6", "warn") not in ids(res(type="ami"))

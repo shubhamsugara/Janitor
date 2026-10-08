@@ -44,7 +44,7 @@ def build(config: Config) -> dict:
         },
         "by_type": {
             "ami": {
-                "in_use": "An instance, launch template, Auto Scaling group, or launch configuration uses it, in an account allowed to launch it, in its own region.",
+                "in_use": "An instance (running or stopped) was launched from it, in an account allowed to launch it, in its own region. Launch templates, Auto Scaling groups, and launch configurations that only name it add a Referenced warning instead.",
                 "managed": "AWS Backup or Data Lifecycle Manager created it.",
                 "unknown": "It is shared publicly, with an organization, or with an account Janitor doesn't scan.",
                 "orphaned": f"Nothing uses it in its region, and it is older than {days} days.",
