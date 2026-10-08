@@ -6,6 +6,7 @@ from collections.abc import Callable
 from datetime import datetime
 
 from janitor.config import Config
+from janitor.graph import Coverage
 from janitor.linker import MANAGED_REASONS
 from janitor.models import Resource, RuleResult
 from janitor.rules import RULES, RULES_BY_ID, evaluate
@@ -126,6 +127,7 @@ def _backing_snapshots(
 
 def _share_impact(store: Store, config: Config, scan_id: int, item: dict) -> dict:
     shares = store.shares_for(scan_id, item["id"])
+    coverage = Coverage(store, scan_id)
     return {
         "ami_id": item["id"],
         "region": item["region"],
@@ -133,7 +135,7 @@ def _share_impact(store: Store, config: Config, scan_id: int, item: dict) -> dic
             {
                 "id": s.principal,
                 "name": config.account_name(s.principal),
-                "scanned": s.principal == config.admin.account or s.principal in config.accounts,
+                "scanned": not coverage.couldnt_check(s.principal, item["region"]),
             }
             for s in shares
             if s.principal_type == "account"

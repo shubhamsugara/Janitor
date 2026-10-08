@@ -52,6 +52,8 @@
 .janitor-node.active .janitor-node-state { color: #00802f; font-weight: 600; }
 
 .react-flow__edge.edge-used_by .react-flow__edge-path { stroke: #00802f; stroke-width: 2; }
+/* A template, ASG, or launch config only names the AMI: no instance runs it. */
+.react-flow__edge.edge-references .react-flow__edge-path { stroke: var(--muted); stroke-dasharray: 4 4; }
 .react-flow__edge.edge-backs .react-flow__edge-path,
 .react-flow__edge.edge-snapshot_of .react-flow__edge-path,
 .react-flow__edge.edge-snapshot_of_db .react-flow__edge-path { stroke: #7aa116; }

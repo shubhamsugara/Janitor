@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Graph, GraphNode } from "./api";
-import { LANE_WIDTH, ROW_HEIGHT, diagramHeight, layoutGraph } from "./graphLayout";
+import { LANE_WIDTH, ROW_HEIGHT, diagramHeight, layoutGraph, RELATION_LABELS } from "./graphLayout";
 
 function node(id: string, kind: GraphNode["kind"], depth: number, label = id): GraphNode {
   return { id, kind, label, status: null, account: "", account_name: "", region: "", active: null, state: "", depth };
@@ -56,5 +56,11 @@ describe("diagramHeight", () => {
 
   it("stops growing at a full lane; the canvas scrolls and zooms from there", () => {
     expect(diagramHeight(lane(26))).toBe(900);
+  });
+});
+
+describe("relation labels", () => {
+  it("names the edge from an account to a template that only references the AMI", () => {
+    expect(RELATION_LABELS.references).toBe("names it");
   });
 });

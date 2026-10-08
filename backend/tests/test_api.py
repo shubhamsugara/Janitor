@@ -303,7 +303,7 @@ def test_volume_cost_has_a_breakdown(client):
 def test_graph_route(client):
     ami = find(client, "ami", f"base-linux-{stamp(20)}")
     body = client.get(f"/api/resources/{ami['id']}/graph").json()
-    assert body["root"] == ami["id"] and body["used_by"]["total"] == 4
+    assert body["root"] == ami["id"] and body["used_by"]["total"] == 2  # instances only
     assert client.get("/api/resources/ami-0000000000000dead/graph").status_code == 404
 
 
@@ -562,3 +562,46 @@ def test_switching_to_aws_does_not_show_mock_data(tmp_path):
     app.state.scanner.join(timeout=10)  # with no AWS scan yet, one starts in the background
     overview = TestClient(app).get("/api/overview").json()
     assert overview["last_scan"]["provider"] == "aws"
+
+
+def test_share_impact_marks_accounts_whose_usage_check_failed(tmp_path, config):
+    from janitor.providers.mock import MockProvider
+
+    store = Store(tmp_path / "j.db")
+    scan_id = Scanner(store, MockProvider(SEED, clock=lambda: NOW), config, clock=lambda: NOW).run()
+    partner = store.query_resources(scan_id, {"q": "partner-export", "type": "ami"})[0][0]
+    impact = plans._share_impact(
+        store, config, scan_id, {"id": partner.id, "region": partner.region}
+    )
+    assert impact["accounts"] == [{"id": "444444444444", "name": "444444444444", "scanned": False}]
+    base = store.query_resources(
+        scan_id, {"q": f"base-linux-{stamp(20)}", "type": "ami", "region": "us-east-1"}
+    )[0][0]
+    impact = plans._share_impact(store, config, scan_id, {"id": base.id, "region": base.region})
+    assert all(a["scanned"] for a in impact["accounts"])
+
+
+def test_share_impact_follows_the_usage_check_not_the_config(tmp_path, config):
+    from janitor.models import Segment, Share
+
+    class Provider:
+        name = "mock"
+
+        def list_inventory(self, on_segment=None):
+            segments = [
+                Segment("111111111111", "us-east-1", "usage", ok=True),
+                Segment("222222222222", "us-east-1", "usage", ok=False, error_kind="expired"),
+            ]
+            for seg in segments:
+                on_segment(seg)
+            return Inventory(
+                [_r("ami-a", "ami")], [Share("ami-a", "account", "222222222222")], [], [], segments
+            )
+
+        def recheck(self, items):
+            return {}
+
+    store = Store(tmp_path / "j.db")
+    scan_id = Scanner(store, Provider(), config, clock=lambda: NOW).run()
+    impact = plans._share_impact(store, config, scan_id, {"id": "ami-a", "region": "us-east-1"})
+    assert impact["accounts"] == [{"id": "222222222222", "name": "dev", "scanned": False}]

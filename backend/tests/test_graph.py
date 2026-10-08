@@ -17,6 +17,7 @@ CONTEXT_PREFIXES = {
     "ou",
     "database",
     "more",
+    "unused",
 }
 
 
@@ -37,42 +38,85 @@ def graph_of(scanned, resource, **kw):
     return build_graph(store, config, scan_id, resource.id, **kw)
 
 
-def test_ami_graph_shows_snapshot_copy_users_and_shares(scanned):
+def base_20(store, scan_id):
+    return named(store, scan_id, f"base-linux-{stamp(20)}", region="us-east-1", type="ami")
+
+
+def account_node(g, ami_id, account):
+    return next(n for n in g["nodes"] if n["id"] == f"account:{ami_id}:{account}")
+
+
+def test_ami_graph_hangs_usage_under_accounts(scanned):
     store, _, scan_id = scanned
-    ami = named(store, scan_id, f"base-linux-{stamp(20)}", region="us-east-1", type="ami")
+    ami = base_20(store, scan_id)
     g = graph_of(scanned, ami)
     by_id = {n["id"]: n for n in g["nodes"]}
     edges = {(e["source"], e["target"], e["relation"]) for e in g["edges"]}
     assert by_id[ami.id]["depth"] == 0
     snap_id = ami.snapshot_ids[0]
     assert by_id[snap_id]["depth"] == -1 and (snap_id, ami.id, "backs") in edges
-    users = {
-        n["label"]: n
-        for n in g["nodes"]
-        if n["kind"] in ("instance", "asg", "launch_template") and n["depth"] == 1
-    }
-    assert set(users) == {"dev-api-1", "prd-api-asg", "qas-api-1", "uat-api v3"}
-    assert users["dev-api-1"]["active"] is True and users["qas-api-1"]["active"] is False
-    assert users["uat-api v3"]["active"] is None
-    copy = next(n for n in g["nodes"] if n["kind"] == "ami" and n["region"] == "us-west-2")
-    assert copy["depth"] == 1 and (ami.id, copy["id"], "copied_to") in edges
+
     accounts = {n["label"] for n in g["nodes"] if n["kind"] == "account" and n["depth"] == 1}
-    assert accounts == {"sbx", "dev", "uat", "qas", "prd"}
+    assert accounts == {"dev", "prd", "qas", "uat", "1 account · not used"}  # sbx uses nothing
+    dev = account_node(g, ami.id, "222222222222")
+    assert (ami.id, dev["id"], "shared_with") in edges
+    users = {n["label"]: n for n in g["nodes"] if n["depth"] == 2}
+    assert {"dev-api-1", "qas-api-1", "prd-api-asg", "uat-api v3"} <= set(users)
+    assert (dev["id"], users["dev-api-1"]["id"], "used_by") in edges
+    assert users["dev-api-1"]["active"] is True and users["qas-api-1"]["active"] is False
+    uat = account_node(g, ami.id, "666666666666")
+    assert (uat["id"], users["uat-api v3"]["id"], "references") in edges
     assert g["truncated"] is False
+
+
+def test_ami_graph_shows_its_copies_but_never_its_source_or_siblings(scanned):
+    store, _, scan_id = scanned
+    ami = base_20(store, scan_id)
+    g = graph_of(scanned, ami)
+    amis = [n for n in g["nodes"] if n["kind"] == "ami"]
+    copy = next(n for n in amis if n["region"] == "us-west-2")
+    assert {n["id"] for n in amis} == {ami.id, copy["id"]}
+    assert copy["depth"] == 1
+    # The copy expands to where it is used, and nothing else: no snapshots of its own.
+    prd = account_node(g, copy["id"], "333333333333")
+    assert prd["depth"] == 2
+    assert any(n["label"] == "prd-dr-api-1" and n["depth"] == 3 for n in g["nodes"])
+    copy_snaps = set(store.get_resources(scan_id, [copy["id"]])[0].snapshot_ids)
+    assert not copy_snaps & {n["id"] for n in g["nodes"]}
+
+    west = graph_of(scanned, store.get_resources(scan_id, [copy["id"]])[0])
+    assert {n["id"] for n in west["nodes"] if n["kind"] == "ami"} == {copy["id"]}
 
 
 def test_snapshot_used_by_goes_through_its_ami(scanned):
     store, _, scan_id = scanned
-    ami = named(store, scan_id, f"base-linux-{stamp(20)}", region="us-east-1", type="ami")
+    ami = base_20(store, scan_id)
     [snap] = store.get_resources(scan_id, ami.snapshot_ids)
     g = graph_of(scanned, snap)
-    assert g["used_by"]["total"] == 4 and g["used_by"]["active"] == 2
+    assert g["used_by"]["total"] == 2 and g["used_by"]["active"] == 1
     summary = g["used_by"]["summary"]
-    assert summary.startswith("Used by 1 running instance, 1 active Auto Scaling group")
-    assert f"through {ami.id}" in summary and "dev, prd, qas and uat" in summary
+    assert summary.startswith("Used by 1 running instance and 1 stopped instance in dev and qas")
+    assert f"through {ami.id}" in summary
     depths = {n["id"]: n["depth"] for n in g["nodes"]}
     assert depths[ami.id] == 1
-    assert any(n["label"] == "dev-api-1" and n["depth"] == 2 for n in g["nodes"])
+    assert depths[f"account:{ami.id}:222222222222"] == 2
+    assert any(n["label"] == "dev-api-1" and n["depth"] == 3 for n in g["nodes"])
+
+
+def test_used_by_separates_instances_from_references(scanned):
+    store, _, scan_id = scanned
+    summary = graph_of(scanned, base_20(store, scan_id))["used_by"]["summary"]
+    assert summary == (
+        "Used by 1 running instance and 1 stopped instance in dev and qas. "
+        "Also named by 1 active Auto Scaling group and 1 launch template in prd and uat."
+    )
+    web = named(store, scan_id, f"app-web-{stamp(10)}", type="ami")
+    used = graph_of(scanned, web)["used_by"]
+    assert used == {
+        "active": 0,
+        "total": 0,
+        "summary": "No instance uses it. Named by 1 active Auto Scaling group and 1 launch template in prd.",
+    }
 
 
 def test_volume_graph_shows_instance_and_snapshots(scanned):
@@ -98,12 +142,11 @@ def test_rds_graph_shows_database_and_siblings(scanned):
 
 def test_lane_cap_collapses_extra_nodes(scanned):
     store, _, scan_id = scanned
-    ami = named(store, scan_id, f"base-linux-{stamp(20)}", region="us-east-1", type="ami")
-    g = graph_of(scanned, ami, lane_cap=3)
+    g = graph_of(scanned, base_20(store, scan_id), lane_cap=3)
     lane_one = [n for n in g["nodes"] if n["depth"] == 1]
     assert len([n for n in lane_one if n["kind"] != "more"]) == 3
     more = next(n for n in g["nodes"] if n["id"] == "more:1")
-    assert more["label"] == "+7 more" and g["truncated"] is True
+    assert more["label"] == "+3 more" and g["truncated"] is True
 
 
 def test_context_ids_are_prefixed(scanned):
@@ -116,7 +159,7 @@ def test_context_ids_are_prefixed(scanned):
         else:
             assert node["id"].split(":")[0] in CONTEXT_PREFIXES
     account = next(n for n in g["nodes"] if n["kind"] == "account")
-    assert account["label"] == "444444444444 (not scanned)"
+    assert account["label"] == "444444444444 · couldn't check"
 
 
 def test_unknown_resource_has_no_graph(scanned):
@@ -176,13 +219,16 @@ def _fan_out_store(tmp_path, config):
     return store, Scanner(store, Provider(), config, clock=lambda: NOW).run()
 
 
-def test_lane_cap_keeps_running_users_and_shares(tmp_path, config):
+def test_lane_cap_keeps_running_users(tmp_path, config):
     store, scan_id = _fan_out_store(tmp_path, config)
     g = build_graph(store, config, scan_id, "ami-big", lane_cap=10)
-    labels = {n["label"] for n in g["nodes"] if n["depth"] == 1}
-    assert {"running-0", "running-1", "prd", "444444444444 (not scanned)"} <= labels
-    assert next(n for n in g["nodes"] if n["id"] == "more:1")["label"] == "+24 more"
-    assert ("ami-big", "more:1") in {(e["source"], e["target"]) for e in g["edges"]}
+    assert {n["label"] for n in g["nodes"] if n["depth"] == 1} == {"prd", "1 account · not used"}
+    lane_two = {n["label"] for n in g["nodes"] if n["depth"] == 2}
+    assert {"running-0", "running-1"} <= lane_two
+    assert next(n for n in g["nodes"] if n["id"] == "more:2")["label"] == "+22 more"
+    assert ("account:ami-big:333333333333", "more:2") in {
+        (e["source"], e["target"]) for e in g["edges"]
+    }
 
 
 def test_used_by_admits_what_janitor_cant_see(scanned):
@@ -193,11 +239,11 @@ def test_used_by_admits_what_janitor_cant_see(scanned):
         "Nothing in the scanned accounts uses it. It is public, so other AWS accounts may."
     )
     assert graph_of(scanned, partner)["used_by"]["summary"] == (
-        "Nothing in the scanned accounts uses it. It is shared with 444444444444, "
-        "which Janitor doesn't scan, so it may be used there."
+        "Nothing in the scanned accounts uses it. Janitor couldn't check 444444444444, "
+        "so it may be used there."
     )
     [snap] = store.get_resources(scan_id, partner.snapshot_ids)
     assert graph_of(scanned, snap)["used_by"]["summary"] == (
         f"It backs {partner.id} ({partner.name}). Nothing in the scanned accounts uses it. "
-        "It is shared with 444444444444, which Janitor doesn't scan, so it may be used there."
+        "Janitor couldn't check 444444444444, so it may be used there."
     )

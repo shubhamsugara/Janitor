@@ -20,6 +20,7 @@ export const RELATION_LABELS: Record<string, string> = {
   backs: "backs",
   copied_to: "copy",
   used_by: "used by",
+  references: "names it",
   shared_with: "shared with",
   attached_to: "attached to",
   snapshot_of: "snapshot",
