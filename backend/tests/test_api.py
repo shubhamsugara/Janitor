@@ -713,3 +713,26 @@ def test_meta_rule_outcome_follows_policy(tmp_path):
     rules = {r["id"]: r for r in client.get("/api/meta").json()["definitions"]["rules"]}
     assert (rules["W2"]["outcome"], rules["W1"]["outcome"]) == ("block", "warn")
     assert "3 newest" in rules["R6"]["explanation"]
+
+
+@pytest.mark.parametrize("pattern", ["(unclosed", "x" * 201])
+def test_bad_name_regex_is_400(client, pattern):
+    for route in ("/api/resources", "/api/stats", "/api/resources/export.json"):
+        response = client.get(route, params={"name_regex": pattern})
+        assert response.status_code == 400, route
+        assert response.json()["detail"].startswith("That name pattern isn't")
+
+
+def test_filters_apply_to_stats_and_export(client):
+    params = {"type": "ami", "name_regex": "^BASE-linux", "region": "us-east-1"}
+    body = client.get("/api/resources", params=params).json()
+    assert body["total"] == 7 and all(i["name"].startswith("base-linux") for i in body["items"])
+    assert client.get("/api/stats", params=params).json()["total"] == 7
+    assert client.get("/api/resources/export.json", params=params).json()["total"] == 7
+    source = find(client, "ami", f"base-linux-{stamp(20)}")["id"]
+    copies = client.get("/api/resources", params={"type": "ami", "source_ami": source}).json()
+    assert [i["region"] for i in copies["items"]] == ["us-west-2"]
+    db = client.get(
+        "/api/resources", params={"type": "rds_snapshot", "source_db": "dev-legacy"}
+    ).json()
+    assert db["total"] == 2

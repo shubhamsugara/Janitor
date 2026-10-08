@@ -6,11 +6,13 @@ pruned; the audit log never is.
 """
 
 import json
+import re
 import sqlite3
 import threading
 from collections import defaultdict
 from dataclasses import asdict, fields
 from datetime import UTC, datetime
+from functools import lru_cache
 from pathlib import Path
 
 from janitor.models import (
@@ -141,6 +143,16 @@ def _resource(row: sqlite3.Row) -> Resource:
     return Resource(**data)
 
 
+@lru_cache(maxsize=32)
+def _pattern(pattern: str) -> re.Pattern:
+    return re.compile(pattern, re.IGNORECASE)
+
+
+def _regexp(pattern: str, value: str | None) -> bool:
+    """SQLite's REGEXP operator: Python re.search, case-insensitive."""
+    return value is not None and _pattern(pattern).search(value) is not None
+
+
 def _where(scan_id: int, filters: dict) -> tuple[str, list]:
     clauses, params = ["scan_id = ?"], [scan_id]
     if filters.get("type"):
@@ -161,6 +173,15 @@ def _where(scan_id: int, filters: dict) -> tuple[str, list]:
     if filters.get("created_to"):
         clauses.append("substr(created_at, 1, 10) <= ?")
         params.append(filters["created_to"])
+    if filters.get("name_regex"):  # validated by the API; see _regexp
+        clauses.append("name REGEXP ?")
+        params.append(filters["name_regex"])
+    if filters.get("source_ami"):  # its copies, and the snapshots that name it
+        clauses.append("(source_ami_id = ? OR linked_ami_id = ?)")
+        params += [filters["source_ami"]] * 2
+    if filters.get("source_db"):
+        clauses.append("source_db_id = ?")
+        params.append(filters["source_db"])
     if filters.get("tag"):
         key, sep, value = filters["tag"].partition("=")
         if sep:
@@ -182,6 +203,7 @@ class Store:
             Path(path).parent.mkdir(parents=True, exist_ok=True)
         self._db = sqlite3.connect(str(path), check_same_thread=False)
         self._db.row_factory = sqlite3.Row
+        self._db.create_function("REGEXP", 2, _regexp, deterministic=True)
         self._lock = threading.Lock()
         with self._lock:
             self._db.execute("PRAGMA journal_mode=WAL")

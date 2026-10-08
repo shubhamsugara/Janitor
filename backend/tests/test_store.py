@@ -342,3 +342,28 @@ def test_shared_with_round_trips(tmp_path):
     got = {r.id: r for r in store.all_resources(scan_id)}
     assert got["arn:rds:1"].shared_with == ["222222222222", "all"]
     assert got["vol-9"].shared_with == []
+
+
+def test_name_regex_filters_case_insensitively(store):
+    assert ids(store, name_regex="^base-linux") == ["vol-1"]
+    assert ids(store, name_regex=r"^100.*done$") == ["vol-2", "vol-3"]
+
+
+def test_source_ami_matches_copies_and_snapshots(store):
+    assert ids(store, source_ami="ami-1") == ["ami-2", "snap-1"]
+
+
+def test_source_db_matches_rds_snapshots(tmp_path):
+    store = Store(tmp_path / "j.db")
+    scan_id = store.start_scan("mock")
+    store.save_inventory(
+        scan_id,
+        [
+            res("arn:1", type="rds_snapshot", source_db_id="orders"),
+            res("arn:2", type="rds_snapshot", source_db_id="billing"),
+        ],
+        [],
+        [],
+    )
+    items, _ = store.query_resources(scan_id, {"source_db": "orders"})
+    assert [r.id for r in items] == ["arn:1"]

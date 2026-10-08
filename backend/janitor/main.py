@@ -72,8 +72,13 @@ def list_filters(
     created_from: str | None = None,
     created_to: str | None = None,
     tag: str | None = None,
+    name_regex: str | None = None,
+    source_ami: str | None = None,
+    source_db: str | None = None,
 ) -> dict:
-    """The resource filters shared by the list, stats, and export routes."""
+    """The resource filters shared by the list, stats, export, and plan routes."""
+    if name_regex:
+        _check_pattern(name_regex)
     for name, value in (("created_from", created_from), ("created_to", created_to)):
         if value is None:
             continue
@@ -94,7 +99,26 @@ def list_filters(
         "created_from": created_from,
         "created_to": created_to,
         "tag": tag,
+        "name_regex": name_regex,
+        "source_ami": source_ami,
+        "source_db": source_db,
     }
+
+
+MAX_PATTERN = 200  # AWS names are at most 255 characters; this keeps backtracking bounded
+
+
+def _check_pattern(pattern: str) -> None:
+    if len(pattern) > MAX_PATTERN:
+        raise HTTPException(
+            400, f"That name pattern isn't usable: keep it to {MAX_PATTERN} characters or fewer."
+        )
+    try:
+        re.compile(pattern)
+    except re.error as e:
+        raise HTTPException(
+            400, f"That name pattern isn't a valid regular expression: {e}."
+        ) from None
 
 
 Filters = Annotated[dict, Depends(list_filters)]
