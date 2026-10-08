@@ -74,7 +74,7 @@ def test_provider_failure_marks_scan_failed(tmp_path, config):
     class Broken:
         name = "mock"
 
-        def list_inventory(self) -> Inventory:
+        def list_inventory(self, on_segment=None) -> Inventory:
             raise RuntimeError("boom")
 
     store = Store(tmp_path / "janitor.db")
@@ -99,3 +99,87 @@ def test_scan_stores_databases(setup):
     store, scanner = setup
     scanner.run()
     assert store._db.execute("SELECT COUNT(*) FROM databases").fetchone()[0] >= 4
+
+
+class Segmented:
+    """A provider that returns given segments around a small inventory."""
+
+    name = "aws"
+
+    def __init__(self, segments, unresolved=()):
+        self.segments, self.unresolved = segments, list(unresolved)
+
+    def list_inventory(self, on_segment=None) -> Inventory:
+        from helpers import days_ago
+
+        from janitor.models import Resource
+
+        for seg in self.segments:
+            if on_segment:
+                on_segment(seg)
+        vol = Resource("vol-1", "volume", "111111111111", "us-east-1", "v", days_ago(5))
+        return Inventory([vol], [], [], [], segments=self.segments, unresolved=self.unresolved)
+
+    def recheck(self, items):
+        return {}
+
+
+def test_a_failed_segment_makes_the_scan_partial_and_it_is_still_read(tmp_path, config):
+    from janitor.models import Segment, Unresolved
+
+    segments = [
+        Segment("111111111111", "us-east-1", "volume", ok=True, items=1),
+        Segment("222222222222", "us-east-1", "usage", ok=False, error_kind="expired", error="x"),
+    ]
+    unresolved = [Unresolved("222222222222", "us-east-1", "asg", "web", "resolve:ssm:/golden")]
+    store = Store(tmp_path / "janitor.db")
+    scan_id = Scanner(store, Segmented(segments, unresolved), config, clock=lambda: NOW).run()
+    scan = store.latest_scan()
+    assert (scan["id"], scan["status"]) == (scan_id, "partial")
+    assert [(s["kind"], s["ok"]) for s in store.segments(scan_id)] == [("volume", 1), ("usage", 0)]
+    assert scan["notes"]["unresolved"][0]["value"] == "resolve:ssm:/golden"
+
+
+def test_every_segment_failing_fails_the_scan_and_keeps_the_old_data(tmp_path, config):
+    from janitor.models import Segment
+
+    store = Store(tmp_path / "janitor.db")
+    ok = Scanner(store, MockProvider(SEED, clock=lambda: NOW), config, clock=lambda: NOW).run()
+    down = [
+        Segment(
+            "111111111111",
+            "us-east-1",
+            "volume",
+            ok=False,
+            error_kind="denied",
+            error="ec2:DescribeVolumes",
+        )
+    ]
+    Scanner(store, Segmented(down), config, clock=lambda: NOW).run()
+    assert store.last_scan()["status"] == "failed"
+    assert store.latest_scan()["id"] == ok
+    assert store.segments(store.last_scan()["id"])[0]["error_kind"] == "denied"
+
+
+def test_segment_messages(config):
+    from janitor.models import Segment
+    from janitor.scanner import segment_message
+
+    def msg(kind, error=""):
+        return segment_message(
+            Segment("222222222222", "us-east-1", "usage", False, 0, kind, error), config
+        )
+
+    assert msg("expired") == "AWS session expired. Refresh your MFA session, then Scan now."
+    assert msg("denied", "ec2:DescribeInstances") == (
+        "Janitor isn't allowed to call ec2:DescribeInstances in dev · us-east-1. "
+        "Ask for read access, then Scan now."
+    )
+    assert (
+        msg("throttled")
+        == "AWS throttled requests in dev · us-east-1. Scan again in a few minutes."
+    )
+    assert "isn't read-only" in msg("blocked")
+    assert msg("other", "Endpoint unreachable") == (
+        "Endpoint unreachable. Scan again; if it repeats, check the server log."
+    )

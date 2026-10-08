@@ -209,7 +209,7 @@ def test_shared_snapshot_is_not_expanded(tmp_path, config):
     class Provider:
         name = "mock"
 
-        def list_inventory(self):
+        def list_inventory(self, on_segment=None):
             return Inventory(
                 [
                     r("ami-a", "ami", snapshot_ids=["snap-shared"]),
@@ -241,7 +241,7 @@ def _store_with(tmp_path, config, resources):
     class Provider:
         name = "mock"
 
-        def list_inventory(self):
+        def list_inventory(self, on_segment=None):
             return Inventory(resources, [], [], [])
 
     store = Store(tmp_path / "j.db")
@@ -437,3 +437,85 @@ def test_selected_snapshot_that_is_blocked_on_its_own_makes_the_plan_mixed(tmp_p
         ("snap-a", None)
     ]  # counted as selected
     assert [i["id"] for i in body["deletable"]] == ["ami-a"]
+
+
+class FakeAws:
+    """An injected provider: one ok segment, one failed for dev with an expired session."""
+
+    name = "mock"  # keeps the startup scan synchronous
+
+    def __init__(self, fail_all=False):
+        self.fail_all = fail_all
+
+    def list_inventory(self, on_segment=None):
+        from janitor.models import Segment
+
+        segments = [
+            Segment(
+                "111111111111",
+                "us-east-1",
+                "volume",
+                ok=not self.fail_all,
+                items=1,
+                error_kind="denied" if self.fail_all else "",
+                error="ec2:DescribeVolumes",
+            ),
+            Segment(
+                "222222222222", "us-east-1", "usage", ok=False, error_kind="expired", error="x"
+            ),
+        ]
+        for seg in segments:
+            if on_segment:
+                on_segment(seg)
+        return Inventory([_r("vol-1", "volume")], [], [], [], segments=segments)
+
+    def recheck(self, items):
+        return {}
+
+
+def _settings(tmp_path):
+    return Settings(
+        config_path=str(EXAMPLE),
+        db_path=str(tmp_path / "janitor.db"),
+        seed_path=str(SEED),
+        static_dir=str(tmp_path),
+        prices_path=str(TEST_PRICES),
+    )
+
+
+def test_failed_checks_reach_overview_and_scan_progress(tmp_path):
+    client = TestClient(create_app(_settings(tmp_path), clock=lambda: NOW, provider=FakeAws()))
+    overview = client.get("/api/overview").json()
+    assert overview["last_scan"]["status"] == "partial"
+    (failed,) = overview["segments_failed"]
+    assert (failed["account_name"], failed["region"], failed["kind"]) == (
+        "dev",
+        "us-east-1",
+        "usage",
+    )
+    assert "Refresh your MFA session" in failed["message"]
+    assert overview["newest_failed"] is None
+    latest = client.get("/api/scans/latest").json()
+    assert latest["progress"] == {"done": 2, "failed": 1}
+    assert len(latest["segments"]) == 2
+
+
+def test_a_failed_newest_scan_keeps_showing_the_previous_one(tmp_path):
+    app = create_app(_settings(tmp_path), clock=lambda: NOW, provider=FakeAws())
+    shown = app.state.store.latest_scan()["id"]
+    app.state.scanner._provider = FakeAws(fail_all=True)
+    app.state.scanner.run()
+    overview = TestClient(app).get("/api/overview").json()
+    assert overview["last_scan"]["id"] == shown
+    assert "isn't allowed to call ec2:DescribeVolumes" in overview["newest_failed"]["message"]
+
+
+def test_aws_mode_refuses_profiles_without_a_role(tmp_path, monkeypatch):
+    from aws_helpers import write_aws_config
+
+    from janitor.providers.session import ProfileError
+
+    write_aws_config(tmp_path, monkeypatch, {})
+    monkeypatch.setenv("JANITOR_PROVIDER", "aws")
+    with pytest.raises(ProfileError, match="example-dev"):
+        create_app(_settings(tmp_path), clock=lambda: NOW)

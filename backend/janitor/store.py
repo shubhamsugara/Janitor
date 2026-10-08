@@ -13,9 +13,9 @@ from dataclasses import asdict, fields
 from datetime import UTC, datetime
 from pathlib import Path
 
-from janitor.models import Database, Resource, RuleResult, Share, Usage, format_ts
+from janitor.models import Database, Resource, RuleResult, Segment, Share, Usage, format_ts
 
-SCHEMA_VERSION = 2  # bump when a scan table changes shape; old scan data is dropped
+SCHEMA_VERSION = 3  # bump when a scan table changes shape; old scan data is dropped
 RESOURCE_FIELDS = [f.name for f in fields(Resource)]
 JSON_FIELDS = {"tags", "snapshot_ids", "cost_breakdown"}
 SORTABLE = {
@@ -28,7 +28,8 @@ SORTABLE = {
     "account",
     "est_monthly_cost",
 }
-SCAN_TABLES = ("resources", "shares", "usage", "policy_results", "databases")
+SCAN_TABLES = ("resources", "shares", "usage", "policy_results", "databases", "scan_segments")
+READABLE = "status IN ('ok', 'partial')"  # a partial scan is shown; failed checks show as unknown
 AGE_BUCKETS = (("<30d", 30), ("30–90d", 90), ("90–180d", 180), ("180–365d", 365))
 AGE_KEYS = [label for label, _ in AGE_BUCKETS] + [">1y"]
 BLOCKED_SQL = (
@@ -39,7 +40,11 @@ BLOCKED_SQL = (
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS scans (
   id INTEGER PRIMARY KEY, started_at TEXT NOT NULL, finished_at TEXT,
-  provider TEXT NOT NULL, status TEXT NOT NULL);
+  provider TEXT NOT NULL, status TEXT NOT NULL, notes TEXT NOT NULL DEFAULT '{}');
+CREATE TABLE IF NOT EXISTS scan_segments (
+  scan_id INTEGER NOT NULL, account TEXT NOT NULL, region TEXT NOT NULL, kind TEXT NOT NULL,
+  ok INTEGER NOT NULL, items INTEGER NOT NULL, error_kind TEXT NOT NULL, error TEXT NOT NULL,
+  duration_ms INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS resources (
   scan_id INTEGER NOT NULL, id TEXT NOT NULL, type TEXT NOT NULL, account TEXT NOT NULL,
   region TEXT NOT NULL, name TEXT NOT NULL, created_at TEXT NOT NULL, size_gb INTEGER,
@@ -78,6 +83,10 @@ CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit
 
 def _now() -> str:
     return format_ts(datetime.now(UTC))
+
+
+def _scan(row: sqlite3.Row) -> dict:
+    return dict(row) | {"notes": json.loads(row["notes"] or "{}")}
 
 
 def _marks(items: list) -> str:
@@ -187,19 +196,45 @@ class Store:
         )
 
     def latest_scan(self) -> dict | None:
-        rows = self._q("SELECT * FROM scans WHERE status = 'ok' ORDER BY id DESC LIMIT 1")
-        return dict(rows[0]) if rows else None
+        """The newest scan readers should show: completed, possibly with failed checks."""
+        rows = self._q(f"SELECT * FROM scans WHERE {READABLE} ORDER BY id DESC LIMIT 1")
+        return _scan(rows[0]) if rows else None
 
     def last_scan(self) -> dict | None:
         rows = self._q("SELECT * FROM scans ORDER BY id DESC LIMIT 1")
-        return dict(rows[0]) if rows else None
+        return _scan(rows[0]) if rows else None
+
+    def set_notes(self, scan_id: int, notes: dict) -> None:
+        self._write("UPDATE scans SET notes = ? WHERE id = ?", (json.dumps(notes), scan_id))
+
+    def add_segment(self, scan_id: int, seg: Segment) -> None:
+        self._write(
+            "INSERT INTO scan_segments VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                scan_id,
+                seg.account,
+                seg.region,
+                seg.kind,
+                int(seg.ok),
+                seg.items,
+                seg.error_kind,
+                seg.error,
+                seg.duration_ms,
+            ),
+        )
+
+    def segments(self, scan_id: int) -> list[dict]:
+        rows = self._q("SELECT * FROM scan_segments WHERE scan_id = ? ORDER BY rowid", (scan_id,))
+        return [{k: row[k] for k in row.keys() if k != "scan_id"} for row in rows]
 
     def _prune(self) -> None:
         keep = [
             r["id"]
-            for r in self._q("SELECT id FROM scans WHERE status = 'ok' ORDER BY id DESC LIMIT 2")
+            for r in self._q(f"SELECT id FROM scans WHERE {READABLE} ORDER BY id DESC LIMIT 2")
         ]
         keep += [r["id"] for r in self._q("SELECT id FROM scans WHERE status = 'running'")]
+        # The newest scan's checks explain a failure even when its rows aren't kept.
+        keep += [r["id"] for r in self._q("SELECT MAX(id) AS id FROM scans") if r["id"]]
         marks = _marks(keep) or "-1"
         with self._lock, self._db:
             for table in SCAN_TABLES:

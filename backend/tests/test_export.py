@@ -13,7 +13,7 @@ def _store(tmp_path, config, resources):
     class Provider:
         name = "mock"
 
-        def list_inventory(self):
+        def list_inventory(self, on_segment=None):
             return Inventory(resources, [], [], [])
 
     store = Store(tmp_path / "j.db")

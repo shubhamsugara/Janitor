@@ -3,10 +3,12 @@
 import logging
 import threading
 from collections.abc import Callable
+from dataclasses import asdict
 from datetime import UTC, datetime
 
 from janitor.config import Config
 from janitor.linker import LinkContext, link
+from janitor.models import Segment
 from janitor.pricing import PriceTable, apply_costs
 from janitor.providers.base import CloudProvider
 from janitor.rules import evaluate
@@ -17,6 +19,25 @@ log = logging.getLogger(__name__)
 
 class ScanRunning(Exception):
     """Raised when a scan is requested while one is running."""
+
+
+class AllChecksFailed(Exception):
+    """Every check failed, so there is nothing to show from this scan."""
+
+
+def segment_message(seg: Segment, config: Config) -> str:
+    """What happened to a failed check, then what to do (copy rules, base spec §12)."""
+    where = f"{config.account_name(seg.account)} · {seg.region}"
+    if seg.error_kind == "expired":
+        return "AWS session expired. Refresh your MFA session, then Scan now."
+    if seg.error_kind == "denied":
+        return f"Janitor isn't allowed to call {seg.error} in {where}. Ask for read access, then Scan now."
+    if seg.error_kind == "throttled":
+        return f"AWS throttled requests in {where}. Scan again in a few minutes."
+    if seg.error_kind == "blocked":
+        return "Janitor stopped a call that isn't read-only. Report this; nothing was sent."
+    detail = seg.error.strip().rstrip(".") or "The check failed"
+    return f"{detail}. Scan again; if it repeats, check the server log."
 
 
 def recompute_rules(store: Store, config: Config, scan_id: int, now: datetime) -> None:
@@ -81,24 +102,42 @@ class Scanner:
         scan_id = self._store.start_scan(provider)
         self._store.add_audit("scan_started", {"scan_id": scan_id, "provider": provider})
         try:
-            inventory = self._provider.list_inventory()
-            statuses = link(inventory, LinkContext.from_config(self._config, now))
+            inventory = self._provider.list_inventory(
+                on_segment=lambda seg: self._store.add_segment(scan_id, seg)
+            )
+            failed = [s for s in inventory.segments if not s.ok]
+            if inventory.segments and len(failed) == len(inventory.segments):
+                raise AllChecksFailed(segment_message(failed[0], self._config))
+            ctx = LinkContext.from_config(self._config, now, inventory.segments)
+            statuses = link(inventory, ctx)
             for r in inventory.resources:
                 r.status, r.status_reason = statuses[r.id]
             apply_costs(inventory.resources, self._prices)
             self._store.save_inventory(
                 scan_id, inventory.resources, inventory.shares, inventory.usage, inventory.databases
             )
+            self._store.set_notes(
+                scan_id, {"unresolved": [asdict(u) for u in inventory.unresolved]}
+            )
             recompute_rules(self._store, self._config, scan_id, now)
         except Exception as exc:
+            self._store.set_notes(scan_id, {"error": str(exc)})
             self._store.finish_scan(scan_id, "failed")
             self._store.add_audit(
                 "scan_finished", {"scan_id": scan_id, "status": "failed", "error": str(exc)}
             )
-            raise
-        self._store.finish_scan(scan_id, "ok")
+            if not isinstance(exc, AllChecksFailed):
+                raise
+            return scan_id  # an expected outcome, recorded on the scan; the old data stays
+        status = "partial" if failed else "ok"
+        self._store.finish_scan(scan_id, status)
         self._store.add_audit(
             "scan_finished",
-            {"scan_id": scan_id, "status": "ok", "resources": len(inventory.resources)},
+            {
+                "scan_id": scan_id,
+                "status": status,
+                "resources": len(inventory.resources),
+                "failed_checks": len(failed),
+            },
         )
         return scan_id

@@ -18,11 +18,12 @@ from pydantic import BaseModel
 from janitor import definitions, export, plans
 from janitor.config import load_config
 from janitor.graph import build_graph
-from janitor.models import TYPES, format_ts
+from janitor.models import TYPES, Segment, format_ts
 from janitor.pricing import PriceTable
+from janitor.providers.base import CloudProvider
 from janitor.providers.mock import MockProvider
 from janitor.rules import RULES, strictest
-from janitor.scanner import Scanner, ScanRunning, recompute_rules
+from janitor.scanner import Scanner, ScanRunning, recompute_rules, segment_message
 from janitor.store import SORTABLE, Store
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -106,17 +107,25 @@ def _check_sort(sort: str) -> None:
         )
 
 
+def make_provider(config, settings: Settings, clock) -> CloudProvider:
+    if config.provider == "aws":
+        from janitor.providers.aws import AwsProvider
+        from janitor.providers.session import check_profiles
+
+        check_profiles(config)  # stops startup with every bad profile named
+        return AwsProvider(config, clock)
+    return MockProvider(settings.seed_path, clock=clock, config=config)
+
+
 def create_app(
-    settings: Settings | None = None, clock: Callable[[], datetime] | None = None
+    settings: Settings | None = None,
+    clock: Callable[[], datetime] | None = None,
+    provider: CloudProvider | None = None,
 ) -> FastAPI:
     settings = settings or Settings.from_env()
     clock = clock or (lambda: datetime.now(UTC))
     config = load_config(settings.config_path)
-    if config.provider != "mock":
-        raise RuntimeError(
-            "This version has only the mock provider. Set provider: mock, then start again."
-        )
-    provider = MockProvider(settings.seed_path, clock=clock)
+    provider = provider or make_provider(config, settings, clock)
     store = Store(settings.db_path)
     store.fail_running_scans()
     prices = PriceTable.load(settings.prices_path, config.pricing)
@@ -125,7 +134,10 @@ def create_app(
     if latest:
         recompute_rules(store, config, latest["id"], clock())
     elif settings.scan_on_startup:
-        scanner.run()  # the mock scan takes milliseconds
+        if provider.name == "mock":
+            scanner.run()  # the mock scan takes milliseconds
+        else:
+            scanner.start()  # a real scan takes minutes; answer requests meanwhile
 
     app = FastAPI(title="Janitor")
     app.state.store = store
@@ -163,13 +175,37 @@ def create_app(
             "definitions": definitions.build(config),
         }
 
+    def failed_checks(scan_id: int) -> list[dict]:
+        return [
+            {
+                "account": seg["account"],
+                "account_name": config.account_name(seg["account"]),
+                "region": seg["region"],
+                "kind": seg["kind"],
+                "error_kind": seg["error_kind"],
+                "message": segment_message(Segment(**seg), config),
+            }
+            for seg in store.segments(scan_id)
+            if not seg["ok"]
+        ]
+
     @app.get("/api/overview")
     def overview():
         scan = store.latest_scan()
+        newest = store.last_scan()
+        newest_failed = None
+        if newest and newest["status"] == "failed" and (not scan or newest["id"] != scan["id"]):
+            newest_failed = {
+                "finished_at": newest["finished_at"],
+                "message": newest["notes"].get("error") or "The scan failed.",
+            }
         return {
             "last_scan": scan,
             "scanning": scanner.running,
             "types": store.overview(scan["id"]) if scan else [],
+            "segments_failed": failed_checks(scan["id"]) if scan else [],
+            "unresolved": scan["notes"].get("unresolved", []) if scan else [],
+            "newest_failed": newest_failed,
         }
 
     @app.get("/api/resources")
@@ -269,7 +305,14 @@ def create_app(
 
     @app.get("/api/scans/latest")
     def latest_scan():
-        return {"scan": store.last_scan(), "running": scanner.running}
+        scan = store.last_scan()
+        segments = store.segments(scan["id"]) if scan else []
+        return {
+            "scan": scan,
+            "running": scanner.running,
+            "segments": segments,
+            "progress": {"done": len(segments), "failed": sum(not s["ok"] for s in segments)},
+        }
 
     @app.post("/api/actions/plan")
     def plan(request: PlanRequest):

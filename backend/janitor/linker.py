@@ -4,11 +4,12 @@ Precedence: in_use > managed > unknown > orphaned > idle (spec §6).
 """
 
 from collections import defaultdict
-from dataclasses import dataclass
+from collections.abc import Iterable
+from dataclasses import dataclass, field
 from datetime import datetime
 
 from janitor.config import Config
-from janitor.models import Inventory, Resource, Share, Usage, age_days
+from janitor.models import Inventory, Resource, Segment, Share, Usage, age_days
 
 UNPROVABLE_SHARES = {
     "group": "is public",
@@ -28,18 +29,30 @@ class LinkContext:
     account_names: dict[str, str]  # every account Janitor scans
     orphan_after_days: int
     now: datetime
+    failed: set[tuple[str, str, str]] = field(default_factory=set)  # (account, region, kind)
+    scanned: set[tuple[str, str]] | None = None  # (account, region); None means everywhere
 
     @classmethod
-    def from_config(cls, config: Config, now: datetime) -> "LinkContext":
+    def from_config(
+        cls, config: Config, now: datetime, segments: Iterable[Segment] = ()
+    ) -> "LinkContext":
         return cls(
             owner_account=config.owner.account,
             account_names={account_id: a.name for account_id, a in config.accounts.items()},
             orphan_after_days=config.policy.orphan_after_days,
             now=now,
+            failed={(s.account, s.region, s.kind) for s in segments if not s.ok},
+            scanned={(a, region) for a in config.accounts for region in config.regions_for(a)},
         )
 
     def name(self, account_id: str) -> str:
         return self.account_names.get(account_id, account_id)
+
+    def is_scanned(self, account_id: str, region: str) -> bool:
+        return self.scanned is None or (account_id, region) in self.scanned
+
+    def check_failed(self, account_id: str, region: str, kind: str) -> bool:
+        return (account_id, region, kind) in self.failed
 
 
 def link(inventory: Inventory, ctx: LinkContext) -> dict[str, tuple[str, str]]:
@@ -102,6 +115,19 @@ def _ami(r: Resource, shares: list[Share], usage: list[Usage], ctx: LinkContext)
                 "unknown",
                 f"It is shared with account {share.principal}, which Janitor doesn't scan.",
             )
+        if share.principal_type == "account" and not ctx.is_scanned(share.principal, r.region):
+            return (
+                "unknown",
+                f"It is shared with {ctx.name(share.principal)}, but Janitor doesn't scan "
+                f"{ctx.name(share.principal)} in {r.region}.",
+            )
+    for account_id in sorted(permitted):
+        if ctx.check_failed(account_id, r.region, "usage"):
+            return (
+                "unknown",
+                f"Janitor couldn't read what {ctx.name(account_id)} uses in {r.region}, so it "
+                "can't prove nothing uses it.",
+            )
     age = age_days(r.created_at, ctx.now)
     if age >= ctx.orphan_after_days:
         return "orphaned", f"Nothing uses it in {r.region}, and it is {age} days old."
@@ -123,6 +149,11 @@ def _snapshot(
         return "in_use", f"It backs {ami.id} ({ami.name}), which is still registered."
     if r.managed_by:
         return _managed(r)
+    if r.account == ctx.owner_account and ctx.check_failed(r.account, r.region, "ami"):
+        return "unknown", (
+            f"Janitor couldn't list AMIs in {ctx.name(r.account)} {r.region}, so it can't tell "
+            "whether an AMI uses it."
+        )
     if r.linked_ami_id:
         if r.account != ctx.owner_account:
             return "unknown", (
@@ -135,6 +166,11 @@ def _snapshot(
         )
     if r.source_volume_id and (r.account, r.region, r.source_volume_id) in volumes:
         return "idle", f"Its source volume {r.source_volume_id} still exists."
+    if r.source_volume_id and ctx.check_failed(r.account, r.region, "volume"):
+        return "unknown", (
+            f"Janitor couldn't list volumes in {ctx.name(r.account)} {r.region}, so it can't tell "
+            f"whether {r.source_volume_id} still exists."
+        )
     age = age_days(r.created_at, ctx.now)
     if age >= ctx.orphan_after_days:
         return "orphaned", f"Its source volume is gone, and it is {age} days old."
@@ -158,6 +194,11 @@ def _rds_snapshot(
     kind = "cluster" if r.db_kind == "cluster" else "DB instance"
     if (r.account, r.region, r.source_db_id) in databases:
         return "idle", f"A manual snapshot. Its source {kind} {r.source_db_id} still exists."
+    if ctx.check_failed(r.account, r.region, "database"):
+        return "unknown", (
+            f"Janitor couldn't list databases in {ctx.name(r.account)} {r.region}, so it can't "
+            f"tell whether {kind} {r.source_db_id} still exists."
+        )
     age = age_days(r.created_at, ctx.now)
     if age >= ctx.orphan_after_days:
         return "orphaned", f"Its source {kind} {r.source_db_id} is gone, and it is {age} days old."

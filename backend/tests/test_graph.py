@@ -169,7 +169,7 @@ def _fan_out_store(tmp_path, config):
     class Provider:
         name = "mock"
 
-        def list_inventory(self):
+        def list_inventory(self, on_segment=None):
             return Inventory([ami], shares, usage, [])
 
     store = Store(tmp_path / "fan.db")

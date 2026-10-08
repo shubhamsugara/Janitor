@@ -136,3 +136,71 @@ def test_every_status_per_type_appears_in_the_seed(inventory, config):
         "rds_snapshot": {"managed", "idle", "orphaned"},
     }
     assert all(reason.endswith(".") for _, reason in result.values())
+
+
+# Failed checks (phase 3): what depends on a failed segment is unknown, never deletable.
+
+FAILED_CTX = dict(
+    owner_account=TOOLS, account_names={TOOLS: "tools", DEV: "dev"}, orphan_after_days=90, now=NOW
+)
+
+
+def test_ami_is_unknown_when_a_permitted_accounts_usage_check_failed():
+    ctx = LinkContext(**FAILED_CTX, failed={(DEV, "us-east-1", "usage")})
+    shared = [Share("ami-1", "account", DEV)]
+    statuses, result = status([res("ami-1", "ami")], shared, ctx=ctx)
+    assert statuses["ami-1"] == "unknown"
+    assert "dev" in result["ami-1"][1] and "us-east-1" in result["ami-1"][1]
+    used = [Usage("ami-1", DEV, "us-east-1", "instance", "i-1")]
+    assert status([res("ami-1", "ami")], shared, used, ctx=ctx)[0]["ami-1"] == "in_use"
+
+
+def test_ami_is_unknown_when_the_owners_own_usage_check_failed():
+    ctx = LinkContext(**FAILED_CTX, failed={(TOOLS, "us-east-1", "usage")})
+    assert status([res("ami-1", "ami")], ctx=ctx)[0]["ami-1"] == "unknown"
+
+
+def test_ami_is_unknown_when_shared_with_an_account_not_scanned_in_its_region():
+    ctx = LinkContext(**FAILED_CTX, scanned={(TOOLS, "eu-west-1"), (DEV, "us-east-1")})
+    ami = res("ami-1", "ami", region="eu-west-1")
+    statuses, result = status([ami], [Share("ami-1", "account", DEV)], ctx=ctx)
+    assert statuses["ami-1"] == "unknown"
+    assert "doesn't scan dev in eu-west-1" in result["ami-1"][1]
+
+
+def test_owner_snapshot_is_unknown_when_its_regions_ami_list_failed():
+    ctx = LinkContext(**FAILED_CTX, failed={(TOOLS, "us-east-1", "ami")})
+    snaps = [
+        res("snap-1", "snapshot", created_at=days_ago(200)),
+        res("snap-2", "snapshot", created_at=days_ago(200), region="us-west-2"),
+    ]
+    statuses, result = status(snaps, ctx=ctx)
+    assert statuses == {"snap-1": "unknown", "snap-2": "orphaned"}
+    assert "AMIs" in result["snap-1"][1]
+
+
+def test_snapshot_is_unknown_when_its_volume_list_failed_and_the_volume_is_missing():
+    ctx = LinkContext(**FAILED_CTX, failed={(DEV, "us-east-1", "volume")})
+    snap = res(
+        "snap-1", "snapshot", account=DEV, source_volume_id="vol-1", created_at=days_ago(200)
+    )
+    statuses, result = status([snap], ctx=ctx)
+    assert statuses["snap-1"] == "unknown" and "volumes" in result["snap-1"][1]
+
+
+def test_manual_rds_snapshot_is_unknown_when_its_database_list_failed():
+    ctx = LinkContext(**FAILED_CTX, failed={(DEV, "us-east-1", "database")})
+    statuses, _ = status(
+        [
+            res("rds-manual", "rds_snapshot", account=DEV, source_db_id="db1"),
+            res(
+                "rds-auto",
+                "rds_snapshot",
+                account=DEV,
+                source_db_id="db1",
+                managed_by="rds_automated",
+            ),
+        ],
+        ctx=ctx,
+    )
+    assert statuses == {"rds-manual": "unknown", "rds-auto": "managed"}

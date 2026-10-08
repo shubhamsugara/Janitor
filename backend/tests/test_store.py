@@ -248,3 +248,23 @@ def test_filters_accept_lists(store):
         "vol-4",
     ]
     assert ids(store, account="111111111111,999999999999", type="ami") == ["ami-1", "ami-2"]
+
+
+def test_segments_and_notes_round_trip(tmp_path):
+    from janitor.models import Segment
+    from janitor.store import Store
+
+    store = Store(tmp_path / "j.db")
+    scan_id = store.start_scan("aws")
+    store.add_segment(scan_id, Segment("111111111111", "us-east-1", "ami", True, 3, duration_ms=12))
+    store.set_notes(scan_id, {"unresolved": [{"value": "resolve:ssm:/x"}]})
+    store.finish_scan(scan_id, "partial")
+    (seg,) = store.segments(scan_id)
+    assert (seg["account"], seg["kind"], seg["ok"], seg["items"], seg["duration_ms"]) == (
+        "111111111111",
+        "ami",
+        1,
+        3,
+        12,
+    )
+    assert store.latest_scan()["notes"] == {"unresolved": [{"value": "resolve:ssm:/x"}]}
