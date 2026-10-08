@@ -40,6 +40,8 @@ export interface Resource {
   tags: Record<string, string>;
   snapshot_ids: string[];
   source_ami_id: string | null;
+  source_db_id?: string | null; // RDS snapshot
+  shared_with?: string[]; // manual RDS snapshot: "all" means public
   managed_by: string | null;
   attached_instance: string | null;
   volume_type: string | null;

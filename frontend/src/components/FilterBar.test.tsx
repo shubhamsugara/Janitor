@@ -81,3 +81,24 @@ describe("FilterBar", () => {
   });
 });
 
+
+describe("FilterBar name pattern and source filters", () => {
+  it("applies a name pattern", () => {
+    const onChange = vi.fn();
+    render(<FilterBar meta={meta} filters={EMPTY} onChange={onChange} total={5} />);
+    fireEvent.click(screen.getByRole("button", { name: /Name pattern/ }));
+    fireEvent.change(screen.getByLabelText(/regular expression/), { target: { value: "^web-" } });
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ name: "^web-", page: 1 }));
+  });
+
+  it("shows source filters as removable pills", () => {
+    const onChange = vi.fn();
+    const filters = { ...EMPTY, sourceAmi: "ami-0000aaaa", sourceDb: "orders-db" };
+    render(<FilterBar meta={meta} filters={filters} onChange={onChange} total={2} />);
+    expect(screen.getByText("Source AMI: ami-0000aaaa")).toBeTruthy();
+    expect(screen.getByText("Source database: orders-db")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Remove the source AMI filter" }));
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ sourceAmi: "", sourceDb: "orders-db" }));
+  });
+});

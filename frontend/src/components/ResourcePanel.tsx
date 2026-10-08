@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { Link } from "react-router";
 import { CircleCheck, Info } from "lucide-react";
 import { api, type Graph, type Meta, type ResourceDetail } from "../api";
 import { accountName, formatDate, formatGiB, formatUsd } from "../format";
@@ -7,6 +8,7 @@ import { Table, TBody, Td, Th, THead, Tr } from "../ui/table";
 import { Tabs } from "../ui/tabs";
 import AwsIcon from "./AwsIcon";
 import CostBreakdown from "./CostBreakdown";
+import { useDetail } from "../detail";
 import LinkageDiagram from "./LinkageDiagram";
 import StatusBadge, { OutcomeBadge } from "./StatusBadge";
 
@@ -28,6 +30,28 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+/** Links to the list filtered to this resource's relatives; following one closes the drawer. */
+function ListLinks({ detail, onFollow }: { detail: ResourceDetail; onFollow: () => void }) {
+  const r = detail.resource;
+  const links: [string, string][] = [];
+  if (r.type === "ami" && detail.related.links.some((l) => l.relation === "copy")) {
+    links.push(["See its copies", `/amis?source_ami=${encodeURIComponent(r.id)}`]);
+  }
+  if (r.type === "rds_snapshot" && r.source_db_id) {
+    links.push(["See all snapshots of this database", `/rds-snapshots?source_db=${encodeURIComponent(r.source_db_id)}`]);
+  }
+  if (!links.length) return null;
+  return (
+    <div className="mt-2 flex flex-wrap gap-3 text-[13px]">
+      {links.map(([label, to]) => (
+        <Link key={to} to={to} onClick={onFollow} className="font-medium text-accent hover:underline">
+          {label}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
 interface Props {
   id: string;
   meta: Meta;
@@ -40,6 +64,7 @@ export default function ResourcePanel({ id, meta, dark, onSelect }: Props) {
   const [graph, setGraph] = useState<Graph | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState("diagram");
+  const { close } = useDetail();
 
   useEffect(() => {
     let current = true; // a newer selection makes this one's responses stale
@@ -81,6 +106,7 @@ export default function ResourcePanel({ id, meta, dark, onSelect }: Props) {
           <p className="mt-1 truncate font-mono text-xs text-muted" title={r.id}>
             {r.id}
           </p>
+          <ListLinks detail={detail} onFollow={close} />
         </div>
       </div>
 

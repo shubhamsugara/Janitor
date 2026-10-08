@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, Search, Tag, X } from "lucide-react";
+import { ChevronDown, Regex, Search, Tag, X, type LucideIcon } from "lucide-react";
 import type { Meta, ResourceType, Status } from "../api";
 import { EMPTY, hasFilters, type Filters } from "../filters";
 import { Button } from "../ui/button";
@@ -28,7 +28,18 @@ function accountsFor(meta: Meta, type: ResourceType | undefined, selected: strin
   return meta.accounts.filter((a) => keep.has(a.id));
 }
 
-function TagFilter({ value, onApply }: { value: string; onApply: (tag: string) => void }) {
+interface TextFilterProps {
+  label: string;
+  icon: LucideIcon;
+  hint: string;
+  placeholder: string;
+  clearLabel: string;
+  value: string;
+  onApply: (value: string) => void;
+}
+
+/** A pill that opens a one-field form: the tag and name pattern filters. */
+function TextFilter({ label, icon: Icon, hint, placeholder, clearLabel, value, onApply }: TextFilterProps) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(value);
   return (
@@ -47,9 +58,9 @@ function TagFilter({ value, onApply }: { value: string; onApply: (tag: string) =
             value ? "border-accent/40 bg-accent-soft text-accent" : "border-dashed border-line bg-card text-ink hover:bg-subtle",
           )}
         >
-          <Tag className="size-3.5" aria-hidden />
+          <Icon className="size-3.5" aria-hidden />
           <span>
-            Tag
+            {label}
             {value && <span className="font-normal">: {value}</span>}
           </span>
           <ChevronDown className="size-3.5 opacity-60" aria-hidden />
@@ -65,12 +76,12 @@ function TagFilter({ value, onApply }: { value: string; onApply: (tag: string) =
         className="space-y-2"
       >
         <label className="text-xs text-muted">
-          Tag as key=value, or just a key
-          <Input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="env=prod" className="mt-1" />
+          {hint}
+          <Input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={placeholder} className="mt-1" />
         </label>
         <div className="flex justify-between">
           <Button size="sm" variant="ghost" onClick={() => { onApply(""); setOpen(false); }}>
-            Clear tag
+            {clearLabel}
           </Button>
           <Button size="sm" variant="primary" type="submit">
             Apply
@@ -78,6 +89,18 @@ function TagFilter({ value, onApply }: { value: string; onApply: (tag: string) =
         </div>
       </form>
     </Popover>
+  );
+}
+
+/** A filter set from a link in the detail panel; it has no picker, only a remove button. */
+function SourcePill({ label, value, what, onRemove }: { label: string; value: string; what: string; onRemove: () => void }) {
+  return (
+    <span className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-accent/40 bg-accent-soft pr-1.5 pl-3 text-[13px] font-medium text-accent">
+      <span className="max-w-72 truncate" title={value}>{`${label}: ${value}`}</span>
+      <button type="button" onClick={onRemove} aria-label={`Remove the ${what} filter`} className="rounded p-0.5 hover:bg-accent/10">
+        <X className="size-3.5" aria-hidden />
+      </button>
+    </span>
   );
 }
 
@@ -134,8 +157,31 @@ export default function FilterBar({ meta, type, filters, onChange, total }: Prop
       )}
       <MultiSelect label="Status" options={statusOptions} value={filters.status} onChange={(status) => set({ status })} />
       <MultiSelect label="Region" options={regionOptions} value={filters.region} onChange={(region) => set({ region })} />
-      <TagFilter value={filters.tag} onApply={(tag) => set({ tag })} />
+      <TextFilter
+        label="Tag"
+        icon={Tag}
+        hint="Tag as key=value, or just a key"
+        placeholder="env=prod"
+        clearLabel="Clear tag"
+        value={filters.tag}
+        onApply={(tag) => set({ tag })}
+      />
+      <TextFilter
+        label="Name pattern"
+        icon={Regex}
+        hint="A regular expression, matched anywhere in the name and ignoring case"
+        placeholder="^base-linux-"
+        clearLabel="Clear pattern"
+        value={filters.name}
+        onApply={(name) => set({ name })}
+      />
       <DateFilter filters={filters} onChange={onChange} />
+      {filters.sourceAmi && (
+        <SourcePill label="Source AMI" value={filters.sourceAmi} what="source AMI" onRemove={() => set({ sourceAmi: "" })} />
+      )}
+      {filters.sourceDb && (
+        <SourcePill label="Source database" value={filters.sourceDb} what="source database" onRemove={() => set({ sourceDb: "" })} />
+      )}
       <div className="ml-auto flex items-center gap-3">
         {total != null && <span className="text-[13px] text-muted">{total.toLocaleString()} matches</span>}
         {hasFilters(filters) && (

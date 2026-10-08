@@ -9,6 +9,9 @@ const full = {
   tag: "env=prod",
   from: "2026-01-01",
   to: "2026-03-31",
+  name: "^base-linux-",
+  sourceAmi: "ami-0000aaaa",
+  sourceDb: "orders-db",
   sort: "name",
   page: 3,
 };
@@ -34,6 +37,19 @@ describe("filters in the URL", () => {
     expect(params.get("status")).toBe("orphaned,idle");
     expect(params.get("type")).toBe("volume");
     expect(params.get("page")).toBe("3");
+  });
+
+  it("uses the server's names for the name pattern and source filters", () => {
+    const params = toApiParams("ami", full);
+    expect(params.get("name_regex")).toBe("^base-linux-");
+    expect(params.get("source_ami")).toBe("ami-0000aaaa");
+    expect(params.get("source_db")).toBe("orders-db");
+    expect(toSearch(full).get("name")).toBe("^base-linux-");
+  });
+
+  it("counts a source filter as a filter", () => {
+    expect(hasFilters({ ...EMPTY, sourceDb: "orders-db" })).toBe(true);
+    expect(hasFilters({ ...EMPTY, name: "x" })).toBe(true);
   });
 });
 
