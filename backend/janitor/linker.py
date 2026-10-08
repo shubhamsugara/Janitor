@@ -26,7 +26,7 @@ MANAGED_REASONS = {
 @dataclass
 class LinkContext:
     owner_account: str
-    account_names: dict[str, str]  # every account Janitor scans
+    account_names: dict[str, str]  # display names; discovered accounts show their ID
     orphan_after_days: int
     now: datetime
     failed: set[tuple[str, str, str]] = field(default_factory=set)  # (account, region, kind)
@@ -37,12 +37,14 @@ class LinkContext:
         cls, config: Config, now: datetime, segments: Iterable[Segment] = ()
     ) -> "LinkContext":
         return cls(
-            owner_account=config.owner.account,
-            account_names={account_id: a.name for account_id, a in config.accounts.items()},
+            owner_account=config.admin.account,
+            account_names={config.admin.account: config.admin.name}
+            | {account_id: a.name for account_id, a in config.accounts.items()},
             orphan_after_days=config.policy.orphan_after_days,
             now=now,
             failed={(s.account, s.region, s.kind) for s in segments if not s.ok},
-            scanned={(a, region) for a in config.accounts for region in config.regions_for(a)},
+            # Accounts are discovered during the scan, so "scanned" means a usage check ran there.
+            scanned={(s.account, s.region) for s in segments if s.kind == "usage"} or None,
         )
 
     def name(self, account_id: str) -> str:
@@ -109,11 +111,6 @@ def _ami(r: Resource, shares: list[Share], usage: list[Usage], ctx: LinkContext)
             return (
                 "unknown",
                 f"It {UNPROVABLE_SHARES[share.principal_type]}, so Janitor can't prove nothing uses it.",
-            )
-        if share.principal not in ctx.account_names:
-            return (
-                "unknown",
-                f"It is shared with account {share.principal}, which Janitor doesn't scan.",
             )
         if share.principal_type == "account" and not ctx.is_scanned(share.principal, r.region):
             return (

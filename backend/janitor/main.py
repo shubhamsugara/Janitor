@@ -156,15 +156,14 @@ def create_app(
         return {
             "provider": provider.name,
             "read_only": True,
-            "owner": config.owner.model_dump(),
+            "owner": {"account": config.admin.account, "regions": config.regions},
             "accounts": [
                 {
                     "id": account_id,
-                    "name": a.name,
-                    "owns": a.owns,
-                    "regions": config.regions_for(account_id),
+                    "name": config.account_name(account_id),
+                    "regions": config.regions,
                 }
-                for account_id, a in config.accounts.items()
+                for account_id in [config.admin.account, *config.accounts]
             ],
             "policy": {
                 "orphan_after_days": config.policy.orphan_after_days,

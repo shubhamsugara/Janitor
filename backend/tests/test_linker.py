@@ -11,6 +11,11 @@ CTX = LinkContext(
 )
 
 
+FAILED_CTX = dict(
+    owner_account=TOOLS, account_names={TOOLS: "tools", DEV: "dev"}, orphan_after_days=90, now=NOW
+)
+
+
 def res(id, type, **kw):
     fields = {"account": TOOLS, "region": "us-east-1", "name": id, "created_at": days_ago(100)} | kw
     return Resource(id=id, type=type, **fields)
@@ -43,8 +48,11 @@ def test_ami_usage_outside_permissions_is_ignored(usage):
     assert status([res("ami-1", "ami")], usage=[usage])[0]["ami-1"] == "orphaned"
 
 
-def test_ami_shared_with_unscanned_account_is_unknown():
-    statuses, result = status([res("ami-1", "ami")], [Share("ami-1", "account", UNSCANNED)])
+def test_ami_shared_with_an_account_no_usage_check_reached_is_unknown():
+    # Accounts are discovered from launch permissions; one without a usage check can't be proven.
+    ctx = LinkContext(**FAILED_CTX, scanned={(TOOLS, "us-east-1"), (DEV, "us-east-1")})
+    shared = [Share("ami-1", "account", UNSCANNED)]
+    statuses, result = status([res("ami-1", "ami")], shared, ctx=ctx)
     assert statuses["ami-1"] == "unknown" and UNSCANNED in result["ami-1"][1]
 
 
@@ -139,10 +147,6 @@ def test_every_status_per_type_appears_in_the_seed(inventory, config):
 
 
 # Failed checks (phase 3): what depends on a failed segment is unknown, never deletable.
-
-FAILED_CTX = dict(
-    owner_account=TOOLS, account_names={TOOLS: "tools", DEV: "dev"}, orphan_after_days=90, now=NOW
-)
 
 
 def test_ami_is_unknown_when_a_permitted_accounts_usage_check_failed():

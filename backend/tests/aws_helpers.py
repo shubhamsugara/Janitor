@@ -2,23 +2,24 @@
 
 from botocore.client import BaseClient
 
-ROLE = "janitor-read"
+ADMIN_ROLE = "example-admin-read"
+MEMBER_ROLE = "example-janitor-read"
 
 
-def write_aws_config(tmp_path, monkeypatch, accounts: dict[str, str]) -> None:
-    """accounts maps account ID to name; each gets profile example-<name> assuming ROLE there."""
+def write_aws_config(tmp_path, monkeypatch, admin: str = "111111111111") -> None:
+    """One static-key base profile and the admin profile, which assumes ADMIN_ROLE in `admin`.
+
+    Member accounts need no profile: Janitor reaches them from the admin session.
+    """
     lines = [
         "[profile example-base]",
         "aws_access_key_id = testing",
         "aws_secret_access_key = testing",
         "region = us-east-1",
+        "[profile example-tools]",
+        f"role_arn = arn:aws:iam::{admin}:role/{ADMIN_ROLE}",
+        "source_profile = example-base",
     ]
-    for account_id, name in accounts.items():
-        lines += [
-            f"[profile example-{name}]",
-            f"role_arn = arn:aws:iam::{account_id}:role/{ROLE}",
-            "source_profile = example-base",
-        ]
     config = tmp_path / "aws-config"
     config.write_text("\n".join(lines) + "\n")
     (tmp_path / "aws-credentials").write_text("")

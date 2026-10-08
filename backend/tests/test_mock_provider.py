@@ -62,14 +62,14 @@ def test_seed_has_running_and_stopped_users(inventory):
 
 
 def test_mock_reports_one_ok_segment_per_planned_check(config):
-    from janitor.providers.base import phase_one
+    from janitor.providers.base import first_phase
 
     seen = []
     inventory = MockProvider(SEED, clock=lambda: NOW).list_inventory(on_segment=seen.append)
     kinds = {(s.account, s.region, s.kind) for s in inventory.segments}
-    assert set(phase_one(config)) <= kinds
+    assert set(first_phase(config)) <= kinds
     assert ("111111111111", "us-east-1", "usage") in kinds
-    assert all(s.ok for s in inventory.segments)
+    assert all(s.ok for s in inventory.segments if s.account != "444444444444")
     assert len(seen) == len(inventory.segments)
     volumes = next(s for s in inventory.segments if s.kind == "volume" and s.items)
     assert volumes.items == sum(
@@ -81,3 +81,12 @@ def test_mock_reports_one_ok_segment_per_planned_check(config):
 
 def test_mock_recheck_finds_nothing_changed():
     assert MockProvider(SEED).recheck([{"id": "vol-1", "type": "volume"}]) == {}
+
+
+def test_mock_unreachable_account_fails_like_a_role_that_cant_be_assumed():
+    inventory = MockProvider(SEED, clock=lambda: NOW).list_inventory()
+    unreachable = [s for s in inventory.segments if s.account == "444444444444"]
+    assert unreachable and all(
+        (s.ok, s.error_kind, s.error) == (False, "denied", "sts:AssumeRole") for s in unreachable
+    )
+    assert not [r for r in inventory.resources if r.account == "444444444444"]

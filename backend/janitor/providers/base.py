@@ -7,15 +7,7 @@ from collections.abc import Callable
 from typing import Protocol
 
 from janitor.config import Config
-from janitor.models import Inventory, Resource, Segment, Share
-
-# What owning a type means Janitor must list. RDS snapshots are judged by their source databases.
-KINDS_FOR = {
-    "ami": ("ami",),
-    "snapshot": ("snapshot",),
-    "volume": ("volume",),
-    "rds_snapshot": ("rds_snapshot", "database"),
-}
+from janitor.models import Inventory, Segment, Share
 
 OnSegment = Callable[[Segment], None]
 
@@ -30,30 +22,33 @@ class CloudProvider(Protocol):
         ...
 
 
-def phase_one(config: Config) -> list[tuple[str, str, str]]:
-    """(account, region, kind) for every resource list; usage comes after, from the shares found."""
+ADMIN_FIRST = (
+    "ami",
+    "snapshot",
+    "volume",
+)  # AMIs first: their launch permissions name the accounts
+MEMBER_KINDS = ("snapshot", "volume", "rds_snapshot", "database", "usage")
+
+
+def first_phase(config: Config) -> list[tuple[str, str, str]]:
+    """The admin's own lists, in every region. Usage waits for the AMI IDs."""
     return [
-        (account_id, region, kind)
-        for account_id, account in config.accounts.items()
-        for region in config.regions_for(account_id)
-        for owned in account.owns
-        for kind in KINDS_FOR[owned]
+        (config.admin.account, region, kind) for region in config.regions for kind in ADMIN_FIRST
     ]
 
 
-def usage_pairs(config: Config, amis: list[Resource], shares: list[Share]) -> list[tuple[str, str]]:
-    """The owner in each of its regions, plus each scanned account an AMI is shared with, in that
-    AMI's region. Launch permissions are region-scoped, so other regions can't use it.
-    """
-    owner = config.owner.account
-    pairs = {(owner, region) for region in config.regions_for(owner)}
-    region_of = {ami.id: ami.region for ami in amis}
-    for share in shares:
-        region = region_of.get(share.image_id)
-        if (
-            share.principal_type == "account"
-            and share.principal in config.accounts
-            and region in config.regions_for(share.principal)
-        ):
-            pairs.add((share.principal, region))
-    return sorted(pairs)
+def member_accounts(config: Config, shares: list[Share]) -> list[str]:
+    """Every account an AMI is shared with, plus every listed account; never the admin."""
+    found = {s.principal for s in shares if s.principal_type == "account"} | set(config.accounts)
+    return sorted(found - {config.admin.account})
+
+
+def second_phase(config: Config, members: list[str]) -> list[tuple[str, str, str]]:
+    """Usage in the admin account, then each member's lists and usage, in every region."""
+    admin = [(config.admin.account, region, "usage") for region in config.regions]
+    return admin + [
+        (account, region, kind)
+        for account in members
+        for region in config.regions
+        for kind in MEMBER_KINDS
+    ]

@@ -18,7 +18,7 @@ import boto3
 from janitor.config import Config
 from janitor.models import Database, Inventory, Resource, Segment, Share, Unresolved, Usage
 from janitor.providers import normalize, session
-from janitor.providers.base import OnSegment, phase_one, usage_pairs
+from janitor.providers.base import OnSegment, first_phase, member_accounts, second_phase
 
 OPERATIONS = frozenset(
     {
@@ -80,7 +80,7 @@ class AwsProvider:
 
     def list_inventory(self, on_segment: OnSegment | None = None) -> Inventory:
         config = self._config
-        sessions = self._assume_all(list(config.accounts))
+        sessions = self._sessions([])  # the admin first; members once their IDs are known
         rows, segments = _Rows(), []
         lock = threading.Lock()
 
@@ -110,27 +110,23 @@ class AwsProvider:
                 if on_segment:
                     on_segment(seg)
 
-        listers = {
-            "ami": self._amis,
-            "snapshot": self._snapshots,
-            "volume": self._volumes,
-            "rds_snapshot": self._rds_snapshots,
-            "database": self._databases,
-        }
         with ThreadPoolExecutor(config.scan.concurrency) as pool:
-            for account, region, kind in phase_one(config):
-                pool.submit(run, account, region, kind, listers[kind])
+            for account, region, kind in first_phase(config):
+                pool.submit(run, account, region, kind, self._listers[kind])
 
         amis = [r for r in rows.resources if r.type == "ami"]
         normalize.fill_copy_sources(amis, rows.copies)
         ami_ids = {a.id for a in amis}
+        members = member_accounts(config, rows.shares)
+        sessions = self._sessions(members, admin=sessions[config.admin.account])
 
         def usage(sess: boto3.Session, account: str, region: str) -> _Rows:
             return self._usage(sess, account, region, ami_ids)
 
         with ThreadPoolExecutor(config.scan.concurrency) as pool:
-            for account, region in usage_pairs(config, amis, rows.shares):
-                pool.submit(run, account, region, "usage", usage)
+            for account, region, kind in second_phase(config, members):
+                work = usage if kind == "usage" else self._listers[kind]
+                pool.submit(run, account, region, kind, work)
 
         return Inventory(
             resources=rows.resources,
@@ -159,7 +155,7 @@ class AwsProvider:
             for account in self._permitted(i)
         }
         accounts = sorted({a for a, _ in groups} | {a for a, _ in users})
-        sessions = self._assume_all(accounts)
+        sessions = self._sessions([a for a in accounts if a != config.admin.account])
         reasons: dict[str, str] = {}
 
         def unreachable(group: list[dict], exc: Exception) -> None:
@@ -206,16 +202,11 @@ class AwsProvider:
         return reasons
 
     def _permitted(self, ami: dict) -> set[str]:
-        """The owner plus scanned accounts the scan saw in the AMI's launch permissions."""
-        accounts = {ami["account"]}
-        for share in ami.get("shares") or []:
-            if (
-                share["principal_type"] == "account"
-                and share["principal"] in self._config.accounts
-                and ami["region"] in self._config.regions_for(share["principal"])
-            ):
-                accounts.add(share["principal"])
-        return accounts
+        """The admin plus every account the scan saw in the AMI's launch permissions."""
+        shares = ami.get("shares") or []
+        return {ami["account"]} | {
+            s["principal"] for s in shares if s["principal_type"] == "account"
+        }
 
     def _recheck_group(self, sess: boto3.Session, region: str, group: list[dict]) -> dict[str, str]:
         gone = "It no longer exists."
@@ -292,15 +283,43 @@ class AwsProvider:
 
     # Sessions and clients
 
-    def _assume_all(self, accounts: list[str]) -> dict[str, boto3.Session | Exception]:
-        def one(account: str) -> boto3.Session | Exception:
+    @property
+    def _listers(self) -> dict[str, Callable[..., _Rows]]:
+        return {
+            "ami": self._amis,
+            "snapshot": self._snapshots,
+            "volume": self._volumes,
+            "rds_snapshot": self._rds_snapshots,
+            "database": self._databases,
+        }
+
+    def _sessions(
+        self, members: list[str], admin: boto3.Session | Exception | None = None
+    ) -> dict[str, boto3.Session | Exception]:
+        """The admin session (assumed unless given) and one session per member account.
+
+        A failure is kept in place of the session, so every check of that account reports it;
+        if the admin can't be reached, neither can any member.
+        """
+        config = self._config
+        if admin is None:
             try:
-                return session.assume(self._config, account)
-            except Exception as exc:  # every segment of this account reports it
+                admin = session.assume_admin(config)
+            except Exception as exc:
+                admin = exc
+
+        def member(account: str) -> boto3.Session | Exception:
+            if isinstance(admin, Exception):
+                return admin
+            try:
+                return session.assume_member(config, admin, account)
+            except Exception as exc:
                 return exc
 
-        with ThreadPoolExecutor(min(len(accounts), self._config.scan.concurrency) or 1) as pool:
-            return dict(zip(accounts, pool.map(one, accounts), strict=True))
+        workers = min(len(members), config.scan.concurrency) or 1
+        with ThreadPoolExecutor(workers) as pool:
+            found = dict(zip(members, pool.map(member, members), strict=True))
+        return {config.admin.account: admin, **found}
 
     def _client(self, sess: boto3.Session, service: str, region: str):
         with self._client_lock:

@@ -21,7 +21,7 @@ from janitor.models import (
     format_ts,
     parse_ts,
 )
-from janitor.providers.base import OnSegment, phase_one, usage_pairs
+from janitor.providers.base import OnSegment, first_phase, member_accounts, second_phase
 
 EXAMPLE = Path(__file__).resolve().parents[3] / "config" / "janitor.example.yaml"
 
@@ -51,7 +51,11 @@ class MockProvider:
         return {}  # the fixture never changes behind Janitor's back
 
     def _segments(self, inv: Inventory) -> list[Segment]:
-        """Every check the AWS provider would run, all ok, with the rows each would return."""
+        """Every check the AWS provider would run, with the rows each would return.
+
+        The seed's unreachable accounts fail every check, as a member role that can't be assumed
+        would, so the demo shows an AMI that can't be proven unused.
+        """
         config = self._config or load_config(EXAMPLE)
         counts: Counter = Counter()
         for r in inv.resources:
@@ -60,11 +64,15 @@ class MockProvider:
             counts[(d.account, d.region, "database")] += 1
         for u in inv.usage:
             counts[(u.account, u.region, "usage")] += 1
-        amis = [r for r in inv.resources if r.type == "ami"]
-        planned = phase_one(config) + [
-            (account, region, "usage") for account, region in usage_pairs(config, amis, inv.shares)
+        members = member_accounts(config, inv.shares)
+        planned = first_phase(config) + second_phase(config, members)
+        unreachable = set(self._seed.get("unreachable", []))
+        return [
+            Segment(a, r, k, ok=False, error_kind="denied", error="sts:AssumeRole")
+            if a in unreachable
+            else Segment(a, r, k, ok=True, items=counts[(a, r, k)])
+            for a, r, k in planned
         ]
-        return [Segment(a, r, k, ok=True, items=counts[(a, r, k)]) for a, r, k in planned]
 
     def _read(self) -> Inventory:
         shift = self._clock() - parse_ts(self._seed["anchor"])
@@ -73,9 +81,12 @@ class MockProvider:
             resource = Resource(**item)
             resource.created_at = format_ts(parse_ts(resource.created_at) + shift)
             resources.append(resource)
+        unreachable = set(self._seed.get("unreachable", []))  # a failed check contributes no rows
         return Inventory(
-            resources=resources,
+            resources=[r for r in resources if r.account not in unreachable],
             shares=[Share(**s) for s in self._seed["shares"]],
-            usage=[Usage(**u) for u in self._seed["usage"]],
-            databases=[Database(**d) for d in self._seed["databases"]],
+            usage=[Usage(**u) for u in self._seed["usage"] if u["account"] not in unreachable],
+            databases=[
+                Database(**d) for d in self._seed["databases"] if d["account"] not in unreachable
+            ],
         )

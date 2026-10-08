@@ -53,7 +53,8 @@ def test_health_and_meta(client):
 
 def test_overview(client):
     body = client.get("/api/overview").json()
-    assert body["last_scan"]["status"] == "ok"
+    assert body["last_scan"]["status"] == "partial"  # the demo's unreachable account
+    assert {f["account"] for f in body["segments_failed"]} == {"444444444444"}
     assert {t["type"] for t in body["types"]} == {"ami", "snapshot", "volume", "rds_snapshot"}
 
 
@@ -510,14 +511,18 @@ def test_a_failed_newest_scan_keeps_showing_the_previous_one(tmp_path):
     assert "isn't allowed to call ec2:DescribeVolumes" in overview["newest_failed"]["message"]
 
 
-def test_aws_mode_refuses_profiles_without_a_role(tmp_path, monkeypatch):
+def test_aws_mode_refuses_a_missing_admin_profile(tmp_path, monkeypatch):
     from aws_helpers import write_aws_config
 
     from janitor.providers.session import ProfileError
 
-    write_aws_config(tmp_path, monkeypatch, {})
+    write_aws_config(tmp_path, monkeypatch)
+    config_file = tmp_path / "aws-config"
+    config_file.write_text(
+        config_file.read_text().replace("[profile example-tools]", "[profile other]")
+    )
     monkeypatch.setenv("JANITOR_PROVIDER", "aws")
-    with pytest.raises(ProfileError, match="example-dev"):
+    with pytest.raises(ProfileError, match="example-tools"):
         create_app(_settings(tmp_path), clock=lambda: NOW)
 
 

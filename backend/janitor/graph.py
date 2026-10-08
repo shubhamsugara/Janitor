@@ -30,6 +30,10 @@ class Edge:
     relation: str
 
 
+def _known(config: Config, account_id: str) -> bool:
+    return account_id == config.admin.account or account_id in config.accounts
+
+
 def permitted_usage(store: Store, scan_id: int, ami: Resource) -> list[Usage]:
     """Usage in the AMI's own region by accounts allowed to launch it (as the linker counts it)."""
     shares = store.shares_for(scan_id, ami.id)
@@ -125,7 +129,7 @@ def _blind_spot(store: Store, config: Config, scan_id: int, amis: list[Resource]
         {
             s.principal
             for s in shares
-            if s.principal_type == "account" and s.principal not in config.accounts
+            if s.principal_type == "account" and not _known(config, s.principal)
         }
     )
     if unscanned:
@@ -180,7 +184,7 @@ class _Walker:
 
     def share_node(self, share: Share, ami: Resource) -> dict:
         if share.principal_type == "account":
-            scanned = share.principal in self.config.accounts
+            scanned = _known(self.config, share.principal)
             label = (
                 self.config.account_name(share.principal)
                 if scanned

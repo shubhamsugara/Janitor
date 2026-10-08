@@ -1,16 +1,23 @@
-"""Locks 2 and 3: the Describe-only session policy and the runtime guard."""
+"""Locks 2 and 3 through the admin hub: Describe-only session policies and the runtime guard."""
 
 import json
 
 import boto3
 import pytest
-from aws_helpers import record_calls, write_aws_config
+from aws_helpers import MEMBER_ROLE, record_calls, write_aws_config
 from helpers import DEV, EXAMPLE, TOOLS
 from moto import mock_aws
 
 from janitor.config import load_config
 from janitor.providers.guard import ReadOnlyViolation
-from janitor.providers.session import SESSION_POLICY, ProfileError, assume, check_profiles
+from janitor.providers.session import (
+    ADMIN_POLICY,
+    SESSION_POLICY,
+    ProfileError,
+    assume_admin,
+    assume_member,
+    check_profiles,
+)
 
 
 @pytest.fixture
@@ -19,65 +26,72 @@ def config():
 
 
 @pytest.fixture
-def profiles(tmp_path, monkeypatch, config):
-    write_aws_config(
-        tmp_path, monkeypatch, {account_id: a.name for account_id, a in config.accounts.items()}
-    )
-    # The example config names profiles example-<name>, which is what write_aws_config writes.
+def profiles(tmp_path, monkeypatch):
+    write_aws_config(tmp_path, monkeypatch)
     return tmp_path
 
 
-def test_session_policy_allows_only_describe():
+def test_member_session_policy_allows_only_describe():
     (statement,) = SESSION_POLICY["Statement"]
     assert statement["Effect"] == "Allow"
     assert statement["Action"] == ["ec2:Describe*", "autoscaling:Describe*", "rds:Describe*"]
 
 
-def test_check_profiles_names_every_bad_profile(tmp_path, monkeypatch, config):
-    names = {account_id: a.name for account_id, a in config.accounts.items()}
-    names.pop(DEV)  # example-dev missing entirely
-    write_aws_config(tmp_path, monkeypatch, names)
+def test_admin_policy_adds_only_assuming_the_member_role():
+    describe, hop = ADMIN_POLICY(MEMBER_ROLE)["Statement"]
+    assert describe["Action"] == ["ec2:Describe*", "autoscaling:Describe*", "rds:Describe*"]
+    assert hop == {
+        "Effect": "Allow",
+        "Action": "sts:AssumeRole",
+        "Resource": f"arn:aws:iam::*:role/{MEMBER_ROLE}",
+    }
+
+
+def test_check_profiles_names_the_admin_profile_and_member_role(tmp_path, monkeypatch, config):
+    write_aws_config(tmp_path, monkeypatch)
     path = tmp_path / "aws-config"
-    text = path.read_text().replace(
-        "[profile example-tools]\nrole_arn = arn:aws:iam::111111111111:role/janitor-read\n",
-        "[profile example-tools]\n",
-    )
-    path.write_text(text)
+    path.write_text(path.read_text().replace("[profile example-tools]", "[profile other]"))
+    broken = config.model_copy(update={"member_role": ""})
     with pytest.raises(ProfileError) as error:
-        check_profiles(config)
-    assert "example-dev" in str(error.value)
-    assert "example-tools" in str(error.value)
-    assert "role_arn" in str(error.value)
+        check_profiles(broken)
+    assert "example-tools" in str(error.value) and "member_role" in str(error.value)
 
 
-def test_check_profiles_passes_when_all_profiles_assume_roles(profiles, config):
+def test_check_profiles_passes(profiles, config):
     check_profiles(config)
 
 
 @mock_aws
-def test_assume_role_sends_the_session_policy(profiles, config, monkeypatch):
+def test_admin_then_member_each_get_their_policy(profiles, config, monkeypatch):
     calls = record_calls(monkeypatch)
-    assume(config, DEV)
-    (params,) = [p for op, p in calls if op == "AssumeRole"]
-    assert params["RoleArn"] == f"arn:aws:iam::{DEV}:role/janitor-read"
-    assert params["RoleSessionName"] == "janitor-readonly"
-    assert params["DurationSeconds"] == 3600
-    assert json.loads(params["Policy"]) == SESSION_POLICY
+    admin = assume_admin(config)
+    assume_member(config, admin, DEV)
+    first, second = [p for op, p in calls if op == "AssumeRole"]
+    assert first["RoleArn"] == f"arn:aws:iam::{TOOLS}:role/example-admin-read"
+    assert json.loads(first["Policy"]) == ADMIN_POLICY(MEMBER_ROLE)
+    assert second["RoleArn"] == f"arn:aws:iam::{DEV}:role/{MEMBER_ROLE}"
+    assert json.loads(second["Policy"]) == SESSION_POLICY
+    assert {p["RoleSessionName"] for p in (first, second)} == {"janitor-readonly"}
+    assert {p["DurationSeconds"] for p in (first, second)} == {3600}
 
 
 @mock_aws
-def test_guard_stops_a_mutating_call_before_it_is_sent(profiles, config):
-    session = assume(config, TOOLS)
-    ec2 = session.client("ec2", region_name="us-east-1")
-    # Create a snapshot through an unguarded client in the same account.
-    raw = _raw_client(session)
-    vol = raw.create_volume(AvailabilityZone="us-east-1a", Size=1)
-    snap = raw.create_snapshot(VolumeId=vol["VolumeId"])
-    with pytest.raises(ReadOnlyViolation, match="DeleteSnapshot"):
-        ec2.delete_snapshot(SnapshotId=snap["SnapshotId"])
-    found = raw.describe_snapshots(SnapshotIds=[snap["SnapshotId"]])["Snapshots"]
-    assert [s["SnapshotId"] for s in found] == [snap["SnapshotId"]]
-    assert ec2.describe_snapshots(OwnerIds=["self"])["Snapshots"]
+def test_member_session_lands_in_the_member_account(profiles, config):
+    member = assume_member(config, assume_admin(config), DEV)
+    assert member.client("sts").get_caller_identity()["Account"] == DEV
+
+
+@mock_aws
+def test_guard_stops_mutating_calls_on_admin_and_member_sessions(profiles, config):
+    admin = assume_admin(config)
+    for session in (admin, assume_member(config, admin, DEV)):
+        ec2 = session.client("ec2", region_name="us-east-1")
+        raw = _raw_client(session)
+        vol = raw.create_volume(AvailabilityZone="us-east-1a", Size=1)
+        snap = raw.create_snapshot(VolumeId=vol["VolumeId"])
+        with pytest.raises(ReadOnlyViolation, match="DeleteSnapshot"):
+            ec2.delete_snapshot(SnapshotId=snap["SnapshotId"])
+        assert raw.describe_snapshots(SnapshotIds=[snap["SnapshotId"]])["Snapshots"]
 
 
 def _raw_client(session):

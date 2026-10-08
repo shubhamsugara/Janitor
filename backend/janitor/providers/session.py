@@ -1,8 +1,10 @@
-"""Lock 2: reach each account through AssumeRole with a Describe-only session policy.
+"""Lock 2: reach every account through AssumeRole with a Describe-only session policy.
 
-AWS grants the intersection of the role's permissions and the session policy, so even an admin
-role can only describe. Source credentials come from the profile's source_profile, which the
-user keeps fresh with their usual MFA session; mfa_serial is therefore not sent.
+Source credentials (the admin profile's source_profile, kept fresh by the user's usual MFA
+session) assume the admin role; the admin session then assumes `member_role` in each other
+account. AWS grants the intersection of a role's permissions and the session policy, so even an
+admin role can only describe, and the admin session can additionally assume only the member role.
+mfa_serial is not sent: the source credentials are already an MFA session.
 """
 
 import json
@@ -15,16 +17,34 @@ from janitor.config import Config
 from janitor.providers import guard
 
 SESSION_NAME = "janitor-readonly"
+DESCRIBE = ["ec2:Describe*", "autoscaling:Describe*", "rds:Describe*"]
 SESSION_POLICY = {
     "Version": "2012-10-17",
     "Statement": [
         {
             "Effect": "Allow",
-            "Action": ["ec2:Describe*", "autoscaling:Describe*", "rds:Describe*"],
+            "Action": DESCRIBE,
             "Resource": "*",
         }
     ],
 }
+
+
+def ADMIN_POLICY(member_role: str) -> dict:  # noqa: N802 - a constant, parameterized
+    """Describe, plus assuming the member role in other accounts, and nothing else."""
+    return {
+        "Version": "2012-10-17",
+        "Statement": [
+            {"Effect": "Allow", "Action": DESCRIBE, "Resource": "*"},
+            {
+                "Effect": "Allow",
+                "Action": "sts:AssumeRole",
+                "Resource": f"arn:aws:iam::*:role/{member_role}",
+            },
+        ],
+    }
+
+
 CLIENT_CONFIG = BotoConfig(retries={"mode": "adaptive", "max_attempts": 10})
 
 
@@ -37,45 +57,61 @@ def _profiles() -> dict[str, dict]:
 
 
 def check_profiles(config: Config) -> None:
-    """Refuse to start in AWS mode unless every account's profile assumes a role."""
-    profiles = _profiles()
+    """Refuse to start in AWS mode unless the admin profile assumes a role and member_role is set."""
+    profile = _profiles().get(config.admin.profile)
     problems = []
-    for account in config.accounts.values():
-        profile = profiles.get(account.profile)
-        if profile is None:
-            problems.append(f"{account.profile} (for {account.name}) isn't in your AWS config")
-        elif not profile.get("role_arn") or not profile.get("source_profile"):
-            problems.append(
-                f"{account.profile} (for {account.name}) needs role_arn and source_profile"
-            )
+    if not config.admin.profile or profile is None:
+        problems.append(
+            f"admin profile {config.admin.profile or '(none)'} isn't in your AWS config"
+        )
+    elif not profile.get("role_arn") or not profile.get("source_profile"):
+        problems.append(f"admin profile {config.admin.profile} needs role_arn and source_profile")
+    if not config.member_role:
+        problems.append("member_role isn't set (the role Janitor assumes in every other account)")
     if problems:
         raise ProfileError(
-            "Janitor can't use these AWS profiles: "
+            "Janitor can't reach your accounts: "
             + "; ".join(problems)
-            + ". Fix them in your AWS config, then start again."
+            + ". Fix them in janitor.yaml or your AWS config, then start again."
         )
 
 
-def assume(config: Config, account_id: str) -> boto3.Session:
-    """Return a guarded session for the account, limited by the session policy."""
-    profile = _profiles()[config.accounts[account_id].profile]
-    region = config.owner.regions[0]
-    source = boto3.Session(profile_name=profile["source_profile"], region_name=region)
-    guard.install(source, extra=frozenset({"AssumeRole"}))
+def _assume(
+    source: boto3.Session, role_arn: str, policy: dict, region: str, **extra
+) -> boto3.Session:
     params = {
-        "RoleArn": profile["role_arn"],
+        "RoleArn": role_arn,
         "RoleSessionName": SESSION_NAME,
         "DurationSeconds": 3600,
-        "Policy": json.dumps(SESSION_POLICY),
+        "Policy": json.dumps(policy),
+        **extra,
     }
-    if profile.get("external_id"):
-        params["ExternalId"] = profile["external_id"]
     creds = source.client("sts", config=CLIENT_CONFIG).assume_role(**params)["Credentials"]
-    session = boto3.Session(
+    return boto3.Session(
         aws_access_key_id=creds["AccessKeyId"],
         aws_secret_access_key=creds["SecretAccessKey"],
         aws_session_token=creds["SessionToken"],
         region_name=region,
     )
-    guard.install(session)
-    return session
+
+
+def assume_admin(config: Config) -> boto3.Session:
+    """A guarded admin session: Describe, and AssumeRole into member_role only."""
+    profile = _profiles()[config.admin.profile]
+    region = config.regions[0]
+    source = boto3.Session(profile_name=profile["source_profile"], region_name=region)
+    guard.install(source, extra=frozenset({"AssumeRole"}))
+    extra = {"ExternalId": profile["external_id"]} if profile.get("external_id") else {}
+    admin = _assume(source, profile["role_arn"], ADMIN_POLICY(config.member_role), region, **extra)
+    guard.install(admin, extra=frozenset({"AssumeRole"}))
+    return admin
+
+
+def assume_member(config: Config, admin: boto3.Session, account_id: str) -> boto3.Session:
+    """A guarded, Describe-only session in another account, reached from the admin session."""
+    if account_id == config.admin.account:
+        return admin
+    role_arn = f"arn:aws:iam::{account_id}:role/{config.member_role}"
+    member = _assume(admin, role_arn, SESSION_POLICY, config.regions[0])
+    guard.install(member)
+    return member

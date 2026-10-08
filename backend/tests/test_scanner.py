@@ -38,6 +38,7 @@ def test_scan_stores_statuses_costs_and_rules(setup):
 def test_demo_moments(setup):
     store, scanner = setup
     scan_id = scanner.run()
+    assert store.latest_scan()["status"] == "partial"  # the seed's unreachable account
     assert (
         store.query_resources(scan_id, {"q": "partner-export", "type": "ami"})[0][0].status
         == "unknown"
@@ -171,6 +172,10 @@ def test_segment_messages(config):
         )
 
     assert msg("expired") == "AWS session expired. Refresh your MFA session, then Scan now."
+    assert msg("denied", "sts:AssumeRole") == (
+        "Janitor can't assume example-janitor-read in dev. Check that the role exists there and "
+        "trusts the admin account, then Scan now."
+    )
     assert msg("denied", "ec2:DescribeInstances") == (
         "Janitor isn't allowed to call ec2:DescribeInstances in dev · us-east-1. "
         "Ask for read access, then Scan now."

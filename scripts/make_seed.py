@@ -219,6 +219,8 @@ class Seed:
             "shares": self.shares,
             "usage": self.usage,
             "databases": self.databases,
+            # Accounts an AMI is shared with whose role Janitor can't assume (mock only).
+            "unreachable": [UNSCANNED],
         }
 
 

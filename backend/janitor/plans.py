@@ -133,7 +133,7 @@ def _share_impact(store: Store, config: Config, scan_id: int, item: dict) -> dic
             {
                 "id": s.principal,
                 "name": config.account_name(s.principal),
-                "scanned": s.principal in config.accounts,
+                "scanned": s.principal == config.admin.account or s.principal in config.accounts,
             }
             for s in shares
             if s.principal_type == "account"

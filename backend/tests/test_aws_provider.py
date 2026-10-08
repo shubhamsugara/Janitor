@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 
 import pytest
-from aws_helpers import account_session, record_calls, write_aws_config
+from aws_helpers import MEMBER_ROLE, account_session, record_calls, write_aws_config
 from helpers import DEV, TOOLS
 from moto import mock_aws
 
@@ -16,30 +16,42 @@ MOTO_BASE_AMI = "ami-12c6146b"  # one of moto's built-in public images
 
 
 def make_config(**overrides) -> Config:
+    """Admin tools in two regions; dev is named here but is also found from launch permissions."""
     data = {
         "provider": "aws",
-        "owner": {"account": TOOLS, "regions": ["us-east-1", "us-west-2"]},
-        "accounts": {
-            TOOLS: {
-                "name": "tools",
-                "profile": "example-tools",
-                "owns": ["ami", "snapshot", "volume"],
-            },
-            DEV: {
-                "name": "dev",
-                "profile": "example-dev",
-                "owns": ["snapshot", "volume", "rds_snapshot"],
-            },
+        "admin": {
+            "account": TOOLS,
+            "name": "tools",
+            "profile": "example-tools",
+            "regions": ["us-east-1", "us-west-2"],
         },
+        "member_role": MEMBER_ROLE,
+        "accounts": {DEV: {"name": "dev"}},
         "scan": {"concurrency": 4},
     }
     data.update(overrides)
     return Config.model_validate(data)
 
 
+def deny_member(monkeypatch, account: str) -> None:
+    """Make the hop from admin into `account` fail, as a missing or untrusting role would."""
+    from botocore.exceptions import ClientError
+
+    from janitor.providers import session
+
+    real = session.assume_member
+
+    def assume_member(config, admin, account_id):
+        if account_id == account:
+            raise ClientError({"Error": {"Code": "AccessDenied", "Message": "no"}}, "AssumeRole")
+        return real(config, admin, account_id)
+
+    monkeypatch.setattr(session, "assume_member", assume_member)
+
+
 @pytest.fixture
 def aws(tmp_path, monkeypatch):
-    write_aws_config(tmp_path, monkeypatch, {TOOLS: "tools", DEV: "dev"})
+    write_aws_config(tmp_path, monkeypatch)
     with mock_aws():
         yield tmp_path
 
@@ -120,18 +132,14 @@ def test_segments_cover_every_account_region_and_kind(aws):
     seen = []
     inventory = AwsProvider(make_config(), clock=lambda: NOW).list_inventory(on_segment=seen.append)
     got = sorted((s.account, s.region, s.kind) for s in inventory.segments)
+    regions = ("us-east-1", "us-west-2")
     expected = sorted(
-        [
-            (TOOLS, r, k)
-            for r in ("us-east-1", "us-west-2")
-            for k in ("ami", "snapshot", "volume", "usage")
-        ]
+        [(TOOLS, r, k) for r in regions for k in ("ami", "snapshot", "volume", "usage")]
         + [
             (DEV, r, k)
-            for r in ("us-east-1", "us-west-2")
-            for k in ("snapshot", "volume", "rds_snapshot", "database")
+            for r in regions
+            for k in ("snapshot", "volume", "rds_snapshot", "database", "usage")
         ]
-        + [(DEV, "us-east-1", "usage")]  # the AMI is shared with dev in us-east-1 only
     )
     assert got == expected
     assert len(seen) == len(inventory.segments)
@@ -155,19 +163,14 @@ def test_pagination_reads_every_page(aws, monkeypatch):
     assert sum(1 for op, _ in calls if op == "DescribeDBInstances") >= 3  # 2 pages + 1 region
 
 
-def test_an_account_whose_role_cant_be_assumed_fails_only_its_segments(aws):
+def test_an_account_whose_role_cant_be_assumed_fails_only_its_segments(aws, monkeypatch):
     world = build_world()
-    config_file = aws / "aws-config"
-    config_file.write_text(
-        config_file.read_text().replace(
-            f"role_arn = arn:aws:iam::{DEV}:role/janitor-read\nsource_profile = example-base",
-            f"role_arn = arn:aws:iam::{DEV}:role/janitor-read\nsource_profile = example-nokeys",
-        )
-        + "[profile example-nokeys]\nregion = us-east-1\n"
-    )
+    deny_member(monkeypatch, DEV)
     inventory = AwsProvider(make_config(), clock=lambda: NOW).list_inventory()
     dev_segments = [s for s in inventory.segments if s.account == DEV]
-    assert dev_segments and all(not s.ok and s.error_kind == "expired" for s in dev_segments)
+    assert dev_segments and all(
+        (s.ok, s.error_kind, s.error) == (False, "denied", "sts:AssumeRole") for s in dev_segments
+    )
     assert all(s.ok for s in inventory.segments if s.account == TOOLS)
     assert {r.account for r in inventory.resources} == {TOOLS}
     assert world["ami"] in {r.id for r in inventory.resources}
@@ -268,15 +271,8 @@ def test_recheck_rds_snapshot_that_is_gone(aws):
     assert reasons == {arn: "It no longer exists."}
 
 
-def test_recheck_reports_accounts_it_cant_reach(aws):
-    config_file = aws / "aws-config"
-    config_file.write_text(
-        config_file.read_text().replace(
-            f"role_arn = arn:aws:iam::{DEV}:role/janitor-read\nsource_profile = example-base",
-            f"role_arn = arn:aws:iam::{DEV}:role/janitor-read\nsource_profile = example-nokeys",
-        )
-        + "[profile example-nokeys]\nregion = us-east-1\n"
-    )
+def test_recheck_reports_accounts_it_cant_reach(aws, monkeypatch):
+    deny_member(monkeypatch, DEV)
     reasons = AwsProvider(make_config(), clock=lambda: NOW).recheck(
         [item("vol-0abc", "volume", DEV)]
     )
@@ -313,14 +309,22 @@ def test_a_check_that_fails_while_reporting_still_reports_as_failed(aws, monkeyp
         raise TypeError("classify broke")
 
     monkeypatch.setattr(aws_module.normalize, "classify", broken)
-    monkeypatch.setattr(
-        aws_module.session,
-        "assume",
-        lambda config, account: (_ for _ in ()).throw(RuntimeError("no")),
-    )
+
+    def unreachable(config):
+        raise RuntimeError("no")
+
+    monkeypatch.setattr(aws_module.session, "assume_admin", unreachable)
     inventory = AwsProvider(make_config(), clock=lambda: NOW).list_inventory()
-    planned = (
-        2 * 3 + 2 * 4
-    )  # tools: ami, snapshot, volume; dev: snapshot, volume, rds_snapshot, database
-    assert len(inventory.segments) >= planned
+    # tools: ami, snapshot, volume, usage; dev (listed): five kinds; two regions each
+    assert len(inventory.segments) == 2 * 4 + 2 * 5
     assert all(not s.ok and s.error_kind == "other" for s in inventory.segments)
+
+
+def test_an_account_found_only_in_launch_permissions_is_scanned_through_the_hub(aws):
+    world = build_world()
+    inventory = AwsProvider(make_config(accounts={}), clock=lambda: NOW).list_inventory()
+    assert {(s.account, s.kind) for s in inventory.segments if s.account == DEV} == {
+        (DEV, k) for k in ("snapshot", "volume", "rds_snapshot", "database", "usage")
+    }
+    assert [(u.account, u.ref_id) for u in inventory.usage] == [(DEV, world["used_by"])]
+    assert world["dev_volume"] in {r.id for r in inventory.resources}

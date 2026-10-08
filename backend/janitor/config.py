@@ -10,22 +10,31 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 ResourceType = Literal["ami", "snapshot", "volume", "rds_snapshot"]
 ACCOUNT_ID = re.compile(r"^\d{12}$")
+ROLE_NAME = re.compile(r"^[\w+=,.@-]{1,64}$")
 
 
 class _Strict(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class Owner(_Strict):
+class Admin(_Strict):
+    """The account that owns the AMIs; Janitor reaches every other account from it."""
+
     account: str
+    name: str = "admin"
+    profile: str = ""  # needs role_arn and source_profile; required in AWS mode
     regions: list[str] = Field(min_length=1)
 
+    @field_validator("account")
+    @classmethod
+    def _account_id(cls, account: str) -> str:
+        if not ACCOUNT_ID.match(account):
+            raise ValueError(f"admin account {account!r} must be 12 digits")
+        return account
 
-class Account(_Strict):
+
+class AccountName(_Strict):
     name: str
-    profile: str
-    owns: list[ResourceType] = Field(default_factory=list)
-    regions: list[str] | None = None
 
 
 class Policy(_Strict):
@@ -61,43 +70,53 @@ class Scan(_Strict):
     concurrency: int = Field(8, ge=1, le=32)
 
 
+OLD_LAYOUT = (
+    "janitor.yaml uses the old layout (owner, and accounts with profile and owns). Move to "
+    "admin, member_role, and accounts names: see config/janitor.example.yaml."
+)
+
+
 class Config(_Strict):
     provider: Literal["mock", "aws"] = "mock"
-    owner: Owner
-    accounts: dict[str, Account]
+    admin: Admin
+    member_role: str = ""  # one role name in every account, assumed from the admin session
+    accounts: dict[str, AccountName] = Field(default_factory=dict)  # display names; always scanned
     policy: Policy = Field(default_factory=Policy)
     pricing: Pricing = Field(default_factory=Pricing)
     scan: Scan = Field(default_factory=Scan)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _old_layout(cls, data: object) -> object:
+        if isinstance(data, dict) and "owner" in data:
+            raise ValueError(OLD_LAYOUT)
+        return data
+
+    @field_validator("member_role")
+    @classmethod
+    def _role_name(cls, role: str) -> str:
+        if role and not ROLE_NAME.match(role):
+            raise ValueError(f"member_role {role!r} isn't a valid IAM role name")
+        return role
+
     @field_validator("accounts")
     @classmethod
-    def _account_ids(cls, accounts: dict[str, Account]) -> dict[str, Account]:
+    def _account_ids(cls, accounts: dict[str, AccountName]) -> dict[str, AccountName]:
         for account_id in accounts:
             if not ACCOUNT_ID.match(account_id):
                 raise ValueError(f"account ID {account_id!r} must be 12 digits")
         return accounts
 
-    @model_validator(mode="after")
-    def _owner_rules(self) -> "Config":
-        if self.owner.account not in self.accounts:
-            raise ValueError(f"owner account {self.owner.account} must be listed under accounts")
-        for account_id, account in self.accounts.items():
-            if "ami" in account.owns and account_id != self.owner.account:
-                raise ValueError(f"only the owner account may own ami (found in {account.name})")
-            if "snapshot" in account.owns and "volume" not in account.owns:
-                # Snapshots are judged by whether their source volume still exists.
-                raise ValueError(
-                    f"{account.name} owns snapshot, so it must also own volume: Janitor needs "
-                    "its volumes to tell whether a snapshot's source volume still exists"
-                )
-        return self
+    @property
+    def regions(self) -> list[str]:
+        """Every account is scanned in the admin's regions."""
+        return self.admin.regions
 
     def account_name(self, account_id: str) -> str:
+        if account_id == self.admin.account:
+            return self.admin.name
         account = self.accounts.get(account_id)
         return account.name if account else account_id
-
-    def regions_for(self, account_id: str) -> list[str]:
-        return self.accounts[account_id].regions or self.owner.regions
 
 
 def load_config(path: str | Path | None = None) -> Config:
