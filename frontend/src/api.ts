@@ -113,18 +113,46 @@ export interface Meta {
   };
 }
 
+export interface Unresolved {
+  account: string;
+  region: string;
+  ref_type: string;
+  ref_id: string;
+  value: string;
+}
+
 export interface Scan {
   id: number;
   started_at: string;
   finished_at: string | null;
   provider: string;
-  status: string;
+  status: "running" | "ok" | "partial" | "failed" | string;
+  notes?: { error?: string; unresolved?: Unresolved[] };
+}
+
+export interface FailedCheck {
+  account: string;
+  account_name: string;
+  region: string;
+  kind: string;
+  error_kind: string;
+  message: string;
+}
+
+export interface ScanProgress {
+  scan: Scan | null;
+  running: boolean;
+  segments?: unknown[];
+  progress?: { done: number; failed: number };
 }
 
 export interface OverviewData {
   last_scan: Scan | null;
   scanning: boolean;
   types: { type: ResourceType; total: number; orphaned: number; orphaned_gib: number; orphaned_usd: number | null }[];
+  segments_failed?: FailedCheck[];
+  unresolved?: Unresolved[];
+  newest_failed?: { finished_at: string | null; message: string } | null;
 }
 
 export interface RuleHit {
@@ -255,7 +283,7 @@ export const api = {
   graph: (id: string) => request<Graph>(`/api/resources/${encodeURIComponent(id)}/graph`),
   exportJson: (params: URLSearchParams) => request<ExportData>(`/api/resources/export.json?${params}`),
   startScan: () => request<{ started: boolean }>("/api/scans", { method: "POST" }),
-  latestScan: () => request<{ scan: Scan | null; running: boolean }>("/api/scans/latest"),
+  latestScan: () => request<ScanProgress>("/api/scans/latest"),
   plan: (type: ResourceType, ids: string[]) =>
     request<Plan>("/api/actions/plan", { method: "POST", body: JSON.stringify({ type, ids }) }),
   simulate: (planId: string, confirmation: string) =>
@@ -270,14 +298,15 @@ export function exportCsvUrl(params: URLSearchParams): string {
   return `/api/resources/export.csv?${params}`;
 }
 
-/** Start a scan and wait until it finishes. */
-export async function runScan(): Promise<Scan | null> {
+/** Start a scan and wait until it finishes. A partial scan finished; a failed one throws its reason. */
+export async function runScan(onProgress?: (checksDone: number) => void): Promise<Scan | null> {
   await api.startScan();
   for (;;) {
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    const { scan, running } = await api.latestScan();
+    const { scan, running, progress } = await api.latestScan();
+    if (progress) onProgress?.(progress.done);
     if (!running) {
-      if (scan?.status === "failed") throw new Error("The scan failed. Check the server log, then scan again.");
+      if (scan?.status === "failed") throw new Error(scan.notes?.error ?? "The scan failed. Check the server log, then scan again.");
       return scan;
     }
   }

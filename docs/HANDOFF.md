@@ -16,17 +16,25 @@ Read this first, then the spec.
   [`docs/superpowers/plans/2026-10-07-ui-refresh.md`](superpowers/plans/2026-10-07-ui-refresh.md):
   Cloudscape replaced by Tailwind 4 + Radix + Recharts (in-repo kit in `frontend/src/ui/`);
   sidebar layout, KPI cards, filter pills, slide-over detail drawer, light and dark themes.
-- Run it: `make setup` once, then `make run` → http://127.0.0.1:8080 (mock data).
+- **Phase 3 (AWS provider)** on branch `phase-3` from
+  [`docs/superpowers/plans/2026-10-08-phase-3-aws-provider.md`](superpowers/plans/2026-10-08-phase-3-aws-provider.md):
+  read-only `AwsProvider` (AssumeRole with a Describe-only session policy, botocore guard), scan
+  segments with partial failures, `unknown` from failed checks, live re-check before a simulated
+  delete, and scan-health UI. Tested on moto; **the first real scan is the user's** (`make run-aws`).
+  Rules R6/R7/W1/W2/W3/W5, select-all-matching, help panel, and walkthrough are phase 3b.
+- Run it: `make setup` once, then `make run` → http://127.0.0.1:8080 (mock data), or
+  `make run-aws` with a real `config/janitor.yaml` (see README).
 
 ## Next step
 
 1. Phase 2 is built on branch `phase-2`; the user decides how to integrate it.
-2. Next: plan phase 3 (read-only AWS provider) from the roadmap. `make prices` and `make icons`
-   refresh the price list and the local AWS icons.
+2. Next: run the first real scan with `make run-aws`, then plan phase 3b. `make prices` and
+   `make icons` refresh the price list and the local AWS icons.
 3. Behind a TLS-inspecting proxy, Python alone fails with `CERTIFICATE_VERIFY_FAILED`. On macOS,
    `make prices` and `make icons` handle it: they export the system keychain's certificates to
    `.venv/trusted-certs.pem` and point `SSL_CERT_FILE` at it (verification stays on). Elsewhere,
-   set `SSL_CERT_FILE` to your organization's CA bundle.
+   set `SSL_CERT_FILE` to your organization's CA bundle. boto3 reads `AWS_CA_BUNDLE` instead;
+   `make run-aws` sets it from the keychain on macOS.
 
 ## Verified dependency pins (Python 3.12, checked 2026-10-06)
 

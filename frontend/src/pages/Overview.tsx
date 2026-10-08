@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import { api, runScan, type OverviewData, type Stats } from "../api";
 import StatusDonut from "../charts/StatusDonut";
 import AwsIcon from "../components/AwsIcon";
+import ScanHealth from "../components/ScanHealth";
 import { Kpi } from "../components/StatsHeader";
 import { formatDate, formatGiB, formatMoney } from "../format";
 import { TYPE_PAGES, type PageProps } from "../nav";
@@ -58,6 +59,9 @@ export default function Overview({ meta, notify }: PageProps) {
       <Card className="mx-auto mt-12 max-w-md p-10 text-center">
         <h2 className="text-lg font-semibold">No scan yet</h2>
         <p className="mt-1 text-[13px] text-muted">Janitor lists your AMIs, snapshots, and volumes, then explains each status.</p>
+        <div className="mt-4 text-left">
+          <ScanHealth data={data} meta={meta} />
+        </div>
         <Button variant="primary" className="mt-5" loading={scanning || data.scanning} onClick={scan}>
           Run first scan
         </Button>
@@ -81,6 +85,8 @@ export default function Overview({ meta, notify }: PageProps) {
           </span>
         )}
       </div>
+
+      {data && <ScanHealth data={data} meta={meta} />}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Kpi label="Resources" value={data ? total.toLocaleString() : "—"} detail="Across the four types" icon={Layers} />

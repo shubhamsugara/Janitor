@@ -28,4 +28,15 @@ describe("shell", () => {
     expect(screen.getByText("Mock data")).toBeTruthy();
     expect(screen.getByRole("button", { name: /Scan now/ })).toBeTruthy();
   });
+
+  it("flags a partial scan and shows scan progress", () => {
+    render(
+      <MemoryRouter>
+        <TopBar meta={meta} title="Overview" theme="light" scanning progress={12} partial onScan={() => {}} onToggleTheme={() => {}} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("link", { name: /Partial scan/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Scanning · 12 checks done/ })).toBeTruthy();
+  });
 });
+

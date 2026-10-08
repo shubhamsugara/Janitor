@@ -39,6 +39,8 @@ export default function App() {
   const [theme, setTheme] = useState<Theme>(savedTheme);
   const [collapsed, setCollapsed] = useState(savedCollapsed);
   const [scanning, setScanning] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
+  const [partial, setPartial] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -46,6 +48,13 @@ export default function App() {
     api.meta().then(setMeta).catch((e: Error) => setError(e.message));
   }, []);
   useEffect(() => applyTheme(theme), [theme]);
+  // The badge reflects the newest scan; it updates on load and after each scan.
+  useEffect(() => {
+    api
+      .latestScan()
+      .then(({ scan }) => setPartial(scan?.status === "partial"))
+      .catch(() => setPartial(false));
+  }, [refreshKey]);
   // A drawer belongs to the page it was opened on.
   useEffect(() => setSelectedId(null), [location.pathname]);
 
@@ -67,8 +76,9 @@ export default function App() {
 
   async function scan() {
     setScanning(true);
+    setProgress(null);
     try {
-      await runScan();
+      await runScan(setProgress);
       setRefreshKey((key) => key + 1); // remount the page so it reloads
       notify("success", "Scan finished.");
     } catch (e) {
@@ -114,6 +124,8 @@ export default function App() {
             title={TITLES[location.pathname] ?? "Janitor"}
             theme={theme}
             scanning={scanning}
+            progress={progress}
+            partial={partial}
             onScan={scan}
             onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
           />
