@@ -5,6 +5,7 @@ import type { Theme } from "../theme";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { cn } from "../ui/cn";
+import { Menu } from "../ui/dropdown";
 
 interface Props {
   meta: Meta | null;
@@ -15,9 +16,16 @@ interface Props {
   partial?: boolean; // the scan on screen has failed checks
   onScan: () => void;
   onToggleTheme: () => void;
+  onHelp?: (id: "open" | "tour" | "how") => void;
 }
 
-export default function TopBar({ meta, title, theme, scanning, progress, partial, onScan, onToggleTheme }: Props) {
+const HELP_ITEMS = [
+  { id: "open", label: "Open help", description: "About this page" },
+  { id: "tour", label: "Replay walkthrough", description: "Five steps through Janitor" },
+  { id: "how", label: "How Janitor decides", description: "Every status and rule" },
+];
+
+export default function TopBar({ meta, title, theme, scanning, progress, partial, onScan, onToggleTheme, onHelp }: Props) {
   const source = !meta ? "Connecting" : meta.provider === "mock" ? "Mock data" : "AWS · read-only";
   return (
     <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between gap-4 border-b border-line bg-page/80 px-8 backdrop-blur">
@@ -43,6 +51,7 @@ export default function TopBar({ meta, title, theme, scanning, progress, partial
           <RefreshCw className={cn("size-3.5", scanning && "animate-spin")} aria-hidden />
           {scanning ? (progress ? `Scanning · ${progress} checks done` : "Scanning") : "Scan now"}
         </Button>
+        {onHelp && <Menu label="Help" items={HELP_ITEMS} onSelect={(id) => onHelp(id as "open" | "tour" | "how")} />}
         <Button variant="ghost" size="icon" onClick={onToggleTheme} aria-label={theme === "dark" ? "Use light mode" : "Use dark mode"}>
           {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
         </Button>

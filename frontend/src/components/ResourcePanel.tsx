@@ -8,6 +8,7 @@ import { Table, TBody, Td, Th, THead, Tr } from "../ui/table";
 import { Tabs } from "../ui/tabs";
 import AwsIcon from "./AwsIcon";
 import CostBreakdown from "./CostBreakdown";
+import InfoLink from "./InfoLink";
 import { useDetail } from "../detail";
 import LinkageDiagram from "./LinkageDiagram";
 import StatusBadge, { OutcomeBadge } from "./StatusBadge";
@@ -189,7 +190,10 @@ export default function ResourcePanel({ id, meta, dark, onSelect }: Props) {
                   <TBody>
                     {detail.rules.map((rule) => (
                       <Tr key={rule.id}>
-                        <Td className="font-medium whitespace-nowrap">{`${rule.id} · ${rule.title}`}</Td>
+                        <Td className="font-medium whitespace-nowrap">
+                          {`${rule.id} · ${rule.title}`}
+                          <InfoLink topic={`rule:${rule.id}`} label={rule.title.toLowerCase()} className="ml-1" />
+                        </Td>
                         <Td>
                           <OutcomeBadge outcome={rule.outcome} />
                         </Td>

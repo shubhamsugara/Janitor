@@ -4,10 +4,12 @@ import type { Meta, Stats } from "../api";
 import BarList from "../charts/BarList";
 import StatusDonut from "../charts/StatusDonut";
 import { accountName, formatGiB, formatMoney } from "../format";
+import type { HelpTopic } from "../help";
 import { Card, CardBody, CardHeader } from "../ui/card";
 import { cn } from "../ui/cn";
+import InfoLink from "./InfoLink";
 
-export function Kpi({ label, value, detail, icon: Icon, tone = "neutral" }: { label: string; value: ReactNode; detail: string; icon: LucideIcon; tone?: "neutral" | "danger" | "warning" | "accent" }) {
+export function Kpi({ label, value, detail, icon: Icon, tone = "neutral", help }: { label: string; value: ReactNode; detail: string; icon: LucideIcon; tone?: "neutral" | "danger" | "warning" | "accent"; help?: HelpTopic }) {
   const tones = {
     neutral: "bg-subtle text-muted",
     danger: "bg-red-500/10 text-red-600 dark:text-red-400",
@@ -17,7 +19,10 @@ export function Kpi({ label, value, detail, icon: Icon, tone = "neutral" }: { la
   return (
     <Card className="p-5">
       <div className="flex items-center justify-between">
-        <span className="text-[13px] font-medium text-muted">{label}</span>
+        <span className="text-[13px] font-medium text-muted">
+          {label}
+          {help && <InfoLink topic={help} label={label.toLowerCase()} className="ml-1" />}
+        </span>
         <span className={cn("flex size-8 items-center justify-center rounded-lg", tones[tone])}>
           <Icon className="size-4" aria-hidden />
         </span>
@@ -33,16 +38,17 @@ export default function StatsHeader({ stats, meta }: { stats: Stats; meta: Meta 
   return (
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi label="Matching" value={stats.total.toLocaleString()} detail={formatGiB(stats.size_gib)} icon={Layers} />
-        <Kpi label="Orphaned" value={stats.orphaned.toLocaleString()} detail={formatGiB(stats.orphaned_gib)} icon={TriangleAlert} tone="danger" />
+        <Kpi label="Matching" value={stats.total.toLocaleString()} detail={formatGiB(stats.size_gib)} icon={Layers} help="stat:matching" />
+        <Kpi label="Orphaned" value={stats.orphaned.toLocaleString()} detail={formatGiB(stats.orphaned_gib)} icon={TriangleAlert} tone="danger" help="stat:orphaned" />
         <Kpi
           label="Waste"
           value={stats.orphaned_usd == null ? "—" : `~${formatMoney(stats.orphaned_usd)}`}
           detail="Orphaned resources, per month"
           icon={CircleDollarSign}
           tone="warning"
+          help="stat:waste"
         />
-        <Kpi label="Blocked · deletable" value={`${stats.blocked.toLocaleString()} · ${stats.deletable.toLocaleString()}`} detail="By the delete rules" icon={ShieldCheck} tone="accent" />
+        <Kpi label="Blocked · deletable" value={`${stats.blocked.toLocaleString()} · ${stats.deletable.toLocaleString()}`} detail="By the delete rules" icon={ShieldCheck} tone="accent" help="stat:decisions" />
       </div>
       <Card>
         <CardHeader title="Breakdown" description="For the resources that match your filters. Costs are monthly estimates." />

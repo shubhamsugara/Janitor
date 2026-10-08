@@ -5,6 +5,7 @@ import { formatGiB, formatUsd, plural } from "../format";
 import { Button } from "../ui/button";
 import { Dialog } from "../ui/dialog";
 import { Input } from "../ui/input";
+import InfoLink from "./InfoLink";
 
 interface Props {
   plan: Plan;
@@ -37,14 +38,21 @@ function ItemList({ title, items, blocked }: { title: string; items: PlanItem[];
       </summary>
       <ul className="divide-y divide-line border-t border-line">
         {items.map((item) => {
-          const notes = item.rules.filter((r) => r.outcome === (blocked ? "block" : "warn")).map((r) => r.message);
+          const notes = item.rules.filter((r) => r.outcome === (blocked ? "block" : "warn"));
           return (
             <li key={item.id} className="px-4 py-2.5 text-[13px]">
               <span className="font-medium">{item.name || item.id}</span>
               <span className="text-muted"> · {item.region}</span>
               {item.parent && <span className="text-muted">{` · backing snapshot of ${item.parent}`}</span>}
               {notes.length > 0 && (
-                <div className={blocked ? "mt-0.5 text-red-600 dark:text-red-400" : "mt-0.5 text-amber-700 dark:text-amber-400"}>{notes.join(" ")}</div>
+                <div className={blocked ? "mt-0.5 text-red-600 dark:text-red-400" : "mt-0.5 text-amber-700 dark:text-amber-400"}>
+                  {notes.map((note) => (
+                    <span key={note.rule_id} className="mr-1">
+                      {note.message}
+                      <InfoLink topic={`rule:${note.rule_id}`} label={`rule ${note.rule_id}`} />
+                    </span>
+                  ))}
+                </div>
               )}
             </li>
           );

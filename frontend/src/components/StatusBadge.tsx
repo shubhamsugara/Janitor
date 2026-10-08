@@ -1,4 +1,5 @@
 import type { Meta, Outcome, ResourceType, Status } from "../api";
+import { useHelp } from "../help";
 import { OutcomePill, StatusPill } from "../ui/pills";
 import { Popover } from "../ui/popover";
 
@@ -12,6 +13,7 @@ interface Props {
 /** A status pill whose popover explains the status, using the server's definitions. */
 export default function StatusBadge({ meta, type, status, reason }: Props) {
   const def = meta.definitions.statuses[status];
+  const help = useHelp();
   return (
     <Popover
       className="w-80 text-[13px]"
@@ -37,6 +39,9 @@ export default function StatusBadge({ meta, type, status, reason }: Props) {
           </div>
           <p>{def.what_to_do}</p>
         </div>
+        <button type="button" onClick={() => help.open(`status:${status}`)} className="text-[13px] font-medium text-accent hover:underline">
+          Learn more
+        </button>
       </div>
     </Popover>
   );

@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Route, Routes, useLocation } from "react-router";
+import { Route, Routes, useLocation, useNavigate } from "react-router";
 import { api, runScan, type Meta } from "./api";
+import HelpPanel from "./components/HelpPanel";
 import ResourcePanel from "./components/ResourcePanel";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
 import { DetailContext, type DetailApi } from "./detail";
+import { HelpContext, type HelpApi, type HelpTopic } from "./help";
 import { TYPE_PAGES } from "./nav";
 import Audit from "./pages/Audit";
 import Deployments from "./pages/Deployments";
@@ -35,6 +37,7 @@ function savedCollapsed(): boolean {
 
 export default function App() {
   const location = useLocation();
+  const navigate = useNavigate();
   const notify = useToast();
   const [meta, setMeta] = useState<Meta | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +48,8 @@ export default function App() {
   const [partial, setPartial] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [helpTopic, setHelpTopic] = useState<HelpTopic | null>(null);
+  const helpApi: HelpApi = useMemo(() => ({ open: setHelpTopic }), []);
 
   // Reloaded after each scan: accounts are discovered during scans, and the filters list them.
   useEffect(() => {
@@ -76,6 +81,14 @@ export default function App() {
     () => ({ selectedId, open: setSelectedId, close: () => setSelectedId(null) }),
     [selectedId],
   );
+
+  function onHelp(id: "open" | "tour" | "how") {
+    if (id === "how") navigate("/how-it-works");
+    if (id === "open") {
+      const page = TYPE_PAGES.find((p) => p.path === location.pathname);
+      setHelpTopic(page ? `page:${page.type}` : "page:overview");
+    }
+  }
 
   async function scan() {
     setScanning(true);
@@ -119,6 +132,7 @@ export default function App() {
   }
 
   return (
+    <HelpContext.Provider value={helpApi}>
     <DetailContext.Provider value={detailApi}>
       <div className="flex h-full">
         <Sidebar collapsed={collapsed} onToggle={toggleSidebar} />
@@ -132,6 +146,7 @@ export default function App() {
             partial={partial}
             onScan={scan}
             onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+            onHelp={onHelp}
           />
           <main className="mx-auto w-full max-w-[1400px] flex-1 px-8 py-6">{content}</main>
         </div>
@@ -139,6 +154,8 @@ export default function App() {
       <Sheet open={Boolean(selectedId && meta)} onClose={() => setSelectedId(null)} title="Resource details">
         {selectedId && meta && <ResourcePanel id={selectedId} meta={meta} dark={theme === "dark"} onSelect={setSelectedId} />}
       </Sheet>
+      {helpTopic && meta && <HelpPanel topic={helpTopic} meta={meta} onClose={() => setHelpTopic(null)} />}
     </DetailContext.Provider>
+    </HelpContext.Provider>
   );
 }
