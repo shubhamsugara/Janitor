@@ -29,13 +29,20 @@ Read this first, then the spec.
   from launch permissions and reached from the same source login as the admin (per-account `role` override); only instances make an AMI in use
   (templates, ASGs, launch configs add warning W6 "Referenced"); the diagram shows an AMI's own
   links, with usage grouped under accounts.
+- **Config follow-ups** (same branch, after real scans): an account entry can name an AWS
+  `profile` (its role_arn and role_session_name win) and its own `regions` (default: admin's);
+  usage is also checked wherever an admin AMI is shared with the account. `ignore_accounts` are
+  never contacted and don't hold an AMI back (warning W7 instead). An account listed twice in
+  janitor.yaml is refused with the line number. Each page's Account filter lists only accounts
+  that have that type, and hides when there is one.
 - Run it: `make setup` once, then `make run` → http://127.0.0.1:8080 (mock data), or
   `make run-aws` with a real `config/janitor.yaml` (see README).
 
 ## Next step
 
 1. Phase 2 is built on branch `phase-2`; the user decides how to integrate it.
-2. Next: run the first real scan with `make run-aws`, then plan phase 3b. `make prices` and
+2. The user has run real scans and accepted the views. Next: decide how to integrate
+   `phase-3`, then plan phase 3b. `make prices` and
    `make icons` refresh the price list and the local AWS icons.
 3. Behind a TLS-inspecting proxy, Python alone fails with `CERTIFICATE_VERIFY_FAILED`. On macOS,
    `make prices` and `make icons` handle it: they export the system keychain's certificates to
