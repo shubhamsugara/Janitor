@@ -2,6 +2,7 @@
 
 import hashlib
 import uuid
+from collections.abc import Callable
 from datetime import datetime
 
 from janitor.config import Config
@@ -210,7 +211,28 @@ def make_plan(store: Store, config: Config, ids: list[str], now: datetime) -> di
     return plan
 
 
-def simulate(store: Store, config: Config, plan_id: str, confirmation: str) -> dict:
+def _with_shares(store: Store, scan_id: int, item: dict) -> dict:
+    """AMIs carry their scanned launch permissions, so the re-check can spot new ones."""
+    if item["type"] != "ami":
+        return item
+    shares = store.shares_for(scan_id, item["id"])
+    return item | {
+        "shares": [{"principal_type": s.principal_type, "principal": s.principal} for s in shares]
+    }
+
+
+def _no_recheck(items: list[dict]) -> dict[str, str]:
+    return {}
+
+
+def simulate(
+    store: Store,
+    config: Config,
+    plan_id: str,
+    confirmation: str,
+    recheck: Callable[[list[dict]], dict[str, str]] = _no_recheck,
+) -> dict:
+    """Record what would be deleted. `recheck` re-reads items live (AWS mode) just before."""
     saved = store.get_plan(plan_id)
     if saved is None:
         raise PlanError(404, "That plan doesn't exist. Plan the delete again.")
@@ -234,6 +256,15 @@ def simulate(store: Store, config: Config, plan_id: str, confirmation: str) -> d
         hit = next((h for h in current.get(item_id, []) if h.outcome == "block"), None)
         if hit:
             now_blocked[item_id] = (RULES_BY_ID[hit.rule_id].title, hit.message)
+
+    # Live re-check: anything that changed in AWS since the scan is skipped, with the reason.
+    live = [
+        _with_shares(store, plan["scan_id"], i)
+        for i in plan["deletable"]
+        if i["id"] not in now_blocked and i["parent"] not in now_blocked
+    ]
+    for item_id, reason in (recheck(live) if live else {}).items():
+        now_blocked.setdefault(item_id, ("Changed since the scan", reason))
 
     skipped = []
     for i in plan["blocked"]:

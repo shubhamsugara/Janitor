@@ -519,3 +519,29 @@ def test_aws_mode_refuses_profiles_without_a_role(tmp_path, monkeypatch):
     monkeypatch.setenv("JANITOR_PROVIDER", "aws")
     with pytest.raises(ProfileError, match="example-dev"):
         create_app(_settings(tmp_path), clock=lambda: NOW)
+
+
+def test_live_recheck_skips_a_changed_ami_and_keeps_its_snapshots(tmp_path, config):
+    store = Store(tmp_path / "j.db")
+    from janitor.providers.mock import MockProvider
+
+    Scanner(store, MockProvider(SEED, clock=lambda: NOW), config, clock=lambda: NOW).run()
+    ami = store.query_resources(store.latest_scan()["id"], {"q": f"base-linux-{stamp(120)}"})[0][0]
+    made = plans.make_plan(store, config, [ami.id], NOW)
+    seen = []
+
+    def recheck(items):
+        seen.extend(items)
+        return {ami.id: "Instance i-1 in dev now uses it."}
+
+    result = plans.simulate(store, config, made["plan_id"], "", recheck=recheck)
+    assert {i["id"] for i in seen} == {i["id"] for i in made["deletable"]}
+    ami_seen = next(i for i in seen if i["id"] == ami.id)
+    assert {s["principal"] for s in ami_seen["shares"]} >= {"222222222222"}
+    assert result["would_delete"] == []
+    reasons = {s["id"]: (s["rule"], s["reason"]) for s in result["skipped"]}
+    assert reasons[ami.id] == ("Changed since the scan", "Instance i-1 in dev now uses it.")
+    snap = next(i["id"] for i in made["deletable"] if i["parent"] == ami.id)
+    assert reasons[snap][1] == f"Kept because {ami.id} is now blocked."
+    entry = store.list_audit(1, 1)[0][0]
+    assert {i["id"]: i["outcome"] for i in entry["payload"]["items"]}[ami.id] == "skipped"

@@ -186,3 +186,98 @@ def test_every_operation_sent_is_listed_and_read_only(aws, monkeypatch):
     assert sent - {"AssumeRole"} <= OPERATIONS
     assert "AssumeRole" in sent
     assert all(op.startswith(ALLOWED_PREFIXES) for op in OPERATIONS)
+
+
+def item(resource_id, type, account, region="us-east-1", **extra):
+    return {
+        "id": resource_id,
+        "type": type,
+        "account": account,
+        "region": region,
+        "name": resource_id,
+        **extra,
+    }
+
+
+def test_recheck_finds_deleted_and_newly_attached_volumes(aws):
+    ec2 = account_session(DEV).client("ec2")
+    gone = ec2.create_volume(AvailabilityZone="us-east-1a", Size=1)["VolumeId"]
+    ec2.delete_volume(VolumeId=gone)
+    attached = ec2.create_volume(AvailabilityZone="us-east-1a", Size=1)["VolumeId"]
+    instance = ec2.run_instances(ImageId=MOTO_BASE_AMI, MinCount=1, MaxCount=1)["Instances"][0]
+    ec2.attach_volume(VolumeId=attached, InstanceId=instance["InstanceId"], Device="/dev/sdf")
+    quiet = ec2.create_volume(AvailabilityZone="us-east-1a", Size=1)["VolumeId"]
+    snap = ec2.create_snapshot(VolumeId=quiet)["SnapshotId"]
+
+    reasons = AwsProvider(make_config(), clock=lambda: NOW).recheck(
+        [
+            item(gone, "volume", DEV),
+            item(attached, "volume", DEV),
+            item(quiet, "volume", DEV),
+            item(snap, "snapshot", DEV),
+        ]
+    )
+    assert reasons == {
+        gone: "It no longer exists.",
+        attached: f"It is now attached to {instance['InstanceId']}.",
+    }
+
+
+def test_recheck_finds_new_use_and_new_launch_permissions(aws):
+    world = build_world()
+    tools = account_session(TOOLS).client("ec2")
+    builder = tools.run_instances(ImageId=MOTO_BASE_AMI, MinCount=1, MaxCount=1)["Instances"][0]
+    quiet = tools.create_image(InstanceId=builder["InstanceId"], Name="quiet")["ImageId"]
+    widened = tools.create_image(InstanceId=builder["InstanceId"], Name="widened")["ImageId"]
+    tools.modify_image_attribute(ImageId=widened, LaunchPermission={"Add": [{"Group": "all"}]})
+    dev_share = [{"principal_type": "account", "principal": DEV}]
+
+    reasons = AwsProvider(make_config(), clock=lambda: NOW).recheck(
+        [
+            item(world["ami"], "ami", TOOLS, shares=dev_share),
+            item(quiet, "ami", TOOLS, shares=[]),
+            item(widened, "ami", TOOLS, shares=[]),
+        ]
+    )
+    assert reasons == {
+        world["ami"]: f"Instance {world['used_by']} in dev now uses it.",
+        widened: "Its launch permissions changed since the scan.",
+    }
+
+
+def test_recheck_rds_snapshot_that_is_gone(aws):
+    rds = account_session(DEV).client("rds")
+    rds.create_db_instance(
+        DBInstanceIdentifier="orders",
+        DBInstanceClass="db.t3.micro",
+        Engine="postgres",
+        AllocatedStorage=20,
+        MasterUsername="admin1",
+        MasterUserPassword="password1",
+    )
+    kept = rds.create_db_snapshot(DBInstanceIdentifier="orders", DBSnapshotIdentifier="kept")[
+        "DBSnapshot"
+    ]
+    arn = f"arn:aws:rds:us-east-1:{DEV}:snapshot:gone"
+    reasons = AwsProvider(make_config(), clock=lambda: NOW).recheck(
+        [
+            {**item(arn, "rds_snapshot", DEV), "name": "gone"},
+            {**item(kept["DBSnapshotArn"], "rds_snapshot", DEV), "name": "kept"},
+        ]
+    )
+    assert reasons == {arn: "It no longer exists."}
+
+
+def test_recheck_reports_accounts_it_cant_reach(aws):
+    config_file = aws / "aws-config"
+    config_file.write_text(
+        config_file.read_text().replace(
+            f"role_arn = arn:aws:iam::{DEV}:role/janitor-read\nsource_profile = example-base",
+            f"role_arn = arn:aws:iam::{DEV}:role/janitor-read\nsource_profile = example-nokeys",
+        )
+        + "[profile example-nokeys]\nregion = us-east-1\n"
+    )
+    reasons = AwsProvider(make_config(), clock=lambda: NOW).recheck(
+        [item("vol-0abc", "volume", DEV)]
+    )
+    assert reasons["vol-0abc"].startswith("Janitor couldn't re-check it live: ")

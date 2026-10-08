@@ -135,7 +135,154 @@ class AwsProvider:
         )
 
     def recheck(self, items: list[dict]) -> dict[str, str]:
-        return {}
+        """Re-read would-delete items just before a simulated delete; {id: reason} to skip.
+
+        Existence, volume attachment, AMI launch permissions, and instances now running an AMI.
+        Launch templates and ASGs are not re-read (that is a full usage scan); the scan covered
+        them. Anything Janitor can't re-check is skipped with the reason.
+        """
+        config = self._config
+        groups: dict[tuple[str, str], list[dict]] = {}
+        for item in items:
+            groups.setdefault((item["account"], item["region"]), []).append(item)
+        users = {
+            (account, i["region"])
+            for i in items
+            if i["type"] == "ami"
+            for account in self._permitted(i)
+        }
+        accounts = sorted({a for a, _ in groups} | {a for a, _ in users})
+        sessions = self._assume_all(accounts)
+        reasons: dict[str, str] = {}
+
+        def unreachable(group: list[dict], exc: Exception) -> None:
+            detail = normalize.classify(exc)[1].strip().rstrip(".")
+            for i in group:
+                reasons.setdefault(i["id"], f"Janitor couldn't re-check it live: {detail}.")
+
+        for (account, region), group in groups.items():
+            try:
+                found = sessions[account]
+                if isinstance(found, Exception):
+                    raise found
+                reasons |= self._recheck_group(found, region, group)
+            except Exception as exc:
+                unreachable(group, exc)
+
+        amis = [i for i in items if i["type"] == "ami" and i["id"] not in reasons]
+        for account, region in sorted(users):
+            here = [i for i in amis if i["region"] == region and account in self._permitted(i)]
+            if not here:
+                continue
+            try:
+                found = sessions[account]
+                if isinstance(found, Exception):
+                    raise found
+                ec2 = self._client(found, "ec2", region)
+                running = self._pages(
+                    ec2,
+                    "describe_instances",
+                    "Reservations",
+                    Filters=[
+                        {"Name": "image-id", "Values": [i["id"] for i in here]},
+                        {"Name": "instance-state-name", "Values": LIVE_STATES},
+                    ],
+                )
+                for use in normalize.instance_usage(
+                    list(running), account, region, {i["id"] for i in here}
+                ):
+                    reasons.setdefault(
+                        use.image_id,
+                        f"Instance {use.ref_id} in {config.account_name(account)} now uses it.",
+                    )
+            except Exception as exc:
+                unreachable([i for i in here if i["id"] not in reasons], exc)
+        return reasons
+
+    def _permitted(self, ami: dict) -> set[str]:
+        """The owner plus scanned accounts the scan saw in the AMI's launch permissions."""
+        accounts = {ami["account"]}
+        for share in ami.get("shares") or []:
+            if (
+                share["principal_type"] == "account"
+                and share["principal"] in self._config.accounts
+                and ami["region"] in self._config.regions_for(share["principal"])
+            ):
+                accounts.add(share["principal"])
+        return accounts
+
+    def _recheck_group(self, sess: boto3.Session, region: str, group: list[dict]) -> dict[str, str]:
+        gone = "It no longer exists."
+        reasons: dict[str, str] = {}
+        ids = {t: [i["id"] for i in group if i["type"] == t] for t in ("ami", "snapshot", "volume")}
+        ec2 = self._client(sess, "ec2", region)
+        if ids["volume"]:
+            live = {
+                v["VolumeId"]: v
+                for v in self._pages(
+                    ec2,
+                    "describe_volumes",
+                    "Volumes",
+                    Filters=[{"Name": "volume-id", "Values": ids["volume"]}],
+                )
+            }
+            for vid in ids["volume"]:
+                if vid not in live:
+                    reasons[vid] = gone
+                elif attached := normalize.volume(live[vid], "", region).attached_instance:
+                    reasons[vid] = f"It is now attached to {attached}."
+        if ids["snapshot"]:
+            live = {
+                s["SnapshotId"]
+                for s in self._pages(
+                    ec2,
+                    "describe_snapshots",
+                    "Snapshots",
+                    OwnerIds=["self"],
+                    Filters=[{"Name": "snapshot-id", "Values": ids["snapshot"]}],
+                )
+            }
+            reasons |= {sid: gone for sid in ids["snapshot"] if sid not in live}
+        if ids["ami"]:
+            live = {
+                img["ImageId"]
+                for img in self._pages(
+                    ec2,
+                    "describe_images",
+                    "Images",
+                    Owners=["self"],
+                    Filters=[{"Name": "image-id", "Values": ids["ami"]}],
+                )
+            }
+            for ami in (i for i in group if i["type"] == "ami"):
+                if ami["id"] not in live:
+                    reasons[ami["id"]] = gone
+                    continue
+                perms = ec2.describe_image_attribute(
+                    ImageId=ami["id"], Attribute="launchPermission"
+                )
+                now = {
+                    (s.principal_type, s.principal)
+                    for s in normalize.shares(ami["id"], perms.get("LaunchPermissions") or [])
+                }
+                then = {(s["principal_type"], s["principal"]) for s in ami.get("shares") or []}
+                if now - then:
+                    reasons[ami["id"]] = "Its launch permissions changed since the scan."
+        rds_items = [i for i in group if i["type"] == "rds_snapshot"]
+        if rds_items:
+            rds = self._client(sess, "rds", region)
+            for snap in rds_items:
+                cluster = ":cluster-snapshot:" in snap["id"]
+                try:
+                    if cluster:
+                        rds.describe_db_cluster_snapshots(DBClusterSnapshotIdentifier=snap["name"])
+                    else:
+                        rds.describe_db_snapshots(DBSnapshotIdentifier=snap["name"])
+                except rds.exceptions.ClientError as exc:
+                    if "NotFound" not in exc.response.get("Error", {}).get("Code", ""):
+                        raise
+                    reasons[snap["id"]] = gone
+        return reasons
 
     # Sessions and clients
 
