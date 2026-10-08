@@ -597,3 +597,12 @@ def test_asg_and_ecs_deployments_name_their_unit():
     [asg] = n.asg_deployments(groups, TEMPLATES, VERSIONS, {}, DEV, "us-east-1", TAGS, "dev")
     ecs = n.ecs_deployment(service(), taskdef(), DEV, "us-east-1", TAGS, "dev")
     assert (asg.unit, ecs.unit) == ("asg", "service")
+
+
+def test_restore_accounts_reads_restore_attribute():
+    attrs = [
+        {"AttributeName": "restore", "AttributeValues": ["222222222222", "all"]},
+        {"AttributeName": "other", "AttributeValues": ["x"]},
+    ]
+    assert n.restore_accounts(attrs) == ["222222222222", "all"]
+    assert n.restore_accounts([]) == []

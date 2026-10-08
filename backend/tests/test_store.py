@@ -332,3 +332,13 @@ def test_deployments_round_trip_and_are_pruned_with_their_scan(tmp_path):
         later = store.start_scan("mock")
         store.finish_scan(later, "ok")
     assert store.deployments(first) == []
+
+
+def test_shared_with_round_trips(tmp_path):
+    store = Store(tmp_path / "j.db")
+    scan_id = store.start_scan("mock")
+    snap = res("arn:rds:1", type="rds_snapshot", shared_with=["222222222222", "all"])
+    store.save_inventory(scan_id, [snap, res("vol-9")], [], [])
+    got = {r.id: r for r in store.all_resources(scan_id)}
+    assert got["arn:rds:1"].shared_with == ["222222222222", "all"]
+    assert got["vol-9"].shared_with == []

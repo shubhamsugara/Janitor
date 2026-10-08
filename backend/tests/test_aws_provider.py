@@ -487,3 +487,32 @@ def test_members_are_reached_even_when_the_admin_role_is_denied(aws, monkeypatch
     sessions = AwsProvider(make_config(), clock=lambda: NOW)._sessions([DEV])
     assert isinstance(sessions[TOOLS], Exception)
     assert not isinstance(sessions[DEV], Exception)
+
+
+def test_manual_rds_snapshot_shares_are_read(aws):
+    build_world()
+    rds = account_session(DEV).client("rds")
+    rds.modify_db_snapshot_attribute(
+        DBSnapshotIdentifier="orders-snap", AttributeName="restore", ValuesToAdd=["333333333333"]
+    )
+    rds.modify_db_cluster_snapshot_attribute(
+        DBClusterSnapshotIdentifier="billing-snap", AttributeName="restore", ValuesToAdd=["all"]
+    )
+    inventory = AwsProvider(make_config(), clock=lambda: NOW).list_inventory()
+    snaps = {r.name: r for r in inventory.resources if r.type == "rds_snapshot"}
+    assert snaps["orders-snap"].shared_with == ["333333333333"]
+    assert snaps["billing-snap"].shared_with == ["all"]
+
+
+def test_automated_snapshot_makes_no_attribute_call(aws, monkeypatch):
+    build_world()
+    calls = record_calls(monkeypatch)
+    inventory = AwsProvider(make_config(), clock=lambda: NOW).list_inventory()
+    automated = [r for r in inventory.resources if r.managed_by == "rds_automated"]
+    assert automated  # moto makes one per database
+    asked = [
+        params.get("DBSnapshotIdentifier") or params.get("DBClusterSnapshotIdentifier")
+        for op, params in calls
+        if op in ("DescribeDBSnapshotAttributes", "DescribeDBClusterSnapshotAttributes")
+    ]
+    assert sorted(asked) == ["billing-snap", "orders-snap"]

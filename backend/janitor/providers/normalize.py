@@ -144,6 +144,14 @@ def db_snapshot(raw: dict, account: str, region: str, cluster: bool, now: dateti
     )
 
 
+def restore_accounts(attributes: list[dict]) -> list[str]:
+    """Who can restore a manual RDS snapshot: account IDs, or "all" when it is public."""
+    for attribute in attributes:
+        if attribute.get("AttributeName") == "restore":
+            return list(attribute.get("AttributeValues") or [])
+    return []
+
+
 def database(raw: dict, account: str, region: str, cluster: bool) -> Database:
     key = "DBClusterIdentifier" if cluster else "DBInstanceIdentifier"
     return Database(raw[key], account, region, "cluster" if cluster else "instance")

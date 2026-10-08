@@ -199,8 +199,10 @@ class Seed:
         automated=False,
         managed_by=None,
         tags=None,
+        shared_with=None,
     ):
         name = f"rds:{db_id}-{stamp(days)}" if automated else f"{db_id}-{stamp(days)}"
+        shared = {"shared_with": shared_with} if shared_with else {}  # manual only (W5)
         arn_kind = "cluster-snapshot" if kind == "cluster" else "snapshot"
         return self.add(
             id=f"arn:aws:rds:{region}:{account}:{arn_kind}:{name}",
@@ -215,6 +217,7 @@ class Seed:
             source_db_id=db_id,
             db_kind=kind,
             managed_by="rds_automated" if automated else managed_by,
+            **shared,
         )
 
     def asg(
@@ -524,14 +527,18 @@ def build() -> dict:
     s.database(DEV, EAST, "dev-orders")
     s.rds_snapshot(DEV, EAST, "dev-orders", 1, automated=True)
     s.rds_snapshot(DEV, EAST, "dev-orders", 2, automated=True)
-    s.rds_snapshot(DEV, EAST, "dev-orders", 95)  # idle: database exists
+    s.rds_snapshot(DEV, EAST, "dev-orders", 95, shared_with=[QAS])  # idle; shared (W5)
     s.rds_snapshot(DEV, EAST, "dev-orders", 60, tags={})  # idle, no owner tag
-    s.rds_snapshot(DEV, EAST, "dev-legacy", 300)  # orphaned: database deleted
+    s.rds_snapshot(
+        DEV, EAST, "dev-legacy", 300, shared_with=[UAT, QAS]
+    )  # orphaned: database deleted; shared (W5)
     s.rds_snapshot(
         DEV, EAST, "dev-legacy", 200
     )  # orphaned: newest copy of a deleted database
     s.database(DEV, EAST, "dev-analytics", "cluster")
-    s.rds_snapshot(DEV, EAST, "dev-analytics", 40, kind="cluster", size=120)
+    s.rds_snapshot(
+        DEV, EAST, "dev-analytics", 40, kind="cluster", size=120, shared_with=["all"]
+    )  # public (W5)
     s.rds_snapshot(DEV, EAST, "dev-reports", 120, kind="cluster", size=80)  # orphaned
     s.rds_snapshot(
         DEV, EAST, "dev-reports", 10, kind="cluster", size=80

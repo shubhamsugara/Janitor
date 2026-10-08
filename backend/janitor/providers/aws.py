@@ -37,6 +37,8 @@ OPERATIONS = frozenset(
         "DescribeVolumes",
         "DescribeDBSnapshots",
         "DescribeDBClusterSnapshots",
+        "DescribeDBSnapshotAttributes",
+        "DescribeDBClusterSnapshotAttributes",
         "DescribeDBInstances",
         "DescribeDBClusters",
         "DescribeInstances",
@@ -415,7 +417,22 @@ class AwsProvider:
             normalize.db_snapshot(raw, account, region, cluster=True, now=now)
             for raw in self._pages(rds, "describe_db_cluster_snapshots", "DBClusterSnapshots")
         ]
+        for snap in found:
+            if snap.managed_by is None:  # automated and AWS Backup snapshots can't be shared
+                snap.shared_with = self._restore_accounts(rds, snap)
         return _Rows(resources=found)
+
+    def _restore_accounts(self, rds, snap: Resource) -> list[str]:
+        """Who else can restore it (rule W5): one Describe call per manual snapshot."""
+        if snap.db_kind == "cluster":
+            result = rds.describe_db_cluster_snapshot_attributes(
+                DBClusterSnapshotIdentifier=snap.name
+            )["DBClusterSnapshotAttributesResult"]["DBClusterSnapshotAttributes"]
+        else:
+            result = rds.describe_db_snapshot_attributes(DBSnapshotIdentifier=snap.name)[
+                "DBSnapshotAttributesResult"
+            ]["DBSnapshotAttributes"]
+        return normalize.restore_accounts(result)
 
     def _databases(self, sess: boto3.Session, account: str, region: str) -> _Rows:
         rds = self._client(sess, "rds", region)

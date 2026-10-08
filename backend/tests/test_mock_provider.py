@@ -117,3 +117,10 @@ def test_mock_counts_ecs_services_in_their_checks(config):
     inventory = MockProvider(SEED, clock=lambda: NOW, config=config).list_inventory()
     ecs = {(s.account, s.region): s.items for s in inventory.segments if s.kind == "ecs"}
     assert ecs[("333333333333", "us-east-1")] == 3  # orders-api, billing-svc blue and green
+
+
+def test_seed_has_shared_rds_snapshots(inventory):
+    shared = [r for r in inventory.resources if r.type == "rds_snapshot" and r.shared_with]
+    assert any("all" in r.shared_with for r in shared)
+    assert any(r.shared_with and "all" not in r.shared_with for r in shared)
+    assert all(r.managed_by is None for r in shared)  # only manual snapshots can be shared

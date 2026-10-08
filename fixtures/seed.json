@@ -1109,7 +1109,10 @@
    },
    "source_db_id": "dev-orders",
    "db_kind": "instance",
-   "managed_by": null
+   "managed_by": null,
+   "shared_with": [
+    "777777777777"
+   ]
   },
   {
    "id": "arn:aws:rds:us-east-1:222222222222:snapshot:dev-orders-20260802000000",
@@ -1139,7 +1142,11 @@
    },
    "source_db_id": "dev-legacy",
    "db_kind": "instance",
-   "managed_by": null
+   "managed_by": null,
+   "shared_with": [
+    "666666666666",
+    "777777777777"
+   ]
   },
   {
    "id": "arn:aws:rds:us-east-1:222222222222:snapshot:dev-legacy-20260315000000",
@@ -1171,7 +1178,10 @@
    },
    "source_db_id": "dev-analytics",
    "db_kind": "cluster",
-   "managed_by": null
+   "managed_by": null,
+   "shared_with": [
+    "all"
+   ]
   },
   {
    "id": "arn:aws:rds:us-east-1:222222222222:cluster-snapshot:dev-reports-20260603000000",
