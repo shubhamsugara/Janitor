@@ -547,3 +547,53 @@ def test_ecs_version_falls_back_to_the_image_tag_and_env_to_the_service_tag():
 )
 def test_ecs_state(svc, state):
     assert n.ecs_deployment(svc, taskdef(), DEV, "us-east-1", TAGS, "dev").state == state
+
+
+def instance(iid, state="running", **tags):
+    return {
+        "InstanceId": iid,
+        "ImageId": "ami-0aaa",
+        "State": {"Name": state},
+        "LaunchTime": WHEN,
+        "Tags": [{"Key": k.replace("_", "-"), "Value": v} for k, v in tags.items()],
+    }
+
+
+def test_instances_outside_any_asg_are_deployments():
+    in_asg = instance("i-1", role="web")
+    in_asg["Tags"].append({"Key": "aws:autoscaling:groupName", "Value": "dev-web-1.2.0-7"})
+    lone = instance("i-2", role="bastion", version="1.0", Name="tools-bastion")
+    lone["Tags"] += [
+        {"Key": "aws:ec2launchtemplate:id", "Value": "lt-1"},
+        {"Key": "aws:ec2launchtemplate:version", "Value": "3"},
+    ]
+    stopped = instance("i-3", state="stopped", Name="jump-box")
+    untagged = instance("i-4")
+    going = instance("i-5", state="shutting-down", Name="old")
+    reservations = [{"Instances": [in_asg, lone]}, {"Instances": [stopped, untagged, going]}]
+    found = n.standalone_instances(reservations, TEMPLATES, TOOLS, "us-east-1", TAGS, "admin")
+    assert [(d.unit, d.app, d.name, d.version, d.desired, d.running) for d in found] == [
+        ("instance", "bastion", "tools-bastion", "1.0", 1, 1),
+        ("instance", "jump-box", "jump-box", "", 0, 0),
+        ("instance", "i-4", "i-4", "", 1, 1),
+    ]
+    lone = found[0]
+    assert (lone.kind, lone.env, lone.state, lone.resource_id) == (
+        "ec2",
+        "admin",
+        "deployed",
+        "i-2",
+    )
+    assert (lone.ami_id, lone.launch_template, lone.launch_template_version) == (
+        "ami-0aaa",
+        "web",
+        "3",
+    )
+    assert lone.created_at == "2026-01-31T12:00:00Z"
+
+
+def test_asg_and_ecs_deployments_name_their_unit():
+    groups = [tagged("g", role="web", deploy_state="deployed")]
+    [asg] = n.asg_deployments(groups, TEMPLATES, VERSIONS, {}, DEV, "us-east-1", TAGS, "dev")
+    ecs = n.ecs_deployment(service(), taskdef(), DEV, "us-east-1", TAGS, "dev")
+    assert (asg.unit, ecs.unit) == ("asg", "service")

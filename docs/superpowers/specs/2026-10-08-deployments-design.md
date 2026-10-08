@@ -46,6 +46,13 @@ scope: showing them needs `events:List*` as well.
 Only ASGs that carry the `tags.state` key are deployments; other ASGs (node groups, hand-made
 groups) are ignored, as the deploy tool's own listing does.
 
+**Instances in no ASG** (no `aws:autoscaling:groupName` tag) are deployments too, one row each,
+`unit = "instance"`: hand-made servers, older strategies, bastions, a DR server kept stopped.
+App is the first `tags.app`, else `Name`, else the instance ID; desired is 1 while pending or
+running, running is 1 while running. They come from the usage check's instance list: no new
+calls. Each row's `unit` is `asg`, `instance`, or `service`. Target group membership is not
+read (it would need `elasticloadbalancing:Describe*`).
+
 Config, with these defaults (`janitor.example.yaml` documents them):
 
 ```yaml
@@ -92,6 +99,9 @@ deployments:
 - A cell shows the live version. "Live" means any state except `undeployed`, newest first. Two
   live rows (a switch in progress) show `old → new`. In-progress and failed cells get a colored
   badge. A cell with only undeployed rows shows "Not running" and its last version.
+- Every cell shows how many instances or tasks run ("2 instances", "6 tasks"), summed across
+  its rows, and a "N standalone" badge for instances in no ASG. Versions running side by side
+  are listed newest first; `old → new` is only for a switch (a deploying or undeploying row).
 - Next to the deploy state, a **run status** from desired and running counts: running, `1 of 3
   running`, Stopped (scaled to 0), `Stopping: N still running`, or `No instances/tasks running`
   (wants some, has none). The deploy state alone misled: an ASG stays `deployed` after it is

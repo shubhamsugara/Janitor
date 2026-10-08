@@ -261,7 +261,7 @@ export interface ExportData {
 
 export type DeploymentState = "deploying" | "deployed" | "undeploying" | "undeployed" | "failed";
 
-/** An ASG a deploy tool tagged, or an ECS service. Shown as found; never judged. */
+/** An ASG a deploy tool tagged, an instance in no ASG, or an ECS service. Shown as found; never judged. */
 export interface Deployment {
   kind: "ec2" | "ecs";
   account: string;
@@ -284,6 +284,7 @@ export interface Deployment {
   cluster: string;
   task_definition: string;
   image: string;
+  unit: "asg" | "instance" | "service"; // instance: an EC2 instance in no Auto Scaling group
 }
 
 export interface DeploymentsData {

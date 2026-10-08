@@ -432,13 +432,15 @@ class AwsProvider:
         ec2 = self._client(sess, "ec2", region)
         autoscaling = self._client(sess, "autoscaling", region)
         rows = _Rows()
-        reservations = self._pages(
-            ec2,
-            "describe_instances",
-            "Reservations",
-            Filters=[{"Name": "instance-state-name", "Values": LIVE_STATES}],
+        reservations = list(
+            self._pages(
+                ec2,
+                "describe_instances",
+                "Reservations",
+                Filters=[{"Name": "instance-state-name", "Values": LIVE_STATES}],
+            )
         )
-        rows.usage += normalize.instance_usage(list(reservations), account, region, ami_ids)
+        rows.usage += normalize.instance_usage(reservations, account, region, ami_ids)
 
         templates = list(self._pages(ec2, "describe_launch_templates", "LaunchTemplates"))
         groups = list(self._pages(autoscaling, "describe_auto_scaling_groups", "AutoScalingGroups"))
@@ -469,7 +471,12 @@ class AwsProvider:
         rows.usage += found
         rows.unresolved += unresolved
         rows.usage += normalize.launch_config_usage(configs, account, region, ami_ids)
-        # The same pages hold the EC2 deployments: ASGs a deploy tool tagged with a state.
+        # The same pages hold the EC2 deployments: ASGs a deploy tool tagged with a state, and
+        # instances in no ASG.
+        keys, env = self._config.deployments.tags, self._config.account_name(account)
+        rows.deployments += normalize.standalone_instances(
+            reservations, templates, account, region, keys, env
+        )
         rows.deployments += normalize.asg_deployments(
             groups,
             templates,
@@ -477,8 +484,8 @@ class AwsProvider:
             by_name,
             account,
             region,
-            self._config.deployments.tags,
-            self._config.account_name(account),
+            keys,
+            env,
         )
         return rows
 

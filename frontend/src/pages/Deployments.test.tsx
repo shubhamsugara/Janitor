@@ -34,6 +34,7 @@ function dep(over: Partial<Deployment>): Deployment {
     cluster: "",
     task_definition: "",
     image: "",
+    unit: "asg",
     ...over,
   };
 }
@@ -87,6 +88,19 @@ describe("Deployments", () => {
     expect(await screen.findByText("Stopped")).toBeTruthy();
     expect(screen.getByText("No tasks running")).toBeTruthy();
     expect(screen.queryByText("2 of 2 running")).toBeNull(); // the expected case stays quiet in the grid
+    expect(screen.getByText("2 instances")).toBeTruthy(); // but the count always shows
+  });
+
+  it("marks instances in no ASG and describes them in the drawer", async () => {
+    renderWith({
+      scan_id: 1,
+      items: [dep({ unit: "instance", resource_id: "i-0abc", name: "tools-bastion", app: "tools-bastion", version: "", desired: 1, running: 1 })],
+      failed: [],
+    });
+    expect(await screen.findByText("1 standalone")).toBeTruthy();
+    fireEvent.click(screen.getByText("No version tag"));
+    expect(await screen.findByText("i-0abc")).toBeTruthy();
+    expect(screen.getByText("None: this instance isn't in an Auto Scaling group")).toBeTruthy();
   });
 
   it("filters by kind from the URL", async () => {

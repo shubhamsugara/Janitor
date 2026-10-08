@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Deployment } from "./api";
-import { cellLabel, columnsOf, compareVersions, filterItems, rowsOf, runStatus } from "./deployments";
+import { cellLabel, cellSummary, columnsOf, compareVersions, filterItems, rowsOf, runStatus } from "./deployments";
 
 const DEV = "222222222222";
 const PRD = "333333333333";
@@ -29,6 +29,7 @@ function dep(over: Partial<Deployment>): Deployment {
     cluster: "",
     task_definition: "",
     image: "",
+    unit: "asg",
     ...over,
   };
 }
@@ -136,5 +137,25 @@ describe("runStatus", () => {
     expect(runStatus(dep({ desired: 2, running: 0 }))).toEqual({ key: "down", label: "No instances running" });
     expect(runStatus(dep({ kind: "ecs", desired: 2, running: 0 }))).toEqual({ key: "down", label: "No tasks running" });
     expect(runStatus(dep({ desired: 0, running: 1 }))).toEqual({ key: "stopping", label: "Stopping: 1 still running" });
+  });
+});
+
+describe("cellSummary", () => {
+  it("counts what runs across the cell, and the instances in no ASG", () => {
+    const [row] = rowsOf([
+      dep({ version: "3.2.0", desired: 2, running: 2, created_at: "2026-09-30T00:00:00Z" }),
+      dep({ unit: "instance", version: "3.0.9", desired: 1, running: 1 }),
+      dep({ unit: "instance", version: "3.0.2", desired: 0, running: 0 }),
+    ]);
+    const cell = Object.values(row.cells)[0];
+    expect(cellLabel(cell)).toBe("3.2.0, 3.0.9, 3.0.2"); // not a switch: several things run side by side
+    expect(cellSummary(cell)).toEqual({ count: "3 instances", standalone: 2, run: { key: "running", label: "3 of 3 running" } });
+  });
+
+  it("says tasks for ECS and one instance in the singular", () => {
+    const ecs = rowsOf([dep({ kind: "ecs", unit: "service", desired: 6, running: 6 })])[0];
+    expect(cellSummary(Object.values(ecs.cells)[0]).count).toBe("6 tasks");
+    const one = rowsOf([dep({ unit: "instance", desired: 1, running: 1 })])[0];
+    expect(cellSummary(Object.values(one.cells)[0])).toMatchObject({ count: "1 instance", standalone: 1 });
   });
 });

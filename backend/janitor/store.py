@@ -24,7 +24,7 @@ from janitor.models import (
     format_ts,
 )
 
-SCHEMA_VERSION = 6  # bump when a scan table changes shape; old scan data is dropped
+SCHEMA_VERSION = 7  # bump when a scan table changes shape; old scan data is dropped
 RESOURCE_FIELDS = [f.name for f in fields(Resource)]
 DEPLOYMENT_FIELDS = [f.name for f in fields(Deployment)]
 JSON_FIELDS = {"tags", "snapshot_ids", "cost_breakdown"}
@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS deployments (
   resource_id TEXT NOT NULL, name TEXT NOT NULL, created_at TEXT NOT NULL,
   desired INTEGER NOT NULL, running INTEGER NOT NULL, deployment_id TEXT NOT NULL,
   launch_template TEXT NOT NULL, launch_template_version TEXT NOT NULL, ami_id TEXT,
-  cluster TEXT NOT NULL, task_definition TEXT NOT NULL, image TEXT NOT NULL);
+  cluster TEXT NOT NULL, task_definition TEXT NOT NULL, image TEXT NOT NULL, unit TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS policy_results (
   scan_id INTEGER NOT NULL, resource_id TEXT NOT NULL, rule_id TEXT NOT NULL,
   outcome TEXT NOT NULL, message TEXT NOT NULL);

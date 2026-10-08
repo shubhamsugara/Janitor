@@ -57,7 +57,7 @@ The Deployments page is a grid of apps by env and region, from the same scan:
 - **EC2 apps** are Auto Scaling groups your deploy tool tagged with a state (`deploy-state` by
   default: `deploying`, `deployed`, `undeploying`, `undeployed`). Janitor reads their app, env,
   version, and deployment ID tags, the launch template version they pin, and its AMI. Other
-  groups are ignored.
+  groups are ignored. Instances in no Auto Scaling group are listed too, marked standalone.
 - **ECS apps** are services, with the version from their task definition's tags (or the image
   tag). A service scaled to 0, like the standby side of a blue/green pair, is an earlier version.
 

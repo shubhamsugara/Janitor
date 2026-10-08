@@ -59,12 +59,28 @@ function Details({ d, meta }: { d: Deployment; meta: Meta }) {
       <div className="flex items-center justify-between gap-3 border-b border-line pb-2">
         <div className="font-mono text-[13px] font-medium">{d.version || "No version tag"}</div>
         <span className="flex gap-1.5">
-          <Badge tone={state.tone}>{state.label}</Badge>
+          {d.unit === "instance" ? <Badge>Standalone</Badge> : <Badge tone={state.tone}>{state.label}</Badge>}
           <Badge tone={RUN_TONES[run.key]}>{run.label}</Badge>
         </span>
       </div>
       <dl className="pt-1">
-        {d.kind === "ec2" ? (
+        {d.unit === "instance" ? (
+          <>
+            <Field label="Instance">
+              <span className="font-mono text-xs">{d.resource_id}</span>
+              {d.name !== d.resource_id && <span className="text-muted"> ({d.name})</span>}
+            </Field>
+            <Field label="Auto Scaling group">None: this instance isn't in an Auto Scaling group</Field>
+            {d.launch_template && (
+              <Field label="Launch template">
+                {d.launch_template}, version {d.launch_template_version || "unknown"}
+              </Field>
+            )}
+            <Field label="AMI">
+              <Ami d={d} meta={meta} />
+            </Field>
+          </>
+        ) : d.kind === "ec2" ? (
           <>
             <Field label="Auto Scaling group">{d.name}</Field>
             {d.deployment_id && <Field label="Deployment ID">{d.deployment_id}</Field>}

@@ -208,13 +208,14 @@ def test_deployments_from_tagged_asgs_and_ecs_services(aws):
     found = sorted(
         (d.kind, d.account, d.region, d.env, d.app, d.version, d.state)
         for d in inventory.deployments
+        if d.unit != "instance"
     )
     assert found == [
         ("ec2", DEV, "us-east-1", "dev", "web", "1.1.0", "undeployed"),
         ("ec2", DEV, "us-east-1", "dev", "web", "1.2.0", "deployed"),
         ("ecs", DEV, "us-east-1", "dev", "orders-api", "2.7.0", "deploying"),  # moto: rolling out
     ]
-    live = next(d for d in inventory.deployments if d.state == "deployed" and d.kind == "ec2")
+    live = next(d for d in inventory.deployments if d.state == "deployed" and d.unit == "asg")
     assert (live.ami_id, live.launch_template, live.launch_template_version) == (
         world["ami"],
         "web",
@@ -223,6 +224,26 @@ def test_deployments_from_tagged_asgs_and_ecs_services(aws):
     assert (live.deployment_id, live.desired) == ("2", 1)
     ecs = next(d for d in inventory.deployments if d.kind == "ecs")
     assert (ecs.cluster, ecs.task_definition, ecs.desired) == ("apps", "orders-api:1", 2)
+
+
+def test_instances_in_no_asg_are_deployments_and_asg_instances_are_not(aws):
+    world = build_world()
+    build_deployments(world["ami"])
+    inventory = AwsProvider(make_config(), clock=lambda: NOW).list_inventory()
+    lone = {
+        (d.account, d.resource_id, d.unit) for d in inventory.deployments if d.unit == "instance"
+    }
+    # tools' image builder and dev's instance; never the instance dev-web-1.2.0-2 launched
+    assert {(a, r) for a, r, _ in lone} >= {(DEV, world["used_by"])}
+    assert all(r.startswith("i-") for _, r, _ in lone)
+    asg_instances = (
+        account_session(DEV)
+        .client("autoscaling")
+        .describe_auto_scaling_groups(AutoScalingGroupNames=["dev-web-1.2.0-2"])[
+            "AutoScalingGroups"
+        ][0]["Instances"]
+    )
+    assert asg_instances and not {i["InstanceId"] for i in asg_instances} & {r for _, r, _ in lone}
 
 
 def test_an_ecs_check_that_fails_doesnt_touch_amis(aws, monkeypatch):

@@ -98,12 +98,29 @@ export function runStatus(d: Deployment): { key: RunKey; label: string } {
   return { key: d.running < d.desired ? "partial" : "running", label: `${d.running} of ${d.desired} running` };
 }
 
-/** What a cell shows: the live version, `old → new` during a switch, or "Not running". */
+/** What a cell shows: `old → new` during a switch, else every live version (newest first), or
+ * "Not running". Instances in no ASG run beside a deployment, so their versions are listed. */
 export function cellLabel(cell: Cell): string {
   const [newest, previous] = cell.live;
   if (!newest) return "Not running";
-  if (previous && previous.version !== newest.version) return `${previous.version || "?"} → ${newest.version || "?"}`;
-  return newest.version || "No version tag";
+  const switching = cell.live.length === 2 && cell.live.some((d) => d.state === "deploying" || d.state === "undeploying");
+  if (switching && previous.version !== newest.version) return `${previous.version || "?"} → ${newest.version || "?"}`;
+  const versions = [...new Set(cell.live.map((d) => d.version).filter(Boolean))].sort((a, b) => compareVersions(b, a));
+  return versions.join(", ") || "No version tag";
+}
+
+/** How many instances or tasks run in a cell, how many instances are in no ASG, and the run
+ * status of the cell as a whole. */
+export function cellSummary(cell: Cell): { count: string; standalone: number; run: ReturnType<typeof runStatus> } {
+  const running = cell.live.reduce((n, d) => n + d.running, 0);
+  const desired = cell.live.reduce((n, d) => n + d.desired, 0);
+  const ecs = cell.live.length > 0 && cell.live.every((d) => d.kind === "ecs");
+  const unit = ecs ? (running === 1 ? "task" : "tasks") : running === 1 ? "instance" : "instances";
+  return {
+    count: `${running} ${unit}`,
+    standalone: cell.live.filter((d) => d.unit === "instance").length,
+    run: runStatus({ ...cell.live[0], kind: ecs ? "ecs" : "ec2", desired, running }),
+  };
 }
 
 export function filterItems(items: Deployment[], f: DeploymentFilters): Deployment[] {

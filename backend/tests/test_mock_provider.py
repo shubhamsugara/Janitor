@@ -104,7 +104,12 @@ def test_seed_deployments_cover_both_kinds_and_every_state(inventory):
     }
     ec2_amis = {d.ami_id for d in deployments if d.kind == "ec2"}
     used = {(u.image_id, u.ref_name) for u in inventory.usage if u.ref_type == "asg"}
-    assert all((d.ami_id, d.name) in used for d in deployments if d.kind == "ec2")
+    assert all((d.ami_id, d.name) in used for d in deployments if d.unit == "asg")
+    # instances in no ASG are the seed's instance users, with the same IDs
+    instances = {(u.image_id, u.ref_id) for u in inventory.usage if u.ref_type == "instance"}
+    lone = {(d.ami_id, d.resource_id) for d in deployments if d.unit == "instance"}
+    assert lone and lone <= instances
+    assert {d.unit for d in deployments} == {"asg", "instance", "service"}
     assert ec2_amis <= {r.id for r in inventory.resources}
 
 

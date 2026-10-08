@@ -5,8 +5,9 @@ Every status per type appears, plus the demo moments: an in-use AMI with running
 stopped users, a prod-tagged volume, a dangling copied snapshot, snapshots of a deleted
 database, and an AMI shared with an account Janitor doesn't scan.
 
-Deployments: EC2 apps (tagged ASGs, each also an `asg` user of its AMI) and ECS services, with
-a switch in progress, a failed rollout, version drift, a blue/green standby, and old versions.
+Deployments: EC2 apps (tagged ASGs, each also an `asg` user of its AMI), instances in no ASG,
+and ECS services, with a switch in progress, a failed rollout, version drift, a blue/green
+standby, a stopped server, and old versions.
 """
 
 import json
@@ -240,9 +241,33 @@ class Seed:
                 "launch_template": f"{env}-{app}",
                 "launch_template_version": str(n),
                 "ami_id": ami,
+                "unit": "asg",
             }
         )
         self.use(ami, account, region, "asg", name, "active" if desired else "inactive")
+
+    def lone(self, ref_name, env, app, version):
+        """An instance in no ASG, from its usage row (same ID, AMI, and place)."""
+        use = next(u for u in self.usage if u["ref_name"] == ref_name)
+        running = use["ref_state"] == "running"
+        self.deployments.append(
+            {
+                "kind": "ec2",
+                "account": use["account"],
+                "region": use["region"],
+                "env": env,
+                "app": app,
+                "version": version,
+                "state": "deployed",
+                "resource_id": use["ref_id"],
+                "name": ref_name,
+                "created_at": ts(60),
+                "desired": int(running),
+                "running": int(running),
+                "ami_id": use["image_id"],
+                "unit": "instance",
+            }
+        )
 
     def service(
         self, account, region, env, app, version, state, days, *, desired=2, name=None
@@ -267,6 +292,7 @@ class Seed:
                 "cluster": "apps",
                 "task_definition": f"{app}:{revision}",
                 "image": f"registry.example/{app}:{version}",
+                "unit": "service",
             }
         )
 
@@ -615,6 +641,14 @@ def deployments(s: Seed, base: str, web: str, west_base: str) -> None:
     # reports: a small ECS service in two envs.
     s.service(DEV, EAST, "dev", "reports", "0.9.2", "deployed", 1, desired=1)
     s.service(UAT, EAST, "uat", "reports", "0.9.1", "deployed", 10, desired=1)
+
+    # Instances in no ASG: a bastion, an old api server beside the ASGs, and prd's DR and EU
+    # servers (DR kept stopped).
+    s.lone("tools-bastion", "tools", "tools-bastion", "")
+    s.lone("dev-api-1", "dev", "api", "3.0.9")
+    s.lone("qas-api-1", "qas", "api", "3.0.2")
+    s.lone("prd-dr-api-1", "prd", "api", "3.0.5")
+    s.lone("prd-eu-api-1", "prd", "api", "3.0.5")
 
 
 def main() -> None:

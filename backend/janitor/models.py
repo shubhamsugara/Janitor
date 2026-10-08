@@ -101,7 +101,8 @@ class Unresolved:
 
 @dataclass
 class Deployment:
-    """One deploy of an app: an ASG a deploy tool tagged, or an ECS service. Shown, never judged."""
+    """One deploy of an app: an ASG a deploy tool tagged, an instance in no ASG, or an ECS service.
+    Shown, never judged."""
 
     kind: str  # "ec2" or "ecs"
     account: str
@@ -122,6 +123,7 @@ class Deployment:
     cluster: str = ""  # ecs
     task_definition: str = ""  # ecs: family:revision
     image: str = ""  # ecs: the first container's image
+    unit: str = ""  # "asg", "instance" (in no ASG), or "service"
 
 
 @dataclass

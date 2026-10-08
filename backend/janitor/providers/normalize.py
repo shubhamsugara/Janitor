@@ -368,8 +368,53 @@ def asg_deployments(
                 launch_template=template_name,
                 launch_template_version="" if number is None else str(number),
                 ami_id=None if not image_id or image_id.startswith(SSM) else image_id,
+                unit="asg",
             )
         )
+    return found
+
+
+def standalone_instances(
+    reservations: list[dict],
+    templates: list[dict],
+    account: str,
+    region: str,
+    keys: DeploymentTags,
+    fallback_env: str,
+) -> list[Deployment]:
+    """Instances in no ASG: hand-made servers, older deploy strategies, bastions. One row each."""
+    names = {t["LaunchTemplateId"]: t["LaunchTemplateName"] for t in templates}
+    found = []
+    for reservation in reservations:
+        for raw in reservation.get("Instances") or []:
+            tags = _tags(raw)
+            state = (raw.get("State") or {}).get("Name", "")
+            if "aws:autoscaling:groupName" in tags or state in ("shutting-down", "terminated"):
+                continue
+            iid = raw["InstanceId"]
+            name = tags.get("Name") or iid
+            template_id = tags.get("aws:ec2launchtemplate:id", "")
+            found.append(
+                Deployment(
+                    kind="ec2",
+                    account=account,
+                    region=region,
+                    env=_first(tags, keys.env) or fallback_env,
+                    app=_first(tags, keys.app) or name,
+                    version=_first(tags, keys.version),
+                    state="deployed",  # it exists; whether it runs is desired/running
+                    resource_id=iid,
+                    name=name,
+                    created_at=_ts(raw["LaunchTime"]) if raw.get("LaunchTime") else "",
+                    desired=int(state in ("pending", "running")),
+                    running=int(state == "running"),
+                    deployment_id=tags.get(keys.deployment_id, ""),
+                    launch_template=names.get(template_id, template_id),
+                    launch_template_version=tags.get("aws:ec2launchtemplate:version", ""),
+                    ami_id=raw.get("ImageId"),
+                    unit="instance",
+                )
+            )
     return found
 
 
@@ -425,6 +470,7 @@ def ecs_deployment(
         cluster=service.get("clusterArn", "").rpartition("/")[2],
         task_definition=f"{family.partition(':')[0]}:{revision}" if revision else family,
         image=image,
+        unit="service",
     )
 
 
