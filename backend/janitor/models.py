@@ -73,11 +73,38 @@ class Database:
 
 
 @dataclass
+class Segment:
+    """One (account, region, kind) slice of a scan. A failed segment contributes no rows."""
+
+    account: str
+    region: str
+    kind: str  # "ami", "snapshot", "volume", "rds_snapshot", "database", or "usage"
+    ok: bool
+    items: int = 0
+    error_kind: str = ""  # "expired", "denied", "throttled", "blocked", or "other"
+    error: str = ""
+    duration_ms: int = 0
+
+
+@dataclass
+class Unresolved:
+    """An image reference Janitor can't read, such as resolve:ssm:/golden/web."""
+
+    account: str
+    region: str
+    ref_type: str  # "launch_template" or "asg"
+    ref_id: str
+    value: str
+
+
+@dataclass
 class Inventory:
     resources: list[Resource]
     shares: list[Share]
     usage: list[Usage]
     databases: list[Database]
+    segments: list[Segment] = field(default_factory=list)
+    unresolved: list[Unresolved] = field(default_factory=list)
 
 
 @dataclass
