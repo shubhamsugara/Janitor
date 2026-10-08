@@ -47,7 +47,7 @@ Read this first, then the spec.
   Janitor decides. **Follow-ups, not built:** target group membership for instances (needs
   `elasticloadbalancing:Describe*`, the user's call), ECS rolling history from earlier task
   definition revisions, and scheduled/task-only apps (needs `events:List*`).
-- **Phase 3b** on branch `phase-3b` from
+- **Phase 3b** (merged to `main`) from
   [`docs/superpowers/plans/2026-10-08-phase-3b.md`](superpowers/plans/2026-10-08-phase-3b.md):
   rules R6 (keep the 3 newest per AMI name group), R7, W1, W2, W3, W5 from a per-scan rule
   context; manual RDS snapshot shares; name pattern, source AMI, and source DB filters;
@@ -58,8 +58,8 @@ Read this first, then the spec.
 
 ## Next step
 
-1. Phases 1–3 and Deployments are merged to `main` (not pushed). Phase 3b is on `phase-3b`.
-2. Next: try phase 3b on a real scan (`make run-aws`), decide how to integrate it, then plan
+1. Phases 1–3b and Deployments are merged to `main` (not pushed).
+2. Next: try phase 3b on a real scan (`make run-aws`), then plan
    phase 4. `make prices` and `make icons` refresh the price list and the local AWS icons.
 3. Behind a TLS-inspecting proxy, Python alone fails with `CERTIFICATE_VERIFY_FAILED`. On macOS,
    `make prices` and `make icons` handle it: they export the system keychain's certificates to
