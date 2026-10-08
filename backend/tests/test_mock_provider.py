@@ -6,6 +6,7 @@ import pytest
 from helpers import NOW, ROOT, SEED
 
 from janitor.models import TYPES, parse_ts
+from janitor.providers.aws import AwsProvider
 from janitor.providers.base import CloudProvider
 from janitor.providers.mock import MockProvider
 
@@ -28,11 +29,11 @@ def test_timestamps_shift_with_the_clock():
     assert parse_ts(later.created_at) - parse_ts(first.created_at) == timedelta(days=10)
 
 
-@pytest.mark.parametrize("cls", [CloudProvider, MockProvider])
+@pytest.mark.parametrize("cls", [CloudProvider, MockProvider, AwsProvider])
 def test_provider_interface_is_read_only(cls):
-    """Lock 1 (spec §10): the only callable is a read. Update this list deliberately."""
+    """Lock 1 (spec §10): the only callables are reads. Update this list deliberately."""
     methods = [n for n in dir(cls) if not n.startswith("_") and callable(getattr(cls, n))]
-    assert methods == ["list_inventory"]
+    assert methods == ["list_inventory", "recheck"]
 
 
 def test_seed_file_matches_generator():
@@ -58,3 +59,25 @@ def test_seed_has_running_and_stopped_users(inventory):
     volumes = [r for r in inventory.resources if r.type == "volume"]
     assert any(v.volume_type == "io2" and v.iops for v in volumes)
     assert any(r.storage_tier == "archive" for r in inventory.resources)
+
+
+def test_mock_reports_one_ok_segment_per_planned_check(config):
+    from janitor.providers.base import phase_one
+
+    seen = []
+    inventory = MockProvider(SEED, clock=lambda: NOW).list_inventory(on_segment=seen.append)
+    kinds = {(s.account, s.region, s.kind) for s in inventory.segments}
+    assert set(phase_one(config)) <= kinds
+    assert ("111111111111", "us-east-1", "usage") in kinds
+    assert all(s.ok for s in inventory.segments)
+    assert len(seen) == len(inventory.segments)
+    volumes = next(s for s in inventory.segments if s.kind == "volume" and s.items)
+    assert volumes.items == sum(
+        1
+        for r in inventory.resources
+        if (r.type, r.account, r.region) == ("volume", volumes.account, volumes.region)
+    )
+
+
+def test_mock_recheck_finds_nothing_changed():
+    assert MockProvider(SEED).recheck([{"id": "vol-1", "type": "volume"}]) == {}

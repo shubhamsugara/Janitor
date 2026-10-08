@@ -5,21 +5,68 @@ was generated and the demo looks the same on any day.
 """
 
 import json
+from collections import Counter
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
-from janitor.models import Database, Inventory, Resource, Share, Usage, format_ts, parse_ts
+from janitor.config import Config, load_config
+from janitor.models import (
+    Database,
+    Inventory,
+    Resource,
+    Segment,
+    Share,
+    Usage,
+    format_ts,
+    parse_ts,
+)
+from janitor.providers.base import OnSegment, phase_one, usage_pairs
+
+EXAMPLE = Path(__file__).resolve().parents[3] / "config" / "janitor.example.yaml"
 
 
 class MockProvider:
     name = "mock"
 
-    def __init__(self, seed_path: str | Path, clock: Callable[[], datetime] | None = None):
+    def __init__(
+        self,
+        seed_path: str | Path,
+        clock: Callable[[], datetime] | None = None,
+        config: Config | None = None,
+    ):
         self._seed = json.loads(Path(seed_path).read_text())
         self._clock = clock or (lambda: datetime.now(UTC))
+        self._config = config
 
-    def list_inventory(self) -> Inventory:
+    def list_inventory(self, on_segment: OnSegment | None = None) -> Inventory:
+        inventory = self._read()
+        inventory.segments = self._segments(inventory)
+        for seg in inventory.segments:
+            if on_segment:
+                on_segment(seg)
+        return inventory
+
+    def recheck(self, items: list[dict]) -> dict[str, str]:
+        return {}  # the fixture never changes behind Janitor's back
+
+    def _segments(self, inv: Inventory) -> list[Segment]:
+        """Every check the AWS provider would run, all ok, with the rows each would return."""
+        config = self._config or load_config(EXAMPLE)
+        counts: Counter = Counter()
+        for r in inv.resources:
+            counts[(r.account, r.region, r.type)] += 1
+        for d in inv.databases:
+            counts[(d.account, d.region, "database")] += 1
+        for u in inv.usage:
+            counts[(u.account, u.region, "usage")] += 1
+        amis = [r for r in inv.resources if r.type == "ami"]
+        planned = phase_one(config) + [
+            (account, region, "usage") for account, region in usage_pairs(config, amis, inv.shares)
+        ]
+        return [Segment(a, r, k, ok=True, items=counts[(a, r, k)]) for a, r, k in planned]
+
+    def _read(self) -> Inventory:
         shift = self._clock() - parse_ts(self._seed["anchor"])
         resources = []
         for item in self._seed["resources"]:

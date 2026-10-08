@@ -25,6 +25,7 @@ def write_aws_config(tmp_path, monkeypatch, accounts: dict[str, str]) -> None:
     monkeypatch.setenv("AWS_CONFIG_FILE", str(config))
     monkeypatch.setenv("AWS_SHARED_CREDENTIALS_FILE", str(tmp_path / "aws-credentials"))
     monkeypatch.setenv("AWS_DEFAULT_REGION", "us-east-1")
+    monkeypatch.setenv("AWS_EC2_METADATA_DISABLED", "true")  # no slow instance-metadata lookups
     for key in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_PROFILE"):
         monkeypatch.delenv(key, raising=False)
 
@@ -40,3 +41,21 @@ def record_calls(monkeypatch) -> list[tuple[str, dict]]:
 
     monkeypatch.setattr(BaseClient, "_make_api_call", wrapper)
     return calls
+
+
+def account_session(account_id: str, region: str = "us-east-1"):
+    """An unguarded moto session inside an account, for creating test resources."""
+    import boto3
+
+    sts = boto3.client(
+        "sts", region_name=region, aws_access_key_id="testing", aws_secret_access_key="testing"
+    )
+    creds = sts.assume_role(
+        RoleArn=f"arn:aws:iam::{account_id}:role/setup", RoleSessionName="setup"
+    )["Credentials"]
+    return boto3.Session(
+        aws_access_key_id=creds["AccessKeyId"],
+        aws_secret_access_key=creds["SecretAccessKey"],
+        aws_session_token=creds["SessionToken"],
+        region_name=region,
+    )
