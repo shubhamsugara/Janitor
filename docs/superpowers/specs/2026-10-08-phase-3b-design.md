@@ -61,7 +61,7 @@ I/O. `recompute_rules` builds it from the store, so policy edits still apply wit
   and read the `restore` attribute: account IDs, or `all` for public. This is part of the
   existing `rds_snapshot` segment; a failure there fails that segment as today.
 - `Resource.shared_with: list[str]` (RDS snapshot; `"all"` means public). Store column
-  `shared_with` (JSON), `SCHEMA_VERSION` 6.
+  `shared_with` (JSON), `SCHEMA_VERSION` 8.
 - Read-only locks: both operations start with `Describe`, and the session policy already allows
   `rds:Describe*`. No lock changes.
 - Mock seed: a few manual RDS snapshots shared with other fake accounts, one public.
