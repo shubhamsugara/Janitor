@@ -74,6 +74,21 @@ describe("Deployments", () => {
     expect(screen.getAllByText("prd")).toHaveLength(2); // the env tag, shown per deployment
   });
 
+  it("says when a deployed app isn't running", async () => {
+    renderWith({
+      scan_id: 1,
+      items: [
+        dep({ name: "dev-api", version: "3.1.0", desired: 0, running: 0 }),
+        dep({ kind: "ecs", name: "orders", app: "orders", version: "2.0", desired: 2, running: 0, ami_id: null, ami: null }),
+        dep({ name: "web", app: "web", version: "1.0", desired: 2, running: 2 }),
+      ],
+      failed: [],
+    });
+    expect(await screen.findByText("Stopped")).toBeTruthy();
+    expect(screen.getByText("No tasks running")).toBeTruthy();
+    expect(screen.queryByText("2 of 2 running")).toBeNull(); // the expected case stays quiet in the grid
+  });
+
   it("filters by kind from the URL", async () => {
     renderWith({ scan_id: 1, items, failed: [] }, "/deployments?kind=ecs");
     expect(await screen.findByText("orders-api")).toBeTruthy();

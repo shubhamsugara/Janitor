@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import type { Deployment, DeploymentState, Meta } from "../api";
-import type { Cell } from "../deployments";
+import { runStatus, type Cell, type RunKey } from "../deployments";
 import { formatDate } from "../format";
 import { Badge } from "../ui/badge";
 import { Card } from "../ui/card";
@@ -13,6 +13,14 @@ export const STATES: Record<DeploymentState, { label: string; tone: "neutral" | 
   undeploying: { label: "Draining", tone: "warning" },
   undeployed: { label: "Undeployed", tone: "neutral" },
   failed: { label: "Failed", tone: "danger" },
+};
+
+export const RUN_TONES: Record<RunKey, "neutral" | "success" | "warning" | "danger"> = {
+  running: "success",
+  partial: "warning",
+  stopped: "neutral",
+  stopping: "warning",
+  down: "danger",
 };
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -45,11 +53,15 @@ function Ami({ d, meta }: { d: Deployment; meta: Meta }) {
 
 function Details({ d, meta }: { d: Deployment; meta: Meta }) {
   const state = STATES[d.state];
+  const run = runStatus(d);
   return (
     <Card className="px-5 py-3">
       <div className="flex items-center justify-between gap-3 border-b border-line pb-2">
         <div className="font-mono text-[13px] font-medium">{d.version || "No version tag"}</div>
-        <Badge tone={state.tone}>{state.label}</Badge>
+        <span className="flex gap-1.5">
+          <Badge tone={state.tone}>{state.label}</Badge>
+          <Badge tone={RUN_TONES[run.key]}>{run.label}</Badge>
+        </span>
       </div>
       <dl className="pt-1">
         {d.kind === "ec2" ? (

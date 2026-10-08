@@ -86,6 +86,18 @@ export function rowsOf(items: Deployment[]): AppRow[] {
     });
 }
 
+export type RunKey = "running" | "partial" | "stopped" | "down" | "stopping";
+
+/** Whether anything actually runs, from desired and running counts. The deploy state is the deploy
+ * tool's lifecycle tag: an ASG stays "deployed" after it is scaled to 0, and an ECS service stays
+ * "deployed" while its tasks keep failing to start. */
+export function runStatus(d: Deployment): { key: RunKey; label: string } {
+  const unit = d.kind === "ecs" ? "tasks" : "instances";
+  if (d.desired === 0) return d.running === 0 ? { key: "stopped", label: "Stopped" } : { key: "stopping", label: `Stopping: ${d.running} still running` };
+  if (d.running === 0) return { key: "down", label: `No ${unit} running` };
+  return { key: d.running < d.desired ? "partial" : "running", label: `${d.running} of ${d.desired} running` };
+}
+
 /** What a cell shows: the live version, `old → new` during a switch, or "Not running". */
 export function cellLabel(cell: Cell): string {
   const [newest, previous] = cell.live;

@@ -92,6 +92,11 @@ deployments:
 - A cell shows the live version. "Live" means any state except `undeployed`, newest first. Two
   live rows (a switch in progress) show `old → new`. In-progress and failed cells get a colored
   badge. A cell with only undeployed rows shows "Not running" and its last version.
+- Next to the deploy state, a **run status** from desired and running counts: running, `1 of 3
+  running`, Stopped (scaled to 0), `Stopping: N still running`, or `No instances/tasks running`
+  (wants some, has none). The deploy state alone misled: an ASG stays `deployed` after it is
+  scaled to 0, and an ECS service stays `deployed` while its tasks fail to start. Cells show it
+  only when it isn't simply running; the drawer always does.
 - A row whose live versions differ across envs shows "N versions", and cells below the newest
   version (dotted numeric order) are amber.
 - Filters: kind (EC2/ECS), account, and search on app. Kept in the URL.

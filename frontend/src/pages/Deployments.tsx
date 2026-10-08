@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { TriangleAlert } from "lucide-react";
 import { useSearchParams } from "react-router";
 import { api, type DeploymentsData } from "../api";
-import DeploymentPanel, { STATES } from "../components/DeploymentPanel";
+import DeploymentPanel, { RUN_TONES, STATES } from "../components/DeploymentPanel";
 import MultiSelect from "../components/MultiSelect";
 import { groupChecks } from "../components/ScanHealth";
-import { cellLabel, columnsOf, compareVersions, filterItems, rowsOf, type Cell, type Column, type DeploymentFilters } from "../deployments";
+import { cellLabel, columnsOf, compareVersions, filterItems, rowsOf, runStatus, type Cell, type Column, type DeploymentFilters } from "../deployments";
 import { plural } from "../format";
 import type { PageProps } from "../nav";
 import { Badge } from "../ui/badge";
@@ -43,6 +43,7 @@ function CellButton({ cell, latest, onOpen }: { cell: Cell; latest: string | nul
   const [newest] = cell.live;
   const behind = Boolean(newest && latest && compareVersions(newest.version, latest) < 0);
   const state = newest && newest.state !== "deployed" ? STATES[newest.state] : null;
+  const run = newest ? runStatus(newest) : null; // shown only when it isn't simply running
   return (
     <button
       type="button"
@@ -59,7 +60,12 @@ function CellButton({ cell, latest, onOpen }: { cell: Cell; latest: string | nul
       >
         {cellLabel(cell)}
       </span>
-      {state && <Badge tone={state.tone}>{state.label}</Badge>}
+      {(state || (run && run.key !== "running")) && (
+        <span className="flex flex-wrap gap-1">
+          {state && <Badge tone={state.tone}>{state.label}</Badge>}
+          {run && run.key !== "running" && <Badge tone={RUN_TONES[run.key]}>{run.label}</Badge>}
+        </span>
+      )}
       {!newest && cell.history[0] && <span className="text-xs text-muted">Last: {cell.history[0].version || "no version tag"}</span>}
     </button>
   );

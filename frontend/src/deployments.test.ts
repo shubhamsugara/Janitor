@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Deployment } from "./api";
-import { cellLabel, columnsOf, compareVersions, filterItems, rowsOf } from "./deployments";
+import { cellLabel, columnsOf, compareVersions, filterItems, rowsOf, runStatus } from "./deployments";
 
 const DEV = "222222222222";
 const PRD = "333333333333";
@@ -125,5 +125,16 @@ describe("filterItems", () => {
     expect(filterItems(items, { kind: "ecs", accounts: [], q: "" }).map((d) => d.app)).toEqual(["orders-api", "reports"]);
     expect(filterItems(items, { kind: "", accounts: [DEV], q: "" }).map((d) => d.app)).toEqual(["api", "reports"]);
     expect(filterItems(items, { kind: "", accounts: [], q: "API" }).map((d) => d.app)).toEqual(["api", "orders-api"]);
+  });
+});
+
+describe("runStatus", () => {
+  it("says whether anything runs, apart from the deploy state", () => {
+    expect(runStatus(dep({ desired: 2, running: 2 }))).toEqual({ key: "running", label: "2 of 2 running" });
+    expect(runStatus(dep({ desired: 3, running: 1 }))).toEqual({ key: "partial", label: "1 of 3 running" });
+    expect(runStatus(dep({ desired: 0, running: 0 }))).toEqual({ key: "stopped", label: "Stopped" });
+    expect(runStatus(dep({ desired: 2, running: 0 }))).toEqual({ key: "down", label: "No instances running" });
+    expect(runStatus(dep({ kind: "ecs", desired: 2, running: 0 }))).toEqual({ key: "down", label: "No tasks running" });
+    expect(runStatus(dep({ desired: 0, running: 1 }))).toEqual({ key: "stopping", label: "Stopping: 1 still running" });
   });
 });
