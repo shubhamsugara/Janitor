@@ -3,7 +3,7 @@ import yaml
 from helpers import EXAMPLE
 from pydantic import ValidationError
 
-from janitor.config import load_config
+from janitor.config import ConfigError, load_config
 
 
 def test_example_config_loads():
@@ -29,8 +29,9 @@ def test_old_layout_gets_a_migration_message(tmp_path):
             }
         )
     )
-    with pytest.raises(ValidationError, match="uses the old layout"):
+    with pytest.raises(ConfigError, match="uses the old layout") as error:
         load_config(path)
+    assert "input_value" not in str(error.value)  # no echo of the file's contents
 
 
 def test_missing_config_falls_back_to_example_in_mock_mode(tmp_path, monkeypatch):

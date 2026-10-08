@@ -70,6 +70,10 @@ class Scan(_Strict):
     concurrency: int = Field(8, ge=1, le=32)
 
 
+class ConfigError(ValueError):
+    """janitor.yaml can't be used; the message says why and what to change."""
+
+
 OLD_LAYOUT = (
     "janitor.yaml uses the old layout (owner, and accounts with profile and owns). Move to "
     "admin, member_role, and accounts names: see config/janitor.example.yaml."
@@ -137,4 +141,6 @@ def load_config(path: str | Path | None = None) -> Config:
         data["provider"] = "mock"
     elif provider := os.environ.get("JANITOR_PROVIDER"):
         data["provider"] = provider
+    if isinstance(data, dict) and "owner" in data:
+        raise ConfigError(f"{path}: {OLD_LAYOUT}")  # plain message: don't echo the file back
     return Config.model_validate(data)
