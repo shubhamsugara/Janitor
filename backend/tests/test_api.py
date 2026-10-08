@@ -736,3 +736,62 @@ def test_filters_apply_to_stats_and_export(client):
         "/api/resources", params={"type": "rds_snapshot", "source_db": "dev-legacy"}
     ).json()
     assert db["total"] == 2
+
+
+def plan_matching(client, filter, exclude=(), type="ami"):
+    return client.post(
+        "/api/actions/plan",
+        json={"type": type, "selection": {"filter": filter, "exclude": list(exclude)}},
+    )
+
+
+def _top_level(body):
+    return sorted(i["id"] for i in body["blocked"] + body["deletable"] if i["parent"] is None)
+
+
+def test_plan_by_selection_resolves_with_exclude(client):
+    filter = {"name_regex": "^base-linux", "region": "us-east-1"}
+    listed = client.get("/api/resources", params={"type": "ami", **filter}).json()["items"]
+    skip = listed[0]["id"]
+    body = plan_matching(client, filter, exclude=[skip]).json()
+    assert _top_level(body) == sorted(i["id"] for i in listed if i["id"] != skip)
+    audit = client.get("/api/audit").json()["items"][0]
+    assert audit["action"] == "plan"
+
+
+def test_selection_type_comes_from_the_request(client):
+    body = plan_matching(client, {"type": "volume", "region": "us-east-1"}, type="ami").json()
+    assert {i["type"] for i in body["blocked"] + body["deletable"] if i["parent"] is None} == {
+        "ami"
+    }
+
+
+def test_selection_resolves_against_current_scan(client):
+    latest = client.get("/api/scans/latest").json()["scan"]["id"]
+    assert plan_matching(client, {"region": "eu-west-1"}).json()["scan_id"] == latest
+
+
+def test_selection_over_limit_is_400(client, monkeypatch):
+    monkeypatch.setattr(plans, "MAX_SELECTION", 3)
+    response = plan_matching(client, {"region": "us-east-1"})
+    assert response.status_code == 400
+    assert response.json()["detail"].endswith(
+        "resources match. Narrow the filters to 3 or fewer, then plan again."
+    )
+
+
+def test_selection_matching_nothing_is_422(client):
+    response = plan_matching(client, {"name_regex": "^nothing-matches$"})
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "body", [{"type": "ami"}, {"type": "ami", "ids": ["x"], "selection": {"filter": {}}}]
+)
+def test_plan_needs_exactly_one_of_ids_or_selection(client, body):
+    assert client.post("/api/actions/plan", json=body).status_code == 422
+
+
+def test_selection_filter_is_validated(client):
+    assert plan_matching(client, {"name_regex": "(bad"}).status_code == 400
+    assert plan_matching(client, {"created_from": "yesterday"}).status_code == 422

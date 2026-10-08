@@ -3,6 +3,7 @@
 import hashlib
 import uuid
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime
 
 from janitor.config import Config
@@ -13,7 +14,7 @@ from janitor.rules import RULES, RULES_BY_ID, RuleContext, evaluate
 from janitor.scanner import rule_context
 from janitor.store import Store
 
-MAX_SELECTION = 1000
+MAX_SELECTION = 5000
 RULE_ORDER = {rule.id: n for n, rule in enumerate(RULES)}
 
 
@@ -151,12 +152,39 @@ def _share_impact(store: Store, config: Config, scan_id: int, item: dict) -> dic
     }
 
 
-def make_plan(store: Store, config: Config, ids: list[str], now: datetime) -> dict:
+@dataclass(frozen=True)
+class Selection:
+    """Every resource matching the list filters, minus the IDs the user unchecked."""
+
+    filters: dict
+    exclude: list[str]
+
+
+def make_plan(
+    store: Store,
+    config: Config,
+    ids: list[str],
+    now: datetime,
+    selection: Selection | None = None,
+) -> dict:
     scan = store.latest_scan()
     if scan is None:
         raise PlanError(409, "No scan yet. Run a scan, then plan again.")
     scan_id = scan["id"]
+    request: dict | None = None
+    if selection is not None:
+        skip = set(selection.exclude)
+        ids = [i for i in store.matching_ids(scan_id, selection.filters) if i not in skip]
+        if len(ids) > MAX_SELECTION:
+            raise PlanError(
+                400,
+                f"{len(ids):,} resources match. Narrow the filters to {MAX_SELECTION:,} or fewer, "
+                "then plan again.",
+            )
+        used = {k: v for k, v in selection.filters.items() if v is not None}
+        request = {"selection": {"filter": used, "exclude": selection.exclude}}
     ids = list(dict.fromkeys(ids))
+    request = request or {"ids": ids}
     if not ids:
         raise PlanError(422, "Select at least one resource.")
     if len(ids) > MAX_SELECTION:
@@ -202,7 +230,7 @@ def make_plan(store: Store, config: Config, ids: list[str], now: datetime) -> di
         ],
         "requires_typed_confirmation": _needs_typing(deletable, config),
     }
-    store.save_plan(plan["plan_id"], scan_id, {"ids": ids}, plan)
+    store.save_plan(plan["plan_id"], scan_id, request, plan)
     store.add_audit(
         "plan",
         {

@@ -3,6 +3,7 @@
 Run: uvicorn janitor.main:create_app --factory --host 127.0.0.1 --port 8080
 """
 
+import inspect
 import os
 import re
 from collections.abc import Callable
@@ -13,7 +14,7 @@ from typing import Annotated, Self
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 
 from janitor import definitions, export, plans
 from janitor.config import load_config
@@ -50,9 +51,23 @@ class Settings(BaseModel):
         )
 
 
+class Selection(BaseModel):
+    """Every resource matching `filter` (the list route's filters), minus `exclude`."""
+
+    filter: dict[str, str] = Field(default_factory=dict)
+    exclude: list[str] = Field(default_factory=list)
+
+
 class PlanRequest(BaseModel):
     type: str | None = None
-    ids: list[str]
+    ids: list[str] | None = None
+    selection: Selection | None = None
+
+    @model_validator(mode="after")
+    def _one_kind(self) -> "PlanRequest":
+        if (self.ids is None) == (self.selection is None):
+            raise ValueError("Send either ids or selection, not both.")
+        return self
 
 
 class SimulateRequest(BaseModel):
@@ -373,8 +388,15 @@ def create_app(
 
     @app.post("/api/actions/plan")
     def plan(request: PlanRequest):
+        selection = None
+        if request.selection:
+            known = set(inspect.signature(list_filters).parameters) - {"type"}
+            given = {k: v for k, v in request.selection.filter.items() if k in known}
+            # The same validation as the list the user is looking at; type is the page's.
+            filters = list_filters(type=request.type, **given)
+            selection = plans.Selection(filters, request.selection.exclude)
         try:
-            return plans.make_plan(store, config, request.ids, clock())
+            return plans.make_plan(store, config, request.ids or [], clock(), selection)
         except plans.PlanError as error:
             raise HTTPException(error.status_code, error.message) from error
 

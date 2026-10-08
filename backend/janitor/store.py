@@ -370,6 +370,12 @@ class Store:
         )
         return [_resource(r) for r in rows], total
 
+    def matching_ids(self, scan_id: int, filters: dict) -> list[str]:
+        """Every ID the list filters match, for "Select all N matching"."""
+        where, params = _where(scan_id, filters)
+        rows = self._q(f"SELECT id FROM resources WHERE {where} ORDER BY id", params)
+        return [row["id"] for row in rows]
+
     def stats(self, scan_id: int, filters: dict, now: datetime | None = None) -> dict:
         where, params = _where(scan_id, filters)
         row = self._q(
