@@ -169,6 +169,28 @@ class Config(_Strict):
         return account.name if account else account_id
 
 
+class _UniqueKeyLoader(yaml.SafeLoader):
+    """SafeLoader that refuses a key repeated in one mapping (YAML would keep only the last)."""
+
+    def construct_mapping(self, node, deep=False):
+        seen = set()
+        for key_node, _ in node.value:
+            key = self.construct_object(key_node, deep=deep)
+            if key in seen:
+                if isinstance(key, str) and ACCOUNT_ID.match(key):
+                    raise ConfigError(
+                        f"account {key} is listed twice in janitor.yaml (line {key_node.start_mark.line + 1}). "
+                        "List each account once; one entry can cover several regions, for example "
+                        "regions: [us-east-1, us-west-2]."
+                    )
+                raise ConfigError(
+                    f"{key!r} appears twice in one section of janitor.yaml "
+                    f"(line {key_node.start_mark.line + 1}). Keep one."
+                )
+            seen.add(key)
+        return super().construct_mapping(node, deep=deep)
+
+
 def load_config(path: str | Path | None = None) -> Config:
     """Load `path` (default: $JANITOR_CONFIG, else config/janitor.yaml).
 
@@ -182,7 +204,7 @@ def load_config(path: str | Path | None = None) -> Config:
         if not example.exists():
             raise FileNotFoundError(f"No config at {path} and no example at {example}.")
         path = example
-    data = yaml.safe_load(path.read_text()) or {}
+    data = yaml.load(path.read_text(), Loader=_UniqueKeyLoader) or {}
     if fallback:
         data["provider"] = "mock"
     elif provider := os.environ.get("JANITOR_PROVIDER"):

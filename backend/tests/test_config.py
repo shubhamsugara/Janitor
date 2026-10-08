@@ -149,3 +149,17 @@ def test_ignore_accounts(tmp_path):
         path = _variant(tmp_path, lambda d, bad=bad: d.update(ignore_accounts=bad))
         with pytest.raises(ValidationError, match=message):
             load_config(path)
+
+
+def test_an_account_listed_twice_is_an_error_not_a_silent_overwrite(tmp_path):
+    # YAML keeps only the last of two equal keys, so one entry would quietly vanish.
+    path = tmp_path / "janitor.yaml"
+    text = EXAMPLE.read_text().replace(
+        '  "222222222222": { name: dev }\n',
+        '  "222222222222": { name: dev }\n  "222222222222": { name: dev-dr, regions: [us-west-2] }\n',
+    )
+    assert text.count('"222222222222"') == 2
+    path.write_text(text)
+    with pytest.raises(ConfigError, match="222222222222 is listed twice") as error:
+        load_config(path)
+    assert "one entry can cover several regions" in str(error.value)
