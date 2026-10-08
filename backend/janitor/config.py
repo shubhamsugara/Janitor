@@ -2,7 +2,7 @@
 
 import os
 import re
-from functools import cached_property
+from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
@@ -14,6 +14,12 @@ ACCOUNT_ID = re.compile(r"^\d{12}$")
 ROLE_NAME = re.compile(r"^[\w+=,.@-]{1,64}$")
 DEFAULT_GROUP_PATTERN = r"^(?P<group>.+?)[-_.]?(\d{8,14}|v?\d+(\.\d+)*)$"
 Outcome = Literal["warn", "block"]
+
+
+@lru_cache(maxsize=64)
+def _compiled(patterns: tuple[str, ...]) -> tuple[re.Pattern, ...]:
+    """Keyed by the pattern text, so a copied or edited Policy never sees a stale regex."""
+    return tuple(re.compile(p) for p in patterns)
 
 
 class _Strict(BaseModel):
@@ -88,13 +94,13 @@ class Policy(_Strict):
                 ) from None
         return patterns
 
-    @cached_property
+    @property
     def group_regex(self) -> re.Pattern:
-        return re.compile(self.ami_name_group_pattern)
+        return _compiled((self.ami_name_group_pattern,))[0]
 
-    @cached_property
-    def keep_regexes(self) -> list[re.Pattern]:
-        return [re.compile(p) for p in self.keep_name_patterns]
+    @property
+    def keep_regexes(self) -> tuple[re.Pattern, ...]:
+        return _compiled(tuple(self.keep_name_patterns))
 
     @field_validator("protected_tags", mode="before")
     @classmethod

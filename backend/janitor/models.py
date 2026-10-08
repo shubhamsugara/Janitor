@@ -37,6 +37,7 @@ class Resource:
     status_reason: str = ""
     referenced_by: str | None = None  # AMI: templates, ASGs, launch configs that name it (W6)
     ignored_shares: str | None = None  # AMI: ignored accounts it is shared with (W7)
+    shared_with: list[str] = field(default_factory=list)  # manual RDS snapshot: "all" = public
 
 
 @dataclass

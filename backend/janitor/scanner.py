@@ -11,7 +11,7 @@ from janitor.linker import LinkContext, ignored_shares, link, references
 from janitor.models import Segment
 from janitor.pricing import PriceTable, apply_costs
 from janitor.providers.base import CloudProvider
-from janitor.rules import evaluate
+from janitor.rules import RuleContext, context, evaluate
 from janitor.store import Store
 
 log = logging.getLogger(__name__)
@@ -53,9 +53,16 @@ def segment_message(seg: Segment, config: Config) -> str:
     return f"{detail}. Scan again; if it repeats, check the server log."
 
 
+def rule_context(store: Store, scan_id: int, policy) -> RuleContext:
+    """What cross-resource rules (R6, W1, W2, W3) need, from one scan's stored rows."""
+    return context(store.all_resources(scan_id), store.databases(scan_id), policy)
+
+
 def recompute_rules(store: Store, config: Config, scan_id: int, now: datetime) -> None:
     """Rules run after each scan and at startup, so config changes apply without rescanning."""
-    results = [hit for r in store.all_resources(scan_id) for hit in evaluate(r, config.policy, now)]
+    resources = store.all_resources(scan_id)
+    ctx = context(resources, store.databases(scan_id), config.policy)
+    results = [hit for r in resources for hit in evaluate(r, config.policy, now, ctx)]
     store.save_rule_results(scan_id, results)
 
 

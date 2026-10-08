@@ -331,6 +331,7 @@ def build() -> dict:
         EAST, f"base-linux-{stamp(120)}", 120, shared_with=ENVS
     )  # orphaned, deletable
     s.ami(EAST, f"base-linux-{stamp(60)}", 60, shared_with=ENVS)  # idle
+    s.ami(EAST, f"base-linux-{stamp(35)}", 35, shared_with=ENVS)  # idle; R6 keeps 20, 35, 60
     base_20 = s.ami(EAST, f"base-linux-{stamp(20)}", 20, shared_with=ENVS)
     s.use(base_20, DEV, EAST, "instance", "dev-api-1", "running")
     s.use(base_20, PRD, EAST, "asg", "prd-api-asg", "active")

@@ -9,7 +9,8 @@ from janitor.config import Config
 from janitor.graph import Coverage
 from janitor.linker import MANAGED_REASONS
 from janitor.models import Resource, RuleResult
-from janitor.rules import RULES, RULES_BY_ID, evaluate
+from janitor.rules import RULES, RULES_BY_ID, RuleContext, evaluate
+from janitor.scanner import rule_context
 from janitor.store import Store
 
 MAX_SELECTION = 1000
@@ -101,6 +102,7 @@ def _backing_snapshots(
     deleting = {i["id"] for i in items if i["type"] == "ami" and not _blocked(i)}
     taken: set[str] = set()
     out = []
+    ctx: RuleContext | None = None  # built on first use: it reads the whole scan
     for ami in (r for r in selected if r.id in deleting):
         for snap_id in ami.snapshot_ids:
             if snap_id in taken:
@@ -117,7 +119,8 @@ def _backing_snapshots(
             taken.add(snap_id)
             # It is in use only because of the AMI being deleted, so R1 doesn't apply. Its stored
             # status (in_use) outranks managed, so R3 has to be checked here.
-            hits = evaluate(snap, config.policy, now, skip=frozenset({"R1"}))
+            ctx = ctx or rule_context(store, scan_id, config.policy)
+            hits = evaluate(snap, config.policy, now, ctx, skip=frozenset({"R1"}))
             if snap.managed_by:
                 reason = MANAGED_REASONS.get(snap.managed_by, "Created by an AWS-managed service.")
                 hits.insert(0, RuleResult(snap.id, "R3", "block", reason))

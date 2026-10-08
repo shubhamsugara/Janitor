@@ -4,7 +4,7 @@ The API serves this to the UI, so the help text and the logic come from one plac
 """
 
 from janitor.config import Config
-from janitor.rules import RULES, explain
+from janitor.rules import RULES, explain, outcome
 
 
 def _tags(keys: list[str]) -> str:
@@ -143,7 +143,7 @@ def build(config: Config) -> dict:
             {
                 "id": r.id,
                 "title": r.title,
-                "outcome": r.outcome,
+                "outcome": outcome(r, config.policy),
                 "explanation": explain(r, config.policy),
             }
             for r in RULES

@@ -95,7 +95,7 @@ def test_resource_detail(client):
     ami = find(client, "ami", f"base-linux-{stamp(20)}")
     body = client.get(f"/api/resources/{ami['id']}").json()
     assert body["resource"]["status"] == "in_use"
-    assert [r["id"] for r in body["rules"]] == ["R1", "R2", "R3", "R4", "R5", "W4", "W6", "W7"]
+    assert [r["id"] for r in body["rules"]] == ["R1", "R2", "R3", "R4", "R5", "R6", "R7", "W1", "W2", "W3", "W4", "W5", "W6", "W7"]
     assert next(r for r in body["rules"] if r["id"] == "R1")["outcome"] == "block"
     assert {u["ref_name"] for u in body["related"]["usage"]} == {
         "dev-api-1",
@@ -205,17 +205,7 @@ def test_scan_conflict_and_latest(client, app):
 
 
 def test_shared_snapshot_is_not_expanded(tmp_path, config):
-    def r(id, type, **kw):
-        return Resource(
-            id=id,
-            type=type,
-            account="111111111111",
-            region="us-east-1",
-            name=id,
-            created_at="2026-01-01T00:00:00Z",
-            tags={"owner": "me"},
-            **kw,
-        )
+    r = _r
 
     class Provider:
         name = "mock"
@@ -223,9 +213,10 @@ def test_shared_snapshot_is_not_expanded(tmp_path, config):
         def list_inventory(self, on_segment=None):
             return Inventory(
                 [
-                    r("ami-a", "ami", snapshot_ids=["snap-shared"]),
-                    r("ami-b", "ami", snapshot_ids=["snap-shared"]),
+                    r("ami-a", "ami", snapshot_ids=["snap-shared"], name="web-1"),
+                    r("ami-b", "ami", snapshot_ids=["snap-shared"], name="web-2"),
                     r("snap-shared", "snapshot"),
+                    *_newer_versions(),
                 ],
                 [],
                 [],
@@ -253,7 +244,7 @@ def _store_with(tmp_path, config, resources):
         name = "mock"
 
         def list_inventory(self, on_segment=None):
-            return Inventory(resources, [], [], [])
+            return Inventory([*resources, *_newer_versions()], [], [], [])
 
     store = Store(tmp_path / "j.db")
     Scanner(store, Provider(), config, clock=lambda: NOW).run()
@@ -264,11 +255,19 @@ def _r(id, type, **kw):
     fields = {
         "account": "111111111111",
         "region": "us-east-1",
-        "name": id,
+        "name": "web-1" if type == "ami" else id,  # with _newer_versions(), R6 keeps those
         "created_at": "2026-01-01T00:00:00Z",
         "tags": {"owner": "me"},
     } | kw
     return Resource(id=id, type=type, **fields)
+
+
+def _newer_versions():
+    """Three newer AMIs in the web-* group, so R6 keeps them and not the AMI under test."""
+    return [
+        _r(f"ami-new{n}", "ami", name=f"web-{n}", created_at="2026-03-01T00:00:00Z")
+        for n in (7, 8, 9)
+    ]
 
 
 def test_managed_backing_snapshot_is_blocked(tmp_path, config):
@@ -356,7 +355,7 @@ def test_selected_snapshot_of_a_blocked_ami_stays_blocked(tmp_path, config):
 
 def test_plan_rules_are_in_rule_order(client):
     body = plan(client, find(client, "ami", f"base-linux-{stamp(20)}")["id"]).json()
-    assert [r["rule_id"] for r in body["blocked"][0]["rules"]] == ["R1", "R5"]
+    assert [r["rule_id"] for r in body["blocked"][0]["rules"]] == ["R1", "R5", "R6", "W1"]
 
 
 def test_skipped_items_name_their_rule(client):
@@ -699,3 +698,18 @@ def test_deployments_show_failed_usage_and_ecs_checks_only(tmp_path):
     failed = TestClient(app).get("/api/deployments").json()["failed"]
     assert [(f["kind"], f["account_name"]) for f in failed] == [("ecs", "dev")]
     assert "ecs:ListClusters" in failed[0]["message"]
+
+
+def test_meta_rule_outcome_follows_policy(tmp_path):
+    import yaml
+
+    data = yaml.safe_load(EXAMPLE.read_text())
+    data["policy"]["rds_last_copy"] = "block"
+    path = tmp_path / "janitor.yaml"
+    path.write_text(yaml.safe_dump(data))
+    settings = _settings(tmp_path)
+    settings.config_path = str(path)
+    client = TestClient(create_app(settings, clock=lambda: NOW))
+    rules = {r["id"]: r for r in client.get("/api/meta").json()["definitions"]["rules"]}
+    assert (rules["W2"]["outcome"], rules["W1"]["outcome"]) == ("block", "warn")
+    assert "3 newest" in rules["R6"]["explanation"]

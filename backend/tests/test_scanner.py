@@ -251,3 +251,20 @@ def test_scan_stores_the_providers_deployments(tmp_path, config):
     store = Store(tmp_path / "janitor.db")
     scan_id = Scanner(store, WithDeployments([]), config, clock=lambda: NOW).run()
     assert store.deployments(scan_id) == [found]
+
+
+def test_recompute_uses_cross_resource_context(tmp_path, config):
+    from helpers import days_ago
+
+    from janitor.models import Resource
+
+    store = Store(tmp_path / "janitor.db")
+    scan_id = store.start_scan("mock")
+    amis = [
+        Resource(f"ami-{n}", "ami", "111111111111", "us-east-1", f"web-{n}", days_ago(40 + n),
+                 tags={"owner": "me"}, status="idle")
+        for n in range(4)
+    ]
+    store.save_inventory(scan_id, amis, [], [], [])
+    recompute_rules(store, config, scan_id, NOW)
+    assert sum("R6" in rules_of(store, scan_id, a) for a in amis) == 3

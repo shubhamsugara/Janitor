@@ -24,10 +24,10 @@ from janitor.models import (
     format_ts,
 )
 
-SCHEMA_VERSION = 7  # bump when a scan table changes shape; old scan data is dropped
+SCHEMA_VERSION = 8  # bump when a scan table changes shape; old scan data is dropped
 RESOURCE_FIELDS = [f.name for f in fields(Resource)]
 DEPLOYMENT_FIELDS = [f.name for f in fields(Deployment)]
-JSON_FIELDS = {"tags", "snapshot_ids", "cost_breakdown"}
+JSON_FIELDS = {"tags", "snapshot_ids", "cost_breakdown", "shared_with"}
 SORTABLE = {
     "id",
     "name",
@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS resources (
   source_db_id TEXT, db_kind TEXT, managed_by TEXT, iops INTEGER, throughput INTEGER,
   encrypted INTEGER, storage_tier TEXT, est_monthly_cost REAL, cost_breakdown TEXT,
   status TEXT NOT NULL, status_reason TEXT NOT NULL, referenced_by TEXT, ignored_shares TEXT,
+  shared_with TEXT NOT NULL DEFAULT '[]',
   PRIMARY KEY (scan_id, id));
 CREATE INDEX IF NOT EXISTS resources_type_status ON resources (scan_id, type, status);
 CREATE TABLE IF NOT EXISTS shares (
@@ -493,6 +494,12 @@ class Store:
             (scan_id, account, region, db_id),
         )
         return [_resource(r) for r in rows]
+
+    def databases(self, scan_id: int) -> list[Database]:
+        rows = self._q(
+            "SELECT id, account, region, kind FROM databases WHERE scan_id = ?", (scan_id,)
+        )
+        return [Database(**dict(row)) for row in rows]
 
     def database(self, scan_id: int, account: str, region: str, db_id: str) -> Database | None:
         rows = self._q(
