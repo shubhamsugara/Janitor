@@ -2,6 +2,7 @@
 
 import os
 import re
+from functools import cached_property
 from pathlib import Path
 from typing import Literal
 
@@ -11,6 +12,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 ResourceType = Literal["ami", "snapshot", "volume", "rds_snapshot"]
 ACCOUNT_ID = re.compile(r"^\d{12}$")
 ROLE_NAME = re.compile(r"^[\w+=,.@-]{1,64}$")
+DEFAULT_GROUP_PATTERN = r"^(?P<group>.+?)[-_.]?(\d{8,14}|v?\d+(\.\d+)*)$"
+Outcome = Literal["warn", "block"]
 
 
 class _Strict(BaseModel):
@@ -54,6 +57,44 @@ class Policy(_Strict):
     min_age_days: int = Field(30, ge=0)
     protected_tags: dict[str, str] = Field(default_factory=dict)
     typed_confirm_min_items: int = Field(10, ge=1)
+    keep_newest_per_name_group: int = Field(3, ge=1)  # R6
+    ami_name_group_pattern: str = DEFAULT_GROUP_PATTERN  # R6: names minus a date or version
+    keep_name_patterns: list[str] = Field(default_factory=list)  # R7: re.search on AMI names
+    source_with_live_copies: Outcome = "warn"  # W1
+    rds_last_copy: Outcome = "warn"  # W2
+
+    @field_validator("ami_name_group_pattern")
+    @classmethod
+    def _group_pattern(cls, pattern: str) -> str:
+        try:
+            compiled = re.compile(pattern)
+        except re.error as e:
+            raise ValueError(
+                f"ami_name_group_pattern: {pattern!r} isn't a valid regular expression ({e})"
+            ) from None
+        if "group" not in compiled.groupindex:
+            raise ValueError("ami_name_group_pattern needs a named group, (?P<group>...)")
+        return pattern
+
+    @field_validator("keep_name_patterns")
+    @classmethod
+    def _keep_patterns(cls, patterns: list[str]) -> list[str]:
+        for pattern in patterns:
+            try:
+                re.compile(pattern)
+            except re.error as e:
+                raise ValueError(
+                    f"keep_name_patterns: {pattern!r} isn't a valid regular expression ({e})"
+                ) from None
+        return patterns
+
+    @cached_property
+    def group_regex(self) -> re.Pattern:
+        return re.compile(self.ami_name_group_pattern)
+
+    @cached_property
+    def keep_regexes(self) -> list[re.Pattern]:
+        return [re.compile(p) for p in self.keep_name_patterns]
 
     @field_validator("protected_tags", mode="before")
     @classmethod

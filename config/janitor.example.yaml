@@ -21,6 +21,11 @@ policy:
   min_age_days: 30
   protected_tags: { retain: "true", "janitor:keep": "true" }
   typed_confirm_min_items: 10
+  keep_newest_per_name_group: 3   # R6: the newest AMIs kept per name group, per region
+  # ami_name_group_pattern: '^(?P<group>.+?)[-_.]?(\d{8,14}|v?\d+(\.\d+)*)$'   # R6 default
+  keep_name_patterns: []          # R7: AMI names matching any of these regexes are kept
+  source_with_live_copies: warn   # W1: warn | block
+  rds_last_copy: warn             # W2: warn | block
 pricing:                  # fallback only: real rates come from fixtures/prices.json
   snapshot_gb_month: 0.05
   snapshot_archive_gb_month: 0.0125

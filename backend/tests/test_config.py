@@ -189,3 +189,45 @@ def test_deployment_tag_lists_cant_be_empty(tmp_path):
     path.write_text(yaml.safe_dump(data))
     with pytest.raises(ValidationError):
         load_config(path)
+
+
+def test_policy_defaults_for_3b():
+    policy = load_config(EXAMPLE).policy
+    assert policy.keep_newest_per_name_group == 3
+    assert policy.keep_name_patterns == []
+    assert (policy.source_with_live_copies, policy.rds_last_copy) == ("warn", "warn")
+    assert policy.group_regex.match("ecs-gpu-20260901").group("group") == "ecs-gpu"
+    assert policy.group_regex.match("base-v1.2.3").group("group") == "base"
+
+
+def test_bad_keep_pattern_is_rejected(tmp_path):
+    path = _variant(tmp_path, lambda d: d["policy"].update(keep_name_patterns=["^ok", "(bad"]))
+    with pytest.raises(ValidationError, match=r"keep_name_patterns: '\(bad' isn't a valid"):
+        load_config(path)
+
+
+def test_keep_patterns_compile_once(tmp_path):
+    path = _variant(tmp_path, lambda d: d["policy"].update(keep_name_patterns=["^golden-"]))
+    policy = load_config(path).policy
+    assert [p.pattern for p in policy.keep_regexes] == ["^golden-"]
+    assert policy.keep_regexes is policy.keep_regexes
+
+
+@pytest.mark.parametrize("pattern", ["^(.+)-\\d+$", "(?P<group"])
+def test_group_pattern_needs_group(tmp_path, pattern):
+    path = _variant(tmp_path, lambda d: d["policy"].update(ami_name_group_pattern=pattern))
+    with pytest.raises(ValidationError, match="ami_name_group_pattern"):
+        load_config(path)
+
+
+@pytest.mark.parametrize("field", ["source_with_live_copies", "rds_last_copy"])
+def test_outcome_accepts_warn_or_block_only(tmp_path, field):
+    assert load_config(_variant(tmp_path, lambda d: d["policy"].update({field: "block"})))
+    with pytest.raises(ValidationError, match=field):
+        load_config(_variant(tmp_path, lambda d: d["policy"].update({field: "pass"})))
+
+
+def test_keep_newest_is_at_least_one(tmp_path):
+    path = _variant(tmp_path, lambda d: d["policy"].update(keep_newest_per_name_group=0))
+    with pytest.raises(ValidationError, match="keep_newest_per_name_group"):
+        load_config(path)
