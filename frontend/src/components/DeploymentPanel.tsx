@@ -79,6 +79,7 @@ function Details({ d, meta }: { d: Deployment; meta: Meta }) {
             </Field>
           </>
         )}
+        <Field label="Env">{d.env}</Field>
         <Field label="Account">
           {d.account_name} · {d.region}
         </Field>

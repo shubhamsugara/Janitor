@@ -26,7 +26,7 @@ function parse(search: URLSearchParams): DeploymentFilters {
   const kind = search.get("kind");
   return {
     kind: kind === "ec2" || kind === "ecs" ? kind : "",
-    envs: (search.get("env") ?? "").split(",").filter(Boolean),
+    accounts: (search.get("account") ?? "").split(",").filter(Boolean),
     q: search.get("q") ?? "",
   };
 }
@@ -34,7 +34,7 @@ function parse(search: URLSearchParams): DeploymentFilters {
 function toSearch(f: DeploymentFilters): URLSearchParams {
   const s = new URLSearchParams();
   if (f.kind) s.set("kind", f.kind);
-  if (f.envs.length) s.set("env", f.envs.join(","));
+  if (f.accounts.length) s.set("account", f.accounts.join(","));
   if (f.q) s.set("q", f.q);
   return s;
 }
@@ -77,7 +77,10 @@ export default function Deployments({ meta, notify }: PageProps) {
   }, [notify]);
 
   const all = data?.items ?? [];
-  const envOptions = useMemo(() => [...new Set(all.map((d) => d.env))].map((env) => ({ value: env, label: env, text: env })), [all]);
+  const accountOptions = useMemo(
+    () => columnsOf(all).filter((c, i, cols) => cols.findIndex((x) => x.account === c.account) === i).map((c) => ({ value: c.account, label: c.name, text: c.name })),
+    [all],
+  );
   const shown = useMemo(() => filterItems(all, filters), [all, filters]);
   const columns = useMemo(() => columnsOf(shown), [shown]);
   const rows = useMemo(() => rowsOf(shown), [shown]);
@@ -89,7 +92,7 @@ export default function Deployments({ meta, notify }: PageProps) {
           Deployments {data && <span className="font-normal text-muted">({plural(rowsOf(all).length, "app")})</span>}
         </h2>
         <p className="mt-1 text-[13px] text-muted">
-          Which version of each app runs in each env, from the last scan. EC2 apps are Auto Scaling groups tagged by your deploy tool; ECS apps are services. Read-only.
+          Which version of each app runs in each account and region, from the last scan. EC2 apps are Auto Scaling groups tagged by your deploy tool; ECS apps are services. Read-only.
         </p>
       </div>
 
@@ -134,7 +137,7 @@ export default function Deployments({ meta, notify }: PageProps) {
             </button>
           ))}
         </div>
-        <MultiSelect label="Env" options={envOptions} value={filters.envs} onChange={(envs) => setFilters({ ...filters, envs })} />
+        <MultiSelect label="Account" options={accountOptions} value={filters.accounts} onChange={(accounts) => setFilters({ ...filters, accounts })} />
         <Input
           aria-label="Search apps"
           placeholder="Search apps"
@@ -160,7 +163,7 @@ export default function Deployments({ meta, notify }: PageProps) {
                 <Th className="sticky left-0 z-[1] bg-card">App</Th>
                 {columns.map((c) => (
                   <Th key={c.key}>
-                    <div>{c.env}</div>
+                    <div>{c.name}</div>
                     <div className="font-normal tracking-normal normal-case">{c.region}</div>
                   </Th>
                 ))}
@@ -199,7 +202,7 @@ export default function Deployments({ meta, notify }: PageProps) {
         )}
       </Card>
 
-      <Sheet open={Boolean(open)} onClose={() => setOpen(null)} title={open ? `${open.app} · ${open.column.env} · ${open.column.region}` : "Deployment"}>
+      <Sheet open={Boolean(open)} onClose={() => setOpen(null)} title={open ? `${open.app} · ${open.column.name} · ${open.column.region}` : "Deployment"}>
         {open && <DeploymentPanel cell={open.cell} meta={meta} />}
       </Sheet>
     </div>

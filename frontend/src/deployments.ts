@@ -1,11 +1,15 @@
 import type { Deployment } from "./api";
 
-/** Envs from sandbox to production; others follow, by name. */
+/** Envs from sandbox to production, matched on a name's first word (prd-us is prd); others follow. */
 const ENV_ORDER = ["sbx", "sandbox", "dev", "qa", "qas", "test", "uat", "stg", "stage", "staging", "prd", "prod", "production"];
 
+/** Where deployments run: one account in one region, named by the account. Env tags can't be
+ * columns: a deploy tool may tag every prod account's ASGs env=prd while ECS services carry no
+ * env tag, which would split one account across two columns. */
 export interface Column {
   key: string;
-  env: string;
+  account: string;
+  name: string;
   region: string;
 }
 
@@ -24,14 +28,14 @@ export interface AppRow {
 
 export interface DeploymentFilters {
   kind: "" | Deployment["kind"];
-  envs: string[];
+  accounts: string[];
   q: string;
 }
 
-export const columnKey = (d: Pick<Deployment, "env" | "region">) => `${d.env}|${d.region}`;
+export const columnKey = (d: Pick<Deployment, "account" | "region">) => `${d.account}|${d.region}`;
 
-function envRank(env: string): number {
-  const i = ENV_ORDER.indexOf(env.toLowerCase());
+function envRank(name: string): number {
+  const i = ENV_ORDER.indexOf(name.toLowerCase().split(/[^a-z0-9]+/)[0] ?? "");
   return i < 0 ? ENV_ORDER.length : i;
 }
 
@@ -53,9 +57,9 @@ export function compareVersions(a: string, b: string): number {
 
 export function columnsOf(items: Deployment[]): Column[] {
   const seen = new Map<string, Column>();
-  for (const d of items) seen.set(columnKey(d), { key: columnKey(d), env: d.env, region: d.region });
+  for (const d of items) seen.set(columnKey(d), { key: columnKey(d), account: d.account, name: d.account_name, region: d.region });
   return [...seen.values()].sort(
-    (a, b) => envRank(a.env) - envRank(b.env) || a.env.localeCompare(b.env) || a.region.localeCompare(b.region),
+    (a, b) => envRank(a.name) - envRank(b.name) || a.name.localeCompare(b.name) || a.region.localeCompare(b.region),
   );
 }
 
@@ -93,6 +97,7 @@ export function cellLabel(cell: Cell): string {
 export function filterItems(items: Deployment[], f: DeploymentFilters): Deployment[] {
   const q = f.q.trim().toLowerCase();
   return items.filter(
-    (d) => (!f.kind || d.kind === f.kind) && (f.envs.length === 0 || f.envs.includes(d.env)) && (!q || d.app.toLowerCase().includes(q)),
+    (d) =>
+      (!f.kind || d.kind === f.kind) && (f.accounts.length === 0 || f.accounts.includes(d.account)) && (!q || d.app.toLowerCase().includes(q)),
   );
 }

@@ -50,8 +50,8 @@ function renderWith(data: DeploymentsData, url = "/deployments") {
 describe("Deployments", () => {
   const items = [
     dep({ name: "dev-api-3.1.0-1", env: "dev", version: "3.1.0" }),
-    dep({ name: "prd-api-3.0.5-2", env: "prd", account_name: "prd", version: "3.0.5" }),
-    dep({ name: "prd-api-3.0.4-1", env: "prd", account_name: "prd", version: "3.0.4", state: "undeployed", desired: 0 }),
+    dep({ name: "prd-api-3.0.5-2", env: "prd", account: "333333333333", account_name: "prd-us", version: "3.0.5" }),
+    dep({ name: "prd-api-3.0.4-1", env: "prd", account: "333333333333", account_name: "prd-us", version: "3.0.4", state: "undeployed", desired: 0 }),
     dep({ kind: "ecs", name: "orders-api", app: "orders-api", env: "dev", version: "2.8.0", state: "failed", ami_id: null, ami: null }),
   ];
 
@@ -71,6 +71,7 @@ describe("Deployments", () => {
     expect(screen.getByText("Earlier versions")).toBeTruthy();
     expect(screen.getByText("prd-api-3.0.4-1")).toBeTruthy();
     expect(screen.getAllByText("dev-api, version 7")).toHaveLength(2); // live and earlier
+    expect(screen.getAllByText("prd")).toHaveLength(2); // the env tag, shown per deployment
   });
 
   it("filters by kind from the URL", async () => {

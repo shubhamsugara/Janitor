@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { Deployment } from "./api";
 import { cellLabel, columnsOf, compareVersions, filterItems, rowsOf } from "./deployments";
 
+const DEV = "222222222222";
+const PRD = "333333333333";
+const UAT = "666666666666";
+
 function dep(over: Partial<Deployment>): Deployment {
   return {
     kind: "ec2",
@@ -44,50 +48,62 @@ describe("compareVersions", () => {
 });
 
 describe("columnsOf", () => {
-  it("orders envs from sandbox to production, then by name and region", () => {
+  it("is one column per account and region, from sandbox to production", () => {
     const items = [
-      dep({ env: "prd", region: "us-west-2" }),
-      dep({ env: "prd", region: "us-east-1" }),
-      dep({ env: "uat" }),
-      dep({ env: "billing-lab" }),
-      dep({ env: "dev" }),
-      dep({ env: "sbx" }),
-      dep({ env: "qas" }),
+      dep({ account: "333333333333", account_name: "prd-us", env: "prd", region: "us-west-2" }),
+      dep({ account: "333333333333", account_name: "prd-us", env: "prd", region: "us-east-1" }),
+      dep({ account: "888888888888", account_name: "prd-eu", env: "prd", region: "eu-west-1" }),
+      dep({ account: "666666666666", account_name: "uat", env: "uat" }),
+      dep({ account: "111111111111", account_name: "admin", env: "admin" }),
+      dep({ account: "222222222222", account_name: "dev", env: "dev" }),
+      dep({ account: "555555555555", account_name: "sbx", env: "sbx" }),
+      dep({ account: "777777777777", account_name: "qas", env: "qas" }),
     ];
-    expect(columnsOf(items).map((c) => `${c.env} ${c.region}`)).toEqual([
+    expect(columnsOf(items).map((c) => `${c.name} ${c.region}`)).toEqual([
       "sbx us-east-1",
       "dev us-east-1",
       "qas us-east-1",
       "uat us-east-1",
-      "prd us-east-1",
-      "prd us-west-2",
-      "billing-lab us-east-1",
+      "prd-eu eu-west-1",
+      "prd-us us-east-1",
+      "prd-us us-west-2",
+      "admin us-east-1",
     ]);
+  });
+
+  it("keeps an ASG tagged env=prd and an untagged ECS service in the same account together", () => {
+    const items = [
+      dep({ kind: "ec2", account: "333333333333", account_name: "prd-us", env: "prd", app: "web" }),
+      dep({ kind: "ecs", account: "333333333333", account_name: "prd-us", env: "prd-us", app: "orders" }),
+    ];
+    expect(columnsOf(items)).toHaveLength(1);
+    const [orders, web] = rowsOf(items);
+    expect(Object.keys(orders.cells)).toEqual(Object.keys(web.cells));
   });
 });
 
 describe("rowsOf", () => {
   const items = [
-    dep({ app: "api", env: "dev", version: "3.1.0", state: "undeploying", created_at: "2026-09-01T00:00:00Z" }),
-    dep({ app: "api", env: "dev", version: "3.2.0", state: "deploying", created_at: "2026-09-30T00:00:00Z" }),
-    dep({ app: "api", env: "prd", version: "3.0.5", state: "deployed" }),
-    dep({ app: "api", env: "prd", version: "3.0.4", state: "undeployed", created_at: "2026-08-01T00:00:00Z" }),
-    dep({ app: "web", env: "uat", version: "2.4.1" }),
-    dep({ app: "web", env: "prd", version: "2.4.1", state: "undeployed" }),
+    dep({ app: "api", version: "3.1.0", state: "undeploying", created_at: "2026-09-01T00:00:00Z" }),
+    dep({ app: "api", version: "3.2.0", state: "deploying", created_at: "2026-09-30T00:00:00Z" }),
+    dep({ app: "api", account: PRD, version: "3.0.5", state: "deployed" }),
+    dep({ app: "api", account: PRD, version: "3.0.4", state: "undeployed", created_at: "2026-08-01T00:00:00Z" }),
+    dep({ app: "web", account: UAT, version: "2.4.1" }),
+    dep({ app: "web", account: PRD, version: "2.4.1", state: "undeployed" }),
   ];
 
   it("groups by app, newest live first, with undeployed rows as history", () => {
     const [api, web] = rowsOf(items);
     expect(api.app).toBe("api");
-    const dev = api.cells["dev|us-east-1"];
+    const dev = api.cells[`${DEV}|us-east-1`];
     expect(dev.live.map((d) => d.version)).toEqual(["3.2.0", "3.1.0"]);
     expect(cellLabel(dev)).toBe("3.1.0 → 3.2.0");
-    const prd = api.cells["prd|us-east-1"];
+    const prd = api.cells[`${PRD}|us-east-1`];
     expect(prd.live.map((d) => d.version)).toEqual(["3.0.5"]);
     expect(prd.history.map((d) => d.version)).toEqual(["3.0.4"]);
     expect(cellLabel(prd)).toBe("3.0.5");
-    expect(web.cells["prd|us-east-1"].live).toEqual([]);
-    expect(cellLabel(web.cells["prd|us-east-1"])).toBe("Not running");
+    expect(web.cells[`${PRD}|us-east-1`].live).toEqual([]);
+    expect(cellLabel(web.cells[`${PRD}|us-east-1`])).toBe("Not running");
   });
 
   it("marks drift: the newest live version, and cells behind it", () => {
@@ -100,14 +116,14 @@ describe("rowsOf", () => {
 
 describe("filterItems", () => {
   const items = [
-    dep({ app: "api", kind: "ec2", env: "dev" }),
-    dep({ app: "orders-api", kind: "ecs", env: "prd" }),
-    dep({ app: "reports", kind: "ecs", env: "dev" }),
+    dep({ app: "api", kind: "ec2" }),
+    dep({ app: "orders-api", kind: "ecs", account: PRD }),
+    dep({ app: "reports", kind: "ecs" }),
   ];
 
-  it("filters by kind, env, and app text", () => {
-    expect(filterItems(items, { kind: "ecs", envs: [], q: "" }).map((d) => d.app)).toEqual(["orders-api", "reports"]);
-    expect(filterItems(items, { kind: "", envs: ["dev"], q: "" }).map((d) => d.app)).toEqual(["api", "reports"]);
-    expect(filterItems(items, { kind: "", envs: [], q: "API" }).map((d) => d.app)).toEqual(["api", "orders-api"]);
+  it("filters by kind, account, and app text", () => {
+    expect(filterItems(items, { kind: "ecs", accounts: [], q: "" }).map((d) => d.app)).toEqual(["orders-api", "reports"]);
+    expect(filterItems(items, { kind: "", accounts: [DEV], q: "" }).map((d) => d.app)).toEqual(["api", "reports"]);
+    expect(filterItems(items, { kind: "", accounts: [], q: "API" }).map((d) => d.app)).toEqual(["api", "orders-api"]);
   });
 });

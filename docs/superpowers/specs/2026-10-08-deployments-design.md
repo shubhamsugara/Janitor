@@ -83,14 +83,18 @@ deployments:
 ## UI
 
 - Sidebar: a **Deployments** section after **Resources**, with one item, "Deployments".
-- Page: a matrix with apps as rows and env · region as columns. Columns are sorted by a known
-  env order (sbx, dev, qa/qas, uat, stg, prd/prod, then alphabetical), then region.
+- Page: a matrix with apps as rows and **account · region** as columns, labeled with the
+  account's name. Columns are sorted by a known env order matched on the name's first word (sbx,
+  dev, qa/qas, uat, stg, prd/prod, so `prd-us` sorts as prd; others last), then region. Env tags
+  are not columns: a deploy tool may tag every prod account's ASGs `env=prd` while ECS services
+  carry no env tag, which split one account across two columns in the first real scan. The env
+  tag is shown in the drawer.
 - A cell shows the live version. "Live" means any state except `undeployed`, newest first. Two
   live rows (a switch in progress) show `old → new`. In-progress and failed cells get a colored
   badge. A cell with only undeployed rows shows "Not running" and its last version.
 - A row whose live versions differ across envs shows "N versions", and cells below the newest
   version (dotted numeric order) are amber.
-- Filters: kind (EC2/ECS), env, and search on app. Kept in the URL.
+- Filters: kind (EC2/ECS), account, and search on app. Kept in the URL.
 - Clicking a cell opens a drawer with the live rows' details: ASG, deployment ID, capacity,
   launch template + version, AMI (name, status, link to the AMI page). For ECS: cluster,
   service, task definition, image, counts. Earlier versions (undeployed rows) come last.
