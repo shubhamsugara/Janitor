@@ -57,12 +57,17 @@ class Pricing(_Strict):
     volume_gb_month: dict[str, float] = Field(default_factory=lambda: {"gp3": 0.08})
 
 
+class Scan(_Strict):
+    concurrency: int = Field(8, ge=1, le=32)
+
+
 class Config(_Strict):
     provider: Literal["mock", "aws"] = "mock"
     owner: Owner
     accounts: dict[str, Account]
     policy: Policy = Field(default_factory=Policy)
     pricing: Pricing = Field(default_factory=Pricing)
+    scan: Scan = Field(default_factory=Scan)
 
     @field_validator("accounts")
     @classmethod
@@ -79,6 +84,12 @@ class Config(_Strict):
         for account_id, account in self.accounts.items():
             if "ami" in account.owns and account_id != self.owner.account:
                 raise ValueError(f"only the owner account may own ami (found in {account.name})")
+            if "snapshot" in account.owns and "volume" not in account.owns:
+                # Snapshots are judged by whether their source volume still exists.
+                raise ValueError(
+                    f"{account.name} owns snapshot, so it must also own volume: Janitor needs "
+                    "its volumes to tell whether a snapshot's source volume still exists"
+                )
         return self
 
     def account_name(self, account_id: str) -> str:

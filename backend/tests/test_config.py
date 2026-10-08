@@ -80,3 +80,27 @@ def test_protected_tag_needs_a_value(tmp_path, value):
     path.write_text(yaml.safe_dump(data))
     with pytest.raises(ValidationError, match="needs a value"):
         load_config(path)
+
+
+def _variant(tmp_path, change):
+    data = yaml.safe_load(EXAMPLE.read_text())
+    change(data)
+    path = tmp_path / "janitor.yaml"
+    path.write_text(yaml.safe_dump(data))
+    return path
+
+
+def test_scan_concurrency_defaults_and_bounds(tmp_path):
+    assert load_config(EXAMPLE).scan.concurrency == 8
+    for bad in (0, 33):
+        path = _variant(tmp_path, lambda d, bad=bad: d.update(scan={"concurrency": bad}))
+        with pytest.raises(ValidationError):
+            load_config(path)
+
+
+def test_snapshot_owner_must_also_own_volumes(tmp_path):
+    path = _variant(
+        tmp_path, lambda d: d["accounts"]["222222222222"].update(owns=["snapshot", "rds_snapshot"])
+    )
+    with pytest.raises(ValidationError, match="must also own volume"):
+        load_config(path)
