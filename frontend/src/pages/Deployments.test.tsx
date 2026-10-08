@@ -103,6 +103,16 @@ describe("Deployments", () => {
     expect(screen.getByText("None: this instance isn't in an Auto Scaling group")).toBeTruthy();
   });
 
+  it("gives every account column the same width", async () => {
+    const { container } = renderWith({ scan_id: 1, items, failed: [] });
+    await screen.findByText("api");
+    expect(container.querySelector("table")?.className).toContain("table-fixed");
+    const [app, ...accounts] = [...container.querySelectorAll("col")].map((c) => c.style.width);
+    expect(app).toBeTruthy();
+    expect(accounts.length).toBe(2);
+    expect(new Set(accounts).size).toBe(1);
+  });
+
   it("filters by kind from the URL", async () => {
     renderWith({ scan_id: 1, items, failed: [] }, "/deployments?kind=ecs");
     expect(await screen.findByText("orders-api")).toBeTruthy();

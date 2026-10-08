@@ -16,6 +16,10 @@ import { Sheet } from "../ui/sheet";
 import { Spinner } from "../ui/spinner";
 import { Table, TBody, Td, Th, THead, Tr } from "../ui/table";
 
+// One width for every account column, so the grid reads evenly; long content wraps instead.
+const APP_WIDTH = 220;
+const COLUMN_WIDTH = 168;
+
 const KINDS: { value: DeploymentFilters["kind"]; label: string }[] = [
   { value: "", label: "All" },
   { value: "ec2", label: "EC2" },
@@ -53,7 +57,7 @@ function CellButton({ cell, latest, onOpen }: { cell: Cell; latest: string | nul
     >
       <span
         className={cn(
-          "font-mono text-[13px] whitespace-nowrap",
+          "font-mono text-[13px] break-words",
           !newest && "font-sans text-muted",
           behind && "text-amber-700 dark:text-amber-400",
         )}
@@ -170,13 +174,19 @@ export default function Deployments({ meta, notify }: PageProps) {
         ) : rows.length === 0 ? (
           <p className="py-16 text-center text-muted">No apps match these filters.</p>
         ) : (
-          <Table>
+          <Table className="table-fixed" style={{ width: APP_WIDTH + columns.length * COLUMN_WIDTH, minWidth: "100%" }}>
+            <colgroup>
+              <col style={{ width: APP_WIDTH }} />
+              {columns.map((c) => (
+                <col key={c.key} style={{ width: COLUMN_WIDTH }} />
+              ))}
+            </colgroup>
             <THead>
               <tr>
                 <Th className="sticky left-0 z-[1] bg-card">App</Th>
                 {columns.map((c) => (
-                  <Th key={c.key}>
-                    <div>{c.name}</div>
+                  <Th key={c.key} className="truncate" title={`${c.name} · ${c.region}`}>
+                    <div className="truncate">{c.name}</div>
                     <div className="font-normal tracking-normal normal-case">{c.region}</div>
                   </Th>
                 ))}
@@ -185,9 +195,9 @@ export default function Deployments({ meta, notify }: PageProps) {
             <TBody>
               {rows.map((row) => (
                 <Tr key={row.app}>
-                  <Td className="sticky left-0 z-[1] bg-card">
-                    <div className="font-medium whitespace-nowrap">{row.app}</div>
-                    <div className="mt-1 flex gap-1">
+                  <Td className="sticky left-0 z-[1] bg-card align-top">
+                    <div className="font-medium break-words">{row.app}</div>
+                    <div className="mt-1 flex flex-wrap gap-1">
                       {row.kinds.map((k) => (
                         <Badge key={k}>{k.toUpperCase()}</Badge>
                       ))}
@@ -197,7 +207,7 @@ export default function Deployments({ meta, notify }: PageProps) {
                   {columns.map((c) => {
                     const cell = row.cells[c.key];
                     return (
-                      <Td key={c.key} className="px-1.5">
+                      <Td key={c.key} className="px-1.5 align-top">
                         {cell ? (
                           <CellButton cell={cell} latest={row.latest} onOpen={() => setOpen({ app: row.app, column: c, cell })} />
                         ) : (
