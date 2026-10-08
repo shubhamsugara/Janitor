@@ -16,7 +16,16 @@ from datetime import UTC, datetime
 import boto3
 
 from janitor.config import Config
-from janitor.models import Database, Inventory, Resource, Segment, Share, Unresolved, Usage
+from janitor.models import (
+    Database,
+    Deployment,
+    Inventory,
+    Resource,
+    Segment,
+    Share,
+    Unresolved,
+    Usage,
+)
 from janitor.providers import normalize, session
 from janitor.providers.base import OnSegment, first_phase, member_accounts, second_phase
 
@@ -35,9 +44,14 @@ OPERATIONS = frozenset(
         "DescribeLaunchTemplateVersions",
         "DescribeAutoScalingGroups",
         "DescribeLaunchConfigurations",
+        "ListClusters",
+        "ListServices",
+        "DescribeServices",
+        "DescribeTaskDefinition",
     }
 )
 MAX_FILTER_VALUES = 200
+MAX_ECS_SERVICES = 10  # DescribeServices takes at most 10 services per call
 LIVE_STATES = ["pending", "running", "shutting-down", "stopping", "stopped"]
 
 
@@ -49,9 +63,10 @@ class _Rows:
     databases: list[Database] = field(default_factory=list)
     unresolved: list[Unresolved] = field(default_factory=list)
     copies: dict[str, str] = field(default_factory=dict)  # destination AMI -> source AMI
+    deployments: list[Deployment] = field(default_factory=list)
 
     def count(self) -> int:
-        return len(self.resources) + len(self.databases) + len(self.usage)
+        return len(self.resources) + len(self.databases) + len(self.usage) + len(self.deployments)
 
     def add(self, other: "_Rows") -> None:
         self.resources += other.resources
@@ -60,6 +75,7 @@ class _Rows:
         self.databases += other.databases
         self.unresolved += other.unresolved
         self.copies |= other.copies
+        self.deployments += other.deployments
 
 
 class AwsProvider:
@@ -135,6 +151,7 @@ class AwsProvider:
             databases=rows.databases,
             segments=segments,
             unresolved=rows.unresolved,
+            deployments=rows.deployments,
         )
 
     def recheck(self, items: list[dict]) -> dict[str, str]:
@@ -291,6 +308,7 @@ class AwsProvider:
             "volume": self._volumes,
             "rds_snapshot": self._rds_snapshots,
             "database": self._databases,
+            "ecs": self._ecs,
         }
 
     def _sessions(
@@ -451,4 +469,39 @@ class AwsProvider:
         rows.usage += found
         rows.unresolved += unresolved
         rows.usage += normalize.launch_config_usage(configs, account, region, ami_ids)
+        # The same pages hold the EC2 deployments: ASGs a deploy tool tagged with a state.
+        rows.deployments += normalize.asg_deployments(
+            groups,
+            templates,
+            versions,
+            by_name,
+            account,
+            region,
+            self._config.deployments.tags,
+            self._config.account_name(account),
+        )
+        return rows
+
+    def _ecs(self, sess: boto3.Session, account: str, region: str) -> _Rows:
+        """Every ECS service, with the task definition it runs (described once per revision)."""
+        ecs = self._client(sess, "ecs", region)
+        keys, env = self._config.deployments.tags, self._config.account_name(account)
+        rows, taskdefs = _Rows(), {}
+        for cluster in self._pages(ecs, "list_clusters", "clusterArns"):
+            arns = list(self._pages(ecs, "list_services", "serviceArns", cluster=cluster))
+            for start in range(0, len(arns), MAX_ECS_SERVICES):
+                described = ecs.describe_services(
+                    cluster=cluster,
+                    services=arns[start : start + MAX_ECS_SERVICES],
+                    include=["TAGS"],
+                )
+                for service in described.get("services") or []:
+                    arn = service["taskDefinition"]
+                    if arn not in taskdefs:
+                        taskdefs[arn] = ecs.describe_task_definition(
+                            taskDefinition=arn, include=["TAGS"]
+                        )
+                    rows.deployments.append(
+                        normalize.ecs_deployment(service, taskdefs[arn], account, region, keys, env)
+                    )
         return rows

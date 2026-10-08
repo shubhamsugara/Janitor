@@ -134,15 +134,113 @@ def test_segments_cover_every_account_region_and_kind(aws):
     got = sorted((s.account, s.region, s.kind) for s in inventory.segments)
     regions = ("us-east-1", "us-west-2")
     expected = sorted(
-        [(TOOLS, r, k) for r in regions for k in ("ami", "snapshot", "volume", "usage")]
+        [(TOOLS, r, k) for r in regions for k in ("ami", "snapshot", "volume", "usage", "ecs")]
         + [
             (DEV, r, k)
             for r in regions
-            for k in ("snapshot", "volume", "rds_snapshot", "database", "usage")
+            for k in ("snapshot", "volume", "rds_snapshot", "database", "usage", "ecs")
         ]
     )
     assert got == expected
     assert len(seen) == len(inventory.segments)
+
+
+def build_deployments(ami: str) -> None:
+    """In dev: a live blue/green ASG on `ami`, its undeployed predecessor, an untagged ASG, and
+    an ECS service whose task definition carries the app and version tags."""
+    dev = account_session(DEV)
+    ec2, autoscaling = dev.client("ec2"), dev.client("autoscaling")
+    template = ec2.create_launch_template(
+        LaunchTemplateName="web", LaunchTemplateData={"ImageId": MOTO_BASE_AMI}
+    )["LaunchTemplate"]
+    ec2.create_launch_template_version(
+        LaunchTemplateId=template["LaunchTemplateId"], LaunchTemplateData={"ImageId": ami}
+    )
+
+    def asg(name: str, pinned: str, desired: int, **tags: str) -> None:
+        autoscaling.create_auto_scaling_group(
+            AutoScalingGroupName=name,
+            LaunchTemplate={"LaunchTemplateId": template["LaunchTemplateId"], "Version": pinned},
+            MinSize=0,
+            MaxSize=2,
+            DesiredCapacity=desired,
+            AvailabilityZones=["us-east-1a"],
+            Tags=[
+                {"Key": k.replace("_", "-"), "Value": v, "PropagateAtLaunch": False}
+                for k, v in tags.items()
+            ],
+        )
+
+    asg(
+        "dev-web-1.1.0-1", "1", 0, role="web", env="dev", version="1.1.0", deploy_state="undeployed"
+    )
+    asg(
+        "dev-web-1.2.0-2",
+        "2",
+        1,
+        role="web",
+        env="dev",
+        version="1.2.0",
+        deploy_state="deployed",
+        deployment_id="2",
+    )
+    asg("eks-nodes", "1", 0)
+
+    ecs = dev.client("ecs")
+    ecs.create_cluster(clusterName="apps")
+    taskdef = ecs.register_task_definition(
+        family="orders-api",
+        containerDefinitions=[
+            {"name": "app", "image": "registry.example/orders-api:2.7.0", "memory": 512}
+        ],
+        tags=[{"key": "app", "value": "orders-api"}, {"key": "version", "value": "2.7.0"}],
+    )["taskDefinition"]["taskDefinitionArn"]
+    ecs.create_service(
+        cluster="apps", serviceName="orders-api", taskDefinition=taskdef, desiredCount=2
+    )
+
+
+def test_deployments_from_tagged_asgs_and_ecs_services(aws):
+    world = build_world()
+    build_deployments(world["ami"])
+    inventory = AwsProvider(make_config(), clock=lambda: NOW).list_inventory()
+    assert all(s.ok for s in inventory.segments), [s for s in inventory.segments if not s.ok]
+    found = sorted(
+        (d.kind, d.account, d.region, d.env, d.app, d.version, d.state)
+        for d in inventory.deployments
+    )
+    assert found == [
+        ("ec2", DEV, "us-east-1", "dev", "web", "1.1.0", "undeployed"),
+        ("ec2", DEV, "us-east-1", "dev", "web", "1.2.0", "deployed"),
+        ("ecs", DEV, "us-east-1", "dev", "orders-api", "2.7.0", "deploying"),  # moto: rolling out
+    ]
+    live = next(d for d in inventory.deployments if d.state == "deployed" and d.kind == "ec2")
+    assert (live.ami_id, live.launch_template, live.launch_template_version) == (
+        world["ami"],
+        "web",
+        "2",
+    )
+    assert (live.deployment_id, live.desired) == ("2", 1)
+    ecs = next(d for d in inventory.deployments if d.kind == "ecs")
+    assert (ecs.cluster, ecs.task_definition, ecs.desired) == ("apps", "orders-api:1", 2)
+
+
+def test_an_ecs_check_that_fails_doesnt_touch_amis(aws, monkeypatch):
+    from botocore.exceptions import ClientError
+
+    world = build_world()
+    real = AwsProvider._ecs
+
+    def denied(self, sess, account, region):
+        if account == DEV:
+            raise ClientError({"Error": {"Code": "AccessDenied", "Message": "no"}}, "ListClusters")
+        return real(self, sess, account, region)
+
+    monkeypatch.setattr(AwsProvider, "_ecs", denied)
+    inventory = AwsProvider(make_config(), clock=lambda: NOW).list_inventory()
+    failed = [(s.account, s.kind, s.error_kind) for s in inventory.segments if not s.ok]
+    assert failed == [(DEV, "ecs", "denied")] * 2  # both regions
+    assert world["ami"] in {r.id for r in inventory.resources}
 
 
 def test_pagination_reads_every_page(aws, monkeypatch):
@@ -315,8 +413,8 @@ def test_a_check_that_fails_while_reporting_still_reports_as_failed(aws, monkeyp
 
     monkeypatch.setattr(aws_module.session, "source", unreachable)
     inventory = AwsProvider(make_config(), clock=lambda: NOW).list_inventory()
-    # tools: ami, snapshot, volume, usage; dev (listed): five kinds; two regions each
-    assert len(inventory.segments) == 2 * 4 + 2 * 5
+    # tools: ami, snapshot, volume, usage, ecs; dev (listed): six kinds; two regions each
+    assert len(inventory.segments) == 2 * 5 + 2 * 6
     assert all(not s.ok and s.error_kind == "other" for s in inventory.segments)
 
 
@@ -324,7 +422,7 @@ def test_an_account_found_only_in_launch_permissions_is_scanned_through_the_hub(
     world = build_world()
     inventory = AwsProvider(make_config(accounts={}), clock=lambda: NOW).list_inventory()
     assert {(s.account, s.kind) for s in inventory.segments if s.account == DEV} == {
-        (DEV, k) for k in ("snapshot", "volume", "rds_snapshot", "database", "usage")
+        (DEV, k) for k in ("snapshot", "volume", "rds_snapshot", "database", "usage", "ecs")
     }
     assert [(u.account, u.ref_id) for u in inventory.usage] == [(DEV, world["used_by"])]
     assert world["dev_volume"] in {r.id for r in inventory.resources}

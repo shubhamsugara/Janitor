@@ -80,7 +80,7 @@ class Segment:
 
     account: str
     region: str
-    kind: str  # "ami", "snapshot", "volume", "rds_snapshot", "database", or "usage"
+    kind: str  # "ami", "snapshot", "volume", "rds_snapshot", "database", "usage", or "ecs"
     ok: bool
     items: int = 0
     error_kind: str = ""  # "expired", "denied", "throttled", "blocked", or "other"
@@ -100,6 +100,31 @@ class Unresolved:
 
 
 @dataclass
+class Deployment:
+    """One deploy of an app: an ASG a deploy tool tagged, or an ECS service. Shown, never judged."""
+
+    kind: str  # "ec2" or "ecs"
+    account: str
+    region: str
+    env: str
+    app: str
+    version: str
+    state: str  # "deploying", "deployed", "undeploying", "undeployed", or "failed"
+    resource_id: str  # ASG name; service ARN
+    name: str  # ASG name; service name
+    created_at: str
+    desired: int = 0
+    running: int = 0
+    deployment_id: str = ""  # ec2
+    launch_template: str = ""  # ec2: template name
+    launch_template_version: str = ""  # ec2: the version number the ASG pins
+    ami_id: str | None = None  # ec2: the image that version (or launch configuration) names
+    cluster: str = ""  # ecs
+    task_definition: str = ""  # ecs: family:revision
+    image: str = ""  # ecs: the first container's image
+
+
+@dataclass
 class Inventory:
     resources: list[Resource]
     shares: list[Share]
@@ -107,6 +132,7 @@ class Inventory:
     databases: list[Database]
     segments: list[Segment] = field(default_factory=list)
     unresolved: list[Unresolved] = field(default_factory=list)
+    deployments: list[Deployment] = field(default_factory=list)
 
 
 @dataclass

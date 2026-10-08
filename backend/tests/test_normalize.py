@@ -6,6 +6,7 @@ import pytest
 from botocore.exceptions import ClientError, NoCredentialsError
 from helpers import DEV, TOOLS
 
+from janitor.config import DeploymentTags
 from janitor.providers import normalize as n
 from janitor.providers.guard import ReadOnlyViolation
 
@@ -385,3 +386,164 @@ def client_error(code, operation="DescribeImages"):
 )
 def test_classify_errors(exc, kind, detail):
     assert n.classify(exc) == (kind, detail)
+
+
+# Deployments
+
+TAGS = DeploymentTags()
+
+
+def tagged(name, desired=2, in_service=2, **tags):
+    return group(
+        name,
+        desired,
+        CreatedTime=WHEN,
+        Tags=[{"Key": k.replace("_", "-"), "Value": v} for k, v in tags.items()],
+        Instances=[{"LifecycleState": "InService"}] * in_service + [{"LifecycleState": "Pending"}],
+        LaunchTemplate={"LaunchTemplateId": "lt-1", "Version": "3"},
+    )
+
+
+def test_only_asgs_with_the_state_tag_are_deployments():
+    groups = [
+        tagged(
+            "dev-web-1.2.0-7",
+            role="web",
+            env="dev",
+            version="1.2.0",
+            deploy_state="deployed",
+            deployment_id="7",
+        ),
+        group("eks-nodes", LaunchTemplate={"LaunchTemplateId": "lt-1"}),
+    ]
+    [d] = n.asg_deployments(groups, TEMPLATES, VERSIONS, {}, DEV, "us-east-1", TAGS, "dev-acct")
+    assert (d.kind, d.app, d.env, d.version, d.state, d.deployment_id) == (
+        "ec2",
+        "web",
+        "dev",
+        "1.2.0",
+        "deployed",
+        "7",
+    )
+    assert (d.resource_id, d.name, d.created_at) == (
+        "dev-web-1.2.0-7",
+        "dev-web-1.2.0-7",
+        "2026-01-31T12:00:00Z",
+    )
+    assert (d.desired, d.running) == (2, 2)  # the pending instance isn't running yet
+    assert (d.launch_template, d.launch_template_version, d.ami_id) == ("web", "3", "ami-0ccc")
+
+
+def test_asg_deployment_falls_back_to_the_group_name_and_the_account_name():
+    groups = [tagged("old-batch", desired=0, in_service=0, deploy_state="undeployed")]
+    [d] = n.asg_deployments(groups, TEMPLATES, VERSIONS, {}, DEV, "us-east-1", TAGS, "dev-acct")
+    assert (d.app, d.env, d.version, d.state, d.desired) == (
+        "old-batch",
+        "dev-acct",
+        "",
+        "undeployed",
+        0,
+    )
+
+
+def test_asg_deployment_image_from_launch_config_or_none_for_ssm():
+    legacy = tagged("a", role="a", deploy_state="deployed")
+    del legacy["LaunchTemplate"]
+    legacy["LaunchConfigurationName"] = "lc-a"
+    ssm = tagged("b", role="b", deploy_state="deployed")
+    ssm["LaunchTemplate"] = {"LaunchTemplateName": "web", "Version": "$Latest"}
+    found = n.asg_deployments(
+        [legacy, ssm],
+        TEMPLATES,
+        VERSIONS,
+        {"lc-a": {"ImageId": "ami-0bbb"}},
+        DEV,
+        "us-east-1",
+        TAGS,
+        "dev",
+    )
+    assert [(d.app, d.ami_id, d.launch_template, d.launch_template_version) for d in found] == [
+        ("a", "ami-0bbb", "", ""),
+        ("b", None, "web", "4"),
+    ]
+
+
+def test_renamed_tags_are_read_first_present_wins():
+    tags = DeploymentTags(app=["service", "role"], state="stage")
+    groups = [tagged("x", role="r", stage="deployed")]
+    [d] = n.asg_deployments(groups, TEMPLATES, VERSIONS, {}, DEV, "us-east-1", tags, "dev")
+    assert (d.app, d.state) == ("r", "deployed")
+
+
+CLUSTER = "arn:aws:ecs:us-east-1:222222222222:cluster/apps"
+
+
+def service(desired=3, running=3, rollout="COMPLETED", status="ACTIVE", tags=None, extra=()):
+    return {
+        "serviceArn": "arn:aws:ecs:us-east-1:222222222222:service/apps/orders-api",
+        "serviceName": "orders-api",
+        "clusterArn": CLUSTER,
+        "status": status,
+        "desiredCount": desired,
+        "runningCount": running,
+        "createdAt": WHEN,
+        "taskDefinition": "arn:aws:ecs:us-east-1:222222222222:task-definition/orders-api:42",
+        "deployments": [{"status": "PRIMARY", "rolloutState": rollout}, *extra],
+        "tags": [{"key": k, "value": v} for k, v in (tags or {}).items()],
+    }
+
+
+def taskdef(image="registry.example/orders-api:2.7.0", **tags):
+    return {
+        "taskDefinition": {
+            "family": "orders-api",
+            "revision": 42,
+            "containerDefinitions": [{"image": image}, {"image": "sidecar:1"}],
+        },
+        "tags": [{"key": k, "value": v} for k, v in tags.items()],
+    }
+
+
+def test_ecs_service_is_a_deployment_with_its_task_definition_version():
+    d = n.ecs_deployment(
+        service(), taskdef(app="orders", version="2.7.1"), DEV, "us-east-1", TAGS, "dev"
+    )
+    assert (d.kind, d.app, d.env, d.version, d.state) == (
+        "ecs",
+        "orders",
+        "dev",
+        "2.7.1",
+        "deployed",
+    )
+    assert (d.cluster, d.name, d.task_definition, d.image) == (
+        "apps",
+        "orders-api",
+        "orders-api:42",
+        "registry.example/orders-api:2.7.0",
+    )
+    assert (d.desired, d.running, d.created_at, d.ami_id) == (3, 3, "2026-01-31T12:00:00Z", None)
+
+
+def test_ecs_version_falls_back_to_the_image_tag_and_env_to_the_service_tag():
+    d = n.ecs_deployment(service(tags={"env": "qas"}), taskdef(), DEV, "us-east-1", TAGS, "dev")
+    assert (d.app, d.env, d.version) == ("orders-api", "qas", "2.7.0")
+    digest = taskdef(image="registry.example/orders-api@sha256:abc")
+    assert n.ecs_deployment(service(), digest, DEV, "us-east-1", TAGS, "dev").version == ""
+    assert n.ecs_deployment(service(), None, DEV, "us-east-1", TAGS, "dev").version == ""
+    port = taskdef(image="registry.example:5000/orders-api")
+    assert n.ecs_deployment(service(), port, DEV, "us-east-1", TAGS, "dev").version == ""
+
+
+@pytest.mark.parametrize(
+    ("svc", "state"),
+    [
+        (service(desired=0, running=0), "undeployed"),
+        (service(status="DRAINING"), "undeploying"),
+        (service(rollout="IN_PROGRESS"), "deploying"),
+        (service(rollout="FAILED"), "failed"),
+        (service(rollout=None, extra=[{"status": "ACTIVE"}]), "deploying"),
+        (service(rollout=None), "deployed"),
+    ],
+)
+def test_ecs_state(svc, state):
+    assert n.ecs_deployment(svc, taskdef(), DEV, "us-east-1", TAGS, "dev").state == state

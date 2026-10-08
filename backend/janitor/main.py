@@ -216,6 +216,31 @@ def create_app(
             "newest_failed": newest_failed,
         }
 
+    @app.get("/api/deployments")
+    def deployments():
+        """Every deployment in the shown scan, with its AMI when the scan has it."""
+        scan = store.latest_scan()
+        if not scan:
+            return {"scan_id": None, "items": [], "failed": []}
+        rows = store.deployments(scan["id"])
+        ami_ids = sorted({d.ami_id for d in rows if d.ami_id})
+        amis = {r.id: r for r in store.get_resources(scan["id"], ami_ids)}
+        return {
+            "scan_id": scan["id"],
+            "items": [
+                asdict(d)
+                | {
+                    "account_name": config.account_name(d.account),
+                    "ami": {"id": ami.id, "name": ami.name, "status": ami.status}
+                    if (ami := amis.get(d.ami_id or ""))
+                    else None,
+                }
+                for d in rows
+            ],
+            # EC2 deployments come from the usage check; ECS services from their own check.
+            "failed": [f for f in failed_checks(scan["id"]) if f["kind"] in ("usage", "ecs")],
+        }
+
     @app.get("/api/resources")
     def resources(
         filters: Filters,

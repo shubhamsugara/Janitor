@@ -224,3 +224,30 @@ def test_ignoring_the_unreachable_demo_account_makes_its_ami_deletable_with_a_wa
     assert "W7" in rules_of(store, scan_id, partner) and "R2" not in rules_of(
         store, scan_id, partner
     )
+
+
+def test_scan_stores_the_providers_deployments(tmp_path, config):
+    from janitor.models import Deployment
+
+    found = Deployment(
+        "ecs",
+        "222222222222",
+        "us-east-1",
+        "dev",
+        "orders",
+        "2.0",
+        "deployed",
+        "arn:svc",
+        "svc",
+        "2026-01-15T00:00:00Z",
+    )
+
+    class WithDeployments(Segmented):
+        def list_inventory(self, on_segment=None) -> Inventory:
+            inventory = super().list_inventory(on_segment)
+            inventory.deployments = [found]
+            return inventory
+
+    store = Store(tmp_path / "janitor.db")
+    scan_id = Scanner(store, WithDeployments([]), config, clock=lambda: NOW).run()
+    assert store.deployments(scan_id) == [found]

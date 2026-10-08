@@ -133,6 +133,7 @@ class Scanner:
             self._store.save_inventory(
                 scan_id, inventory.resources, inventory.shares, inventory.usage, inventory.databases
             )
+            self._store.save_deployments(scan_id, inventory.deployments)
             self._store.set_notes(
                 scan_id, {"unresolved": [asdict(u) for u in inventory.unresolved]}
             )

@@ -13,6 +13,7 @@ from pathlib import Path
 from janitor.config import Config, load_config
 from janitor.models import (
     Database,
+    Deployment,
     Inventory,
     Resource,
     Segment,
@@ -64,6 +65,8 @@ class MockProvider:
             counts[(d.account, d.region, "database")] += 1
         for u in inv.usage:
             counts[(u.account, u.region, "usage")] += 1
+        for d in inv.deployments:
+            counts[(d.account, d.region, "usage" if d.kind == "ec2" else "ecs")] += 1
         members = member_accounts(config, inv.shares)
         amis = [r for r in inv.resources if r.type == "ami"]
         planned = first_phase(config) + second_phase(config, members, amis, inv.shares)
@@ -83,6 +86,12 @@ class MockProvider:
             resource.created_at = format_ts(parse_ts(resource.created_at) + shift)
             resources.append(resource)
         unreachable = set(self._seed.get("unreachable", []))  # a failed check contributes no rows
+        deployments = []
+        for item in self._seed.get("deployments", []):
+            if item["account"] not in unreachable:
+                deployment = Deployment(**item)
+                deployment.created_at = format_ts(parse_ts(deployment.created_at) + shift)
+                deployments.append(deployment)
         return Inventory(
             resources=[r for r in resources if r.account not in unreachable],
             shares=[Share(**s) for s in self._seed["shares"]],
@@ -90,4 +99,5 @@ class MockProvider:
             databases=[
                 Database(**d) for d in self._seed["databases"] if d["account"] not in unreachable
             ],
+            deployments=deployments,
         )

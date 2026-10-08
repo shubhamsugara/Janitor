@@ -27,7 +27,7 @@ ADMIN_FIRST = (
     "snapshot",
     "volume",
 )  # AMIs first: their launch permissions name the accounts
-MEMBER_KINDS = ("snapshot", "volume", "rds_snapshot", "database", "usage")
+MEMBER_KINDS = ("snapshot", "volume", "rds_snapshot", "database", "usage", "ecs")
 
 
 def first_phase(config: Config) -> list[tuple[str, str, str]]:
@@ -47,9 +47,9 @@ def member_accounts(config: Config, shares: list[Share]) -> list[str]:
 def second_phase(
     config: Config, members: list[str], amis: list[Resource], shares: list[Share]
 ) -> list[tuple[str, str, str]]:
-    """Usage in the admin account, then each member's lists and usage.
+    """Usage and ECS services in the admin account, then each member's lists, usage, and ECS.
 
-    A member's resources are listed in its own regions. Its usage is also checked wherever an
+    A member's resources and ECS services are listed in its own regions. Its usage is also checked wherever an
     admin AMI is shared with it: launch permissions are region-scoped, so an AMI in us-east-1
     shared with an EU-only account can still be launched there, and only a check proves it isn't.
     """
@@ -58,7 +58,7 @@ def second_phase(
     for share in shares:
         if share.principal_type == "account" and share.image_id in region_of:
             shared_in.setdefault(share.principal, set()).add(region_of[share.image_id])
-    plan = [(config.admin.account, region, "usage") for region in config.regions]
+    plan = [(config.admin.account, r, k) for r in config.regions for k in ("usage", "ecs")]
     for account in members:
         own = config.regions_for(account)
         plan += [(account, region, kind) for region in own for kind in MEMBER_KINDS]

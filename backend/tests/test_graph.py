@@ -108,14 +108,16 @@ def test_used_by_separates_instances_from_references(scanned):
     summary = graph_of(scanned, base_20(store, scan_id))["used_by"]["summary"]
     assert summary == (
         "Used by 1 running instance and 1 stopped instance in dev and qas. "
-        "Also named by 1 active Auto Scaling group and 1 launch template in prd and uat."
+        "Also named by 8 active Auto Scaling groups, 1 inactive Auto Scaling group and 1 launch "
+        "template in dev, prd, qas and uat."
     )
     web = named(store, scan_id, f"app-web-{stamp(10)}", type="ami")
     used = graph_of(scanned, web)["used_by"]
     assert used == {
         "active": 0,
         "total": 0,
-        "summary": "No instance uses it. Named by 1 active Auto Scaling group and 1 launch template in prd.",
+        "summary": "No instance uses it. Named by 4 active Auto Scaling groups, 1 inactive Auto "
+        "Scaling group and 1 launch template in prd, qas and uat.",
     }
 
 

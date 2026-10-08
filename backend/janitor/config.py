@@ -82,6 +82,23 @@ class Scan(_Strict):
     concurrency: int = Field(8, ge=1, le=32)
 
 
+class DeploymentTags(_Strict):
+    """The tags a deploy tool puts on its ASGs, ECS services, and task definitions.
+
+    For the lists, the first tag present wins. Only ASGs carrying `state` are deployments.
+    """
+
+    app: list[str] = Field(default_factory=lambda: ["role", "app"], min_length=1)
+    env: list[str] = Field(default_factory=lambda: ["env"], min_length=1)
+    version: list[str] = Field(default_factory=lambda: ["version"], min_length=1)
+    state: str = Field("deploy-state", min_length=1)
+    deployment_id: str = "deployment-id"
+
+
+class Deployments(_Strict):
+    tags: DeploymentTags = Field(default_factory=DeploymentTags)
+
+
 class ConfigError(ValueError):
     """janitor.yaml can't be used; the message says why and what to change."""
 
@@ -102,6 +119,7 @@ class Config(_Strict):
     policy: Policy = Field(default_factory=Policy)
     pricing: Pricing = Field(default_factory=Pricing)
     scan: Scan = Field(default_factory=Scan)
+    deployments: Deployments = Field(default_factory=Deployments)
 
     @model_validator(mode="before")
     @classmethod

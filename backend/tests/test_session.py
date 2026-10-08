@@ -31,10 +31,16 @@ def profiles(tmp_path, monkeypatch):
     return tmp_path
 
 
-def test_member_session_policy_allows_only_describe():
+def test_member_session_policy_allows_only_describe_and_list():
     (statement,) = SESSION_POLICY["Statement"]
     assert statement["Effect"] == "Allow"
-    assert statement["Action"] == ["ec2:Describe*", "autoscaling:Describe*", "rds:Describe*"]
+    assert statement["Action"] == [
+        "ec2:Describe*",
+        "autoscaling:Describe*",
+        "rds:Describe*",
+        "ecs:Describe*",
+        "ecs:List*",  # ECS lists clusters and services; there is no Describe for that
+    ]
 
 
 def test_check_profiles_names_the_admin_profile_and_member_role(tmp_path, monkeypatch, config):

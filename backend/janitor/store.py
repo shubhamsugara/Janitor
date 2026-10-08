@@ -13,10 +13,20 @@ from dataclasses import asdict, fields
 from datetime import UTC, datetime
 from pathlib import Path
 
-from janitor.models import Database, Resource, RuleResult, Segment, Share, Usage, format_ts
+from janitor.models import (
+    Database,
+    Deployment,
+    Resource,
+    RuleResult,
+    Segment,
+    Share,
+    Usage,
+    format_ts,
+)
 
-SCHEMA_VERSION = 5  # bump when a scan table changes shape; old scan data is dropped
+SCHEMA_VERSION = 6  # bump when a scan table changes shape; old scan data is dropped
 RESOURCE_FIELDS = [f.name for f in fields(Resource)]
+DEPLOYMENT_FIELDS = [f.name for f in fields(Deployment)]
 JSON_FIELDS = {"tags", "snapshot_ids", "cost_breakdown"}
 SORTABLE = {
     "id",
@@ -28,7 +38,15 @@ SORTABLE = {
     "account",
     "est_monthly_cost",
 }
-SCAN_TABLES = ("resources", "shares", "usage", "policy_results", "databases", "scan_segments")
+SCAN_TABLES = (
+    "resources",
+    "shares",
+    "usage",
+    "policy_results",
+    "databases",
+    "scan_segments",
+    "deployments",
+)
 READABLE = "status IN ('ok', 'partial')"  # a partial scan is shown; failed checks show as unknown
 AGE_BUCKETS = (("<30d", 30), ("30–90d", 90), ("90–180d", 180), ("180–365d", 365))
 AGE_KEYS = [label for label, _ in AGE_BUCKETS] + [">1y"]
@@ -64,6 +82,13 @@ CREATE TABLE IF NOT EXISTS usage (
 CREATE TABLE IF NOT EXISTS databases (
   scan_id INTEGER NOT NULL, id TEXT NOT NULL, account TEXT NOT NULL, region TEXT NOT NULL,
   kind TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS deployments (
+  scan_id INTEGER NOT NULL, kind TEXT NOT NULL, account TEXT NOT NULL, region TEXT NOT NULL,
+  env TEXT NOT NULL, app TEXT NOT NULL, version TEXT NOT NULL, state TEXT NOT NULL,
+  resource_id TEXT NOT NULL, name TEXT NOT NULL, created_at TEXT NOT NULL,
+  desired INTEGER NOT NULL, running INTEGER NOT NULL, deployment_id TEXT NOT NULL,
+  launch_template TEXT NOT NULL, launch_template_version TEXT NOT NULL, ami_id TEXT,
+  cluster TEXT NOT NULL, task_definition TEXT NOT NULL, image TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS policy_results (
   scan_id INTEGER NOT NULL, resource_id TEXT NOT NULL, rule_id TEXT NOT NULL,
   outcome TEXT NOT NULL, message TEXT NOT NULL);
@@ -530,6 +555,24 @@ class Store:
         return out
 
     # Rule results
+
+    # Deployments: shown as found, never judged
+
+    def save_deployments(self, scan_id: int, deployments: list[Deployment]) -> None:
+        cols = ",".join(["scan_id", *DEPLOYMENT_FIELDS])
+        marks = _marks([None] * (len(DEPLOYMENT_FIELDS) + 1))
+        with self._lock, self._db:
+            self._db.executemany(
+                f"INSERT INTO deployments ({cols}) VALUES ({marks})",
+                [(scan_id, *(getattr(d, f) for f in DEPLOYMENT_FIELDS)) for d in deployments],
+            )
+
+    def deployments(self, scan_id: int) -> list[Deployment]:
+        rows = self._q(
+            "SELECT * FROM deployments WHERE scan_id = ? ORDER BY app, env, region, created_at",
+            (scan_id,),
+        )
+        return [Deployment(**{f: row[f] for f in DEPLOYMENT_FIELDS}) for row in rows]
 
     def save_rule_results(self, scan_id: int, results: list[RuleResult]) -> None:
         with self._lock, self._db:

@@ -12,7 +12,17 @@ from botocore.exceptions import (
     TokenRetrievalError,
 )
 
-from janitor.models import Database, Resource, Share, Unresolved, Usage, format_ts, parse_ts
+from janitor.config import DeploymentTags
+from janitor.models import (
+    Database,
+    Deployment,
+    Resource,
+    Share,
+    Unresolved,
+    Usage,
+    format_ts,
+    parse_ts,
+)
 from janitor.providers.guard import ReadOnlyViolation
 
 BUILT = re.compile(r"Created by CreateImage\((i-[0-9a-f]+)\) for (ami-[0-9a-f]+)")
@@ -303,6 +313,119 @@ def launch_config_usage(
         for c in configs
         if c.get("ImageId") in ami_ids
     ]
+
+
+# Deployments
+
+
+def _first(tags: dict[str, str], keys: list[str]) -> str:
+    return next((tags[k] for k in keys if tags.get(k)), "")
+
+
+def asg_deployments(
+    groups: list[dict],
+    templates: list[dict],
+    versions: dict,
+    configs: dict[str, dict],
+    account: str,
+    region: str,
+    keys: DeploymentTags,
+    fallback_env: str,
+) -> list[Deployment]:
+    """ASGs a deploy tool tagged with a state; other groups aren't deployments."""
+    found = []
+    for group in groups:
+        tags = _tags(group)
+        if keys.state not in tags:
+            continue
+        name = group["AutoScalingGroupName"]
+        template_name, number, image_id = "", None, None
+        if specs := _asg_templates(group):
+            template = _by_id_or_name(templates, specs[0])
+            if template:
+                template_name = template["LaunchTemplateName"]
+                number = _pinned(template, specs[0].get("Version"))
+                image_id = _version_image(versions, template["LaunchTemplateId"], number)
+        elif group.get("LaunchConfigurationName"):
+            image_id = (configs.get(group["LaunchConfigurationName"]) or {}).get("ImageId")
+        found.append(
+            Deployment(
+                kind="ec2",
+                account=account,
+                region=region,
+                env=_first(tags, keys.env) or fallback_env,
+                app=_first(tags, keys.app) or name,
+                version=_first(tags, keys.version),
+                state=tags[keys.state],
+                resource_id=name,
+                name=name,
+                created_at=_ts(group["CreatedTime"]) if group.get("CreatedTime") else "",
+                desired=group.get("DesiredCapacity", 0),
+                running=sum(
+                    i.get("LifecycleState") == "InService" for i in group.get("Instances") or []
+                ),
+                deployment_id=tags.get(keys.deployment_id, ""),
+                launch_template=template_name,
+                launch_template_version="" if number is None else str(number),
+                ami_id=None if not image_id or image_id.startswith(SSM) else image_id,
+            )
+        )
+    return found
+
+
+def _ecs_tags(raw: dict | None) -> dict[str, str]:
+    return {t["key"]: t.get("value", "") for t in (raw or {}).get("tags") or []}
+
+
+def _ecs_state(service: dict) -> str:
+    if service.get("status") == "DRAINING":
+        return "undeploying"
+    if not service.get("desiredCount"):
+        return "undeployed"  # scaled to 0, like the standby side of a blue/green pair
+    deployments = service.get("deployments") or []
+    primary = next((d for d in deployments if d.get("status") == "PRIMARY"), {})
+    rollout = primary.get("rolloutState")
+    if rollout == "FAILED":
+        return "failed"
+    if rollout == "IN_PROGRESS" or (rollout is None and len(deployments) > 1):
+        return "deploying"
+    return "deployed"
+
+
+def ecs_deployment(
+    service: dict,
+    taskdef: dict | None,
+    account: str,
+    region: str,
+    keys: DeploymentTags,
+    fallback_env: str,
+) -> Deployment:
+    """An ECS service and the task definition it runs (DescribeTaskDefinition with tags)."""
+    definition = (taskdef or {}).get("taskDefinition") or {}
+    def_tags, svc_tags = _ecs_tags(taskdef), _ecs_tags(service)
+    containers = definition.get("containerDefinitions") or []
+    image = containers[0].get("image", "") if containers else ""
+    tag = image.rpartition(":")[2] if ":" in image and "@" not in image else ""
+    image_tag = "" if "/" in tag else tag  # registry.example:5000/app has a port, not a tag
+    family = definition.get("family") or service["taskDefinition"].rpartition("/")[2]
+    revision = definition.get("revision")
+    return Deployment(
+        kind="ecs",
+        account=account,
+        region=region,
+        env=_first(svc_tags, keys.env) or _first(def_tags, keys.env) or fallback_env,
+        app=_first(def_tags, keys.app) or _first(svc_tags, keys.app) or service["serviceName"],
+        version=_first(def_tags, keys.version) or image_tag,
+        state=_ecs_state(service),
+        resource_id=service["serviceArn"],
+        name=service["serviceName"],
+        created_at=_ts(service["createdAt"]) if service.get("createdAt") else "",
+        desired=service.get("desiredCount", 0),
+        running=service.get("runningCount", 0),
+        cluster=service.get("clusterArn", "").rpartition("/")[2],
+        task_definition=f"{family.partition(':')[0]}:{revision}" if revision else family,
+        image=image,
+    )
 
 
 # Errors

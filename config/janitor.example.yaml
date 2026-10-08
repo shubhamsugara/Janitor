@@ -28,3 +28,10 @@ pricing:                  # fallback only: real rates come from fixtures/prices.
   volume_gb_month: { gp3: 0.08, gp2: 0.10, io1: 0.125, io2: 0.125, st1: 0.045, sc1: 0.015, standard: 0.05 }
 scan:
   concurrency: 8          # parallel AWS calls per scan (1-32)
+deployments:              # the Deployments page: tags your deploy tool writes (these are the defaults)
+  tags:
+    app: [role, app]      # first tag present wins; else the ASG or ECS service name
+    env: [env]            # else the account's name
+    version: [version]    # ECS: else the first container's image tag
+    state: deploy-state   # only ASGs with this tag are deployments
+    deployment_id: deployment-id

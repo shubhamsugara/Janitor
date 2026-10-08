@@ -4,6 +4,9 @@
 Every status per type appears, plus the demo moments: an in-use AMI with running and
 stopped users, a prod-tagged volume, a dangling copied snapshot, snapshots of a deleted
 database, and an AMI shared with an account Janitor doesn't scan.
+
+Deployments: EC2 apps (tagged ASGs, each also an `asg` user of its AMI) and ECS services, with
+a switch in progress, a failed rollout, version drift, a blue/green standby, and old versions.
 """
 
 import json
@@ -40,6 +43,7 @@ class Seed:
         self.shares: list[dict] = []
         self.usage: list[dict] = []
         self.databases: list[dict] = []
+        self.deployments: list[dict] = []
 
     def new_id(self, prefix: str) -> str:
         return f"{prefix}-0000{self.rng.getrandbits(52):013x}"
@@ -212,6 +216,60 @@ class Seed:
             managed_by="rds_automated" if automated else managed_by,
         )
 
+    def asg(
+        self, account, region, env, app, version, state, days, ami, *, desired=2, n=1
+    ):
+        """A deploy tool's ASG: tagged with a state, launched from a template version."""
+        name = f"{env}-{app}-{version}-{n}"
+        running = desired if state in ("deployed", "deploying") else 0
+        self.deployments.append(
+            {
+                "kind": "ec2",
+                "account": account,
+                "region": region,
+                "env": env,
+                "app": app,
+                "version": version,
+                "state": state,
+                "resource_id": name,
+                "name": name,
+                "created_at": ts(days),
+                "desired": desired,
+                "running": running,
+                "deployment_id": str(n),
+                "launch_template": f"{env}-{app}",
+                "launch_template_version": str(n),
+                "ami_id": ami,
+            }
+        )
+        self.use(ami, account, region, "asg", name, "active" if desired else "inactive")
+
+    def service(
+        self, account, region, env, app, version, state, days, *, desired=2, name=None
+    ):
+        """An ECS service and the task definition revision it runs."""
+        name = name or app
+        revision = sum(1 for d in self.deployments if d["app"] == app) + 1
+        self.deployments.append(
+            {
+                "kind": "ecs",
+                "account": account,
+                "region": region,
+                "env": env,
+                "app": app,
+                "version": version,
+                "state": state,
+                "resource_id": f"arn:aws:ecs:{region}:{account}:service/apps/{name}",
+                "name": name,
+                "created_at": ts(days),
+                "desired": desired,
+                "running": 0 if state == "failed" else desired,
+                "cluster": "apps",
+                "task_definition": f"{app}:{revision}",
+                "image": f"registry.example/{app}:{version}",
+            }
+        )
+
     def to_json(self) -> dict:
         return {
             "anchor": ts(0),
@@ -219,6 +277,7 @@ class Seed:
             "shares": self.shares,
             "usage": self.usage,
             "databases": self.databases,
+            "deployments": self.deployments,
             # Accounts an AMI is shared with whose role Janitor can't assume (mock only).
             "unreachable": [UNSCANNED],
         }
@@ -496,7 +555,66 @@ def build() -> dict:
             attached=s.rng.random() < 0.5,
             tags={"owner": "dev-team"},
         )
+    deployments(s, base_20, web_10, west_copy)
     return s.to_json()
+
+
+def deployments(s: Seed, base: str, web: str, west_base: str) -> None:
+    """Apps in sbx, dev, uat, qas, and prd (two regions). Env names match the account names."""
+    envs = {"sbx": SBX, "dev": DEV, "uat": UAT, "qas": QAS, "prd": PRD}
+    # api: blue/green on EC2 (not in sbx: its share of the AMI stays unused for the demo). dev
+    # is mid-switch; prd keeps its previous group, scaled to 0.
+    for env, version, n in (("qas", "3.1.0", 9), ("uat", "3.1.0", 11)):
+        s.asg(envs[env], EAST, env, "api", version, "deployed", 12, base, n=n)
+    s.asg(DEV, EAST, "dev", "api", "3.1.0", "undeploying", 12, base, n=21)
+    s.asg(DEV, EAST, "dev", "api", "3.2.0", "deploying", 0.1, base, n=22)
+    s.asg(PRD, EAST, "prd", "api", "3.0.5", "deployed", 9, base, desired=6, n=31)
+    s.asg(PRD, EAST, "prd", "api", "3.0.4", "undeployed", 30, base, desired=0, n=30)
+    s.asg(PRD, WEST, "prd", "api", "3.0.5", "deployed", 9, west_base, desired=2, n=32)
+    # web: only uat, qas, and prd can launch its AMI. prd is a version behind.
+    s.asg(UAT, EAST, "uat", "web", "2.4.1", "deployed", 6, web, n=5)
+    s.asg(QAS, EAST, "qas", "web", "2.4.1", "deployed", 7, web, n=4)
+    s.asg(PRD, EAST, "prd", "web", "2.4.0", "deployed", 8, web, desired=4, n=3)
+    s.asg(PRD, EAST, "prd", "web", "2.3.9", "undeployed", 40, web, desired=0, n=2)
+    # worker: destroy-before-create on EC2.
+    s.asg(DEV, EAST, "dev", "worker", "1.8.0", "deployed", 4, base, desired=1, n=8)
+    s.asg(PRD, EAST, "prd", "worker", "1.7.2", "deployed", 20, base, desired=1, n=6)
+
+    # orders-api: rolling on ECS. The qas rollout of 2.8.0 failed.
+    for env, version in (("sbx", "2.8.0"), ("dev", "2.8.0"), ("uat", "2.7.3")):
+        s.service(envs[env], EAST, env, "orders-api", version, "deployed", 3)
+    s.service(QAS, EAST, "qas", "orders-api", "2.8.0", "failed", 0.2)
+    s.service(PRD, EAST, "prd", "orders-api", "2.7.3", "deployed", 15, desired=6)
+    s.service(PRD, WEST, "prd", "orders-api", "2.7.3", "deployed", 15, desired=2)
+    # billing-svc: blue/green on ECS; prd's green side is the standby, scaled to 0.
+    s.service(
+        DEV, EAST, "dev", "billing-svc", "5.1.0", "deployed", 2, name="billing-svc-blue"
+    )
+    s.service(
+        PRD,
+        EAST,
+        "prd",
+        "billing-svc",
+        "5.0.1",
+        "deployed",
+        11,
+        desired=4,
+        name="billing-svc-blue",
+    )
+    s.service(
+        PRD,
+        EAST,
+        "prd",
+        "billing-svc",
+        "5.0.0",
+        "undeployed",
+        25,
+        desired=0,
+        name="billing-svc-green",
+    )
+    # reports: a small ECS service in two envs.
+    s.service(DEV, EAST, "dev", "reports", "0.9.2", "deployed", 1, desired=1)
+    s.service(UAT, EAST, "uat", "reports", "0.9.1", "deployed", 10, desired=1)
 
 
 def main() -> None:

@@ -36,7 +36,7 @@ def test_an_account_lists_its_resources_only_in_its_own_regions():
     plan = second_phase(c, [PROD], [], [])
     lists = {(r, k) for a, r, k in plan if a == PROD and k != "usage"}
     assert {r for r, _ in lists} == {"eu-west-1", "eu-central-1"}
-    assert {k for _, k in lists} == {"snapshot", "volume", "rds_snapshot", "database"}
+    assert {k for _, k in lists} == {"snapshot", "volume", "rds_snapshot", "database", "ecs"}
 
 
 def test_usage_is_also_checked_where_an_ami_is_shared_with_the_account():
@@ -49,9 +49,17 @@ def test_usage_is_also_checked_where_an_ami_is_shared_with_the_account():
     assert ("us-east-1", "volume") not in {(r, k) for a, r, k in plan if a == PROD}
 
 
-def test_admin_usage_runs_in_every_admin_region():
+def test_admin_usage_and_ecs_run_in_every_admin_region():
     plan = second_phase(config(), [], [], [])
-    assert plan == [(TOOLS, r, "usage") for r in ("us-east-1", "us-west-2", "eu-west-1")]
+    regions = ("us-east-1", "us-west-2", "eu-west-1")
+    assert plan == [(TOOLS, r, k) for r in regions for k in ("usage", "ecs")]
+
+
+def test_ecs_runs_only_in_an_accounts_own_regions():
+    # ECS services are deployments, not AMI users: no ECS check where an AMI is merely shared.
+    c = config(**{PROD: {"name": "prd-eu", "regions": ["eu-west-1"]}})
+    plan = second_phase(c, [PROD], [ami("us-east-1")], [Share("ami-us-east-1", "account", PROD)])
+    assert {r for a, r, k in plan if a == PROD and k == "ecs"} == {"eu-west-1"}
 
 
 def test_ignored_accounts_are_never_contacted():

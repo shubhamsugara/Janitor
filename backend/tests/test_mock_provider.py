@@ -90,3 +90,25 @@ def test_mock_unreachable_account_fails_like_a_role_that_cant_be_assumed():
         (s.ok, s.error_kind, s.error) == (False, "denied", "sts:AssumeRole") for s in unreachable
     )
     assert not [r for r in inventory.resources if r.account == "444444444444"]
+
+
+def test_seed_deployments_cover_both_kinds_and_every_state(inventory):
+    deployments = inventory.deployments
+    assert {d.kind for d in deployments} == {"ec2", "ecs"}
+    assert {d.state for d in deployments} == {
+        "deploying",
+        "deployed",
+        "undeploying",
+        "undeployed",
+        "failed",
+    }
+    ec2_amis = {d.ami_id for d in deployments if d.kind == "ec2"}
+    used = {(u.image_id, u.ref_name) for u in inventory.usage if u.ref_type == "asg"}
+    assert all((d.ami_id, d.name) in used for d in deployments if d.kind == "ec2")
+    assert ec2_amis <= {r.id for r in inventory.resources}
+
+
+def test_mock_counts_ecs_services_in_their_checks(config):
+    inventory = MockProvider(SEED, clock=lambda: NOW, config=config).list_inventory()
+    ecs = {(s.account, s.region): s.items for s in inventory.segments if s.kind == "ecs"}
+    assert ecs[("333333333333", "us-east-1")] == 3  # orders-api, billing-svc blue and green

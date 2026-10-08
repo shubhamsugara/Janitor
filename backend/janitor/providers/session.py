@@ -1,4 +1,4 @@
-"""Lock 2: reach every account through AssumeRole with a Describe-only session policy.
+"""Lock 2: reach every account through AssumeRole with a read-only (Describe/List) session policy.
 
 Like the user's own AWS config, every hop starts from the same source credentials (the admin
 profile's source_profile, kept fresh by the user's usual MFA session): the admin role, and
@@ -18,7 +18,13 @@ from janitor.config import Config
 from janitor.providers import guard
 
 SESSION_NAME = "janitor-readonly"
-DESCRIBE = ["ec2:Describe*", "autoscaling:Describe*", "rds:Describe*"]
+DESCRIBE = [
+    "ec2:Describe*",
+    "autoscaling:Describe*",
+    "rds:Describe*",
+    "ecs:Describe*",
+    "ecs:List*",  # ECS lists clusters and services; there is no Describe for that
+]
 SESSION_POLICY = {
     "Version": "2012-10-17",
     "Statement": [

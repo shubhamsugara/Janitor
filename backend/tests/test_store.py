@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from janitor.models import Resource, RuleResult, Share, Usage
+from janitor.models import Deployment, Resource, RuleResult, Share, Usage
 from janitor.store import Store
 
 
@@ -284,3 +284,51 @@ def test_each_provider_reads_only_its_own_scans(tmp_path):
         aws.finish_scan(aws.start_scan("aws"), "ok")
     assert aws.latest_scan()["provider"] == "aws"
     assert mock.latest_scan()["id"] == mock_scan
+
+
+def dep(name, **kw):
+    fields = {
+        "kind": "ec2",
+        "account": "222222222222",
+        "region": "us-east-1",
+        "env": "dev",
+        "app": "web",
+        "version": "1.2.0",
+        "state": "deployed",
+        "resource_id": name,
+        "name": name,
+        "created_at": "2026-01-15T00:00:00Z",
+    } | kw
+    return Deployment(**fields)
+
+
+def test_deployments_round_trip_and_are_pruned_with_their_scan(tmp_path):
+    store = Store(tmp_path / "janitor.db")
+    rows = [
+        dep(
+            "dev-web-1.2.0-2",
+            desired=2,
+            running=2,
+            deployment_id="2",
+            launch_template="web",
+            launch_template_version="7",
+            ami_id="ami-1",
+        ),
+        dep(
+            "arn:svc/orders",
+            kind="ecs",
+            app="orders",
+            cluster="apps",
+            task_definition="orders:3",
+            image="orders:2.0",
+            ami_id=None,
+        ),
+    ]
+    first = store.start_scan("mock")
+    store.save_deployments(first, rows)
+    store.finish_scan(first, "ok")
+    assert store.deployments(first) == sorted(rows, key=lambda d: d.app)  # by app, then env
+    for _ in range(2):
+        later = store.start_scan("mock")
+        store.finish_scan(later, "ok")
+    assert store.deployments(first) == []

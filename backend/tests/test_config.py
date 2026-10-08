@@ -163,3 +163,29 @@ def test_an_account_listed_twice_is_an_error_not_a_silent_overwrite(tmp_path):
     with pytest.raises(ConfigError, match="222222222222 is listed twice") as error:
         load_config(path)
     assert "one entry can cover several regions" in str(error.value)
+
+
+def test_deployment_tags_default_to_the_deploy_tool_tags():
+    tags = load_config(EXAMPLE).deployments.tags
+    assert tags.app == ["role", "app"]
+    assert tags.env == ["env"]
+    assert tags.version == ["version"]
+    assert (tags.state, tags.deployment_id) == ("deploy-state", "deployment-id")
+
+
+def test_deployment_tags_can_be_renamed(tmp_path):
+    data = yaml.safe_load(EXAMPLE.read_text())
+    data["deployments"] = {"tags": {"app": ["service"], "state": "stage"}}
+    path = tmp_path / "janitor.yaml"
+    path.write_text(yaml.safe_dump(data))
+    tags = load_config(path).deployments.tags
+    assert (tags.app, tags.state, tags.env) == (["service"], "stage", ["env"])
+
+
+def test_deployment_tag_lists_cant_be_empty(tmp_path):
+    data = yaml.safe_load(EXAMPLE.read_text())
+    data["deployments"] = {"tags": {"version": []}}
+    path = tmp_path / "janitor.yaml"
+    path.write_text(yaml.safe_dump(data))
+    with pytest.raises(ValidationError):
+        load_config(path)

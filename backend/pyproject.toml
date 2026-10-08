@@ -15,7 +15,7 @@ dev = [
   "pytest==9.1.1",
   "httpx2==2.13.1",
   "ruff==0.16.10",
-  "moto[ec2,rds,autoscaling,sts]==5.2.3",
+  "moto[ec2,rds,autoscaling,sts,ecs]==5.2.3",
 ]
 
 [build-system]

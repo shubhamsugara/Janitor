@@ -102,6 +102,15 @@ def test_resource_detail(client):
         "prd-api-asg",
         "qas-api-1",
         "uat-api v3",
+        # the seed's EC2 deployments (sbx has none of this AMI)
+        "dev-api-3.1.0-21",
+        "dev-api-3.2.0-22",
+        "qas-api-3.1.0-9",
+        "uat-api-3.1.0-11",
+        "prd-api-3.0.5-31",
+        "prd-api-3.0.4-30",
+        "dev-worker-1.8.0-8",
+        "prd-worker-1.7.2-6",
     }
     assert any(link["relation"] == "copy" for link in body["related"]["links"])
     assert client.get("/api/resources/vol-nope").status_code == 404
@@ -629,3 +638,64 @@ def test_meta_says_which_accounts_have_each_type(client):
     by_type = client.get("/api/meta").json()["accounts_by_type"]
     assert by_type["ami"] == ["111111111111"]  # only the admin owns AMIs
     assert "222222222222" in by_type["volume"] and len(by_type["volume"]) > 1
+
+
+def test_deployments_list_every_app_with_its_ami(client):
+    body = client.get("/api/deployments").json()
+    assert body["scan_id"]
+    # Only the seed's unreachable partner account: Janitor couldn't check its deployments.
+    assert {(f["account"], f["kind"]) for f in body["failed"]} == {
+        ("444444444444", "usage"),
+        ("444444444444", "ecs"),
+    }
+    items = body["items"]
+    assert {i["kind"] for i in items} == {"ec2", "ecs"}
+    live = next(i for i in items if i["name"] == "prd-api-3.0.5-31")
+    assert (live["env"], live["app"], live["version"], live["account_name"]) == (
+        "prd",
+        "api",
+        "3.0.5",
+        "prd",
+    )
+    assert live["ami"]["name"] == f"base-linux-{stamp(20)}"
+    assert live["ami"]["status"] == "in_use"
+    orders = next(i for i in items if i["kind"] == "ecs" and i["env"] == "qas")
+    assert (orders["state"], orders["ami"]) == ("failed", None)
+
+
+def test_deployments_show_failed_usage_and_ecs_checks_only(tmp_path):
+    from janitor.models import Segment
+
+    class Failing:
+        name = "aws"
+
+        def list_inventory(self, on_segment=None):
+            from janitor.models import Inventory
+
+            segments = [
+                Segment(
+                    "222222222222",
+                    "us-east-1",
+                    "ecs",
+                    ok=False,
+                    error_kind="denied",
+                    error="ecs:ListClusters",
+                ),
+                Segment("222222222222", "us-east-1", "volume", ok=False, error_kind="throttled"),
+                Segment("111111111111", "us-east-1", "ami", ok=True),
+            ]
+            for seg in segments:
+                on_segment and on_segment(seg)
+            return Inventory([], [], [], [], segments=segments)
+
+        def recheck(self, items):
+            return {}
+
+    settings = Settings(
+        config_path=str(EXAMPLE), db_path=str(tmp_path / "j.db"), prices_path=str(TEST_PRICES)
+    )
+    app = create_app(settings, clock=lambda: NOW, provider=Failing())
+    app.state.scanner.join(5)  # an AWS-named provider scans in the background at startup
+    failed = TestClient(app).get("/api/deployments").json()["failed"]
+    assert [(f["kind"], f["account_name"]) for f in failed] == [("ecs", "dev")]
+    assert "ecs:ListClusters" in failed[0]["message"]
