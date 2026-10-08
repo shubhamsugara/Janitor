@@ -118,3 +118,10 @@ def test_an_account_can_override_the_member_role(tmp_path):
     bad = _variant(tmp_path, lambda d: d["accounts"]["555555555555"].update(role="bad role!"))
     with pytest.raises(ValidationError, match="role"):
         load_config(bad)
+
+
+def test_an_account_can_name_its_profile(tmp_path):
+    config = load_config(
+        _variant(tmp_path, lambda d: d["accounts"]["222222222222"].update(profile="example-dev"))
+    )
+    assert config.accounts["222222222222"].profile == "example-dev"

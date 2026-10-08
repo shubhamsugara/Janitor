@@ -6,10 +6,11 @@ ADMIN_ROLE = "example-admin-read"
 MEMBER_ROLE = "example-janitor-read"
 
 
-def write_aws_config(tmp_path, monkeypatch, admin: str = "111111111111") -> None:
+def write_aws_config(tmp_path, monkeypatch, admin: str = "111111111111", extra: str = "") -> None:
     """One static-key base profile and the admin profile, which assumes ADMIN_ROLE in `admin`.
 
-    Member accounts need no profile: Janitor reaches them from the admin session.
+    Member accounts need no profile (Janitor assumes member_role from the same source login);
+    `extra` appends more profile sections verbatim.
     """
     lines = [
         "[profile example-base]",
@@ -21,7 +22,7 @@ def write_aws_config(tmp_path, monkeypatch, admin: str = "111111111111") -> None
         "source_profile = example-base",
     ]
     config = tmp_path / "aws-config"
-    config.write_text("\n".join(lines) + "\n")
+    config.write_text("\n".join(lines) + "\n" + extra)
     (tmp_path / "aws-credentials").write_text("")
     monkeypatch.setenv("AWS_CONFIG_FILE", str(config))
     monkeypatch.setenv("AWS_SHARED_CREDENTIALS_FILE", str(tmp_path / "aws-credentials"))

@@ -114,3 +114,55 @@ def _raw_client(session):
         aws_secret_access_key=creds.secret_key,
         aws_session_token=creds.token,
     )
+
+
+DEV_PROFILE = f"""[profile example-dev]
+role_arn = arn:aws:iam::{DEV}:role/{MEMBER_ROLE}
+source_profile = example-base
+role_session_name = example-person
+"""
+
+
+def with_dev_profile(config):
+    from janitor.config import AccountName
+
+    return config.model_copy(
+        update={"accounts": {DEV: AccountName(name="dev", profile="example-dev")}}
+    )
+
+
+def test_an_account_profile_supplies_its_role_and_session_name(tmp_path, monkeypatch, config):
+    write_aws_config(tmp_path, monkeypatch, extra=DEV_PROFILE)  # before moto takes over the env
+    custom = with_dev_profile(config)
+    check_profiles(custom)
+    with mock_aws():
+        calls = record_calls(monkeypatch)
+        sts, _ = hops(custom)
+        member = assume_member(custom, DEV, sts)
+        params = [p for op, p in calls if op == "AssumeRole"][-1]
+        assert params["RoleArn"] == f"arn:aws:iam::{DEV}:role/{MEMBER_ROLE}"
+        assert params["RoleSessionName"] == "example-person"  # trust policies may require it
+        assert json.loads(params["Policy"]) == SESSION_POLICY
+        assert member.client("sts").get_caller_identity()["Account"] == DEV
+
+
+@pytest.mark.parametrize(
+    ("profile_text", "problem"),
+    [
+        ("", "example-dev (for dev) isn't in your AWS config"),
+        (
+            DEV_PROFILE.replace(DEV, TOOLS),
+            "example-dev (for dev) assumes a role in another account",
+        ),
+        (
+            DEV_PROFILE.replace("source_profile = example-base", "source_profile = other"),
+            "example-dev (for dev) uses a different source login",
+        ),
+    ],
+)
+def test_check_profiles_checks_account_profiles(
+    tmp_path, monkeypatch, config, profile_text, problem
+):
+    write_aws_config(tmp_path, monkeypatch, extra=profile_text)
+    with pytest.raises(ProfileError, match=problem.replace("(", r"\(").replace(")", r"\)")):
+        check_profiles(with_dev_profile(config))

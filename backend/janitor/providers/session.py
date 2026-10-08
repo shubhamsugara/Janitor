@@ -54,6 +54,18 @@ def check_profiles(config: Config) -> None:
         problems.append(f"admin profile {config.admin.profile} needs role_arn and source_profile")
     if not config.member_role:
         problems.append("member_role isn't set (the role Janitor assumes in every other account)")
+    source_login = (profile or {}).get("source_profile")
+    for account_id, account in config.accounts.items():
+        if not account.profile:
+            continue
+        found = _profiles().get(account.profile)
+        where = f"{account.profile} (for {account.name})"
+        if found is None:
+            problems.append(f"{where} isn't in your AWS config")
+        elif f":{account_id}:role/" not in found.get("role_arn", ""):
+            problems.append(f"{where} assumes a role in another account")
+        elif found.get("source_profile") != source_login:
+            problems.append(f"{where} uses a different source login than the admin profile")
     if problems:
         raise ProfileError(
             "Janitor can't reach your accounts: "
@@ -62,11 +74,16 @@ def check_profiles(config: Config) -> None:
         )
 
 
-def _assume(sts, role_arn: str, policy: dict, region: str, **extra) -> boto3.Session:
-    """AssumeRole through an STS client (from a guarded session) with the session policy."""
+def _assume(
+    sts, role_arn: str, policy: dict, region: str, session_name: str = "", **extra
+) -> boto3.Session:
+    """AssumeRole through an STS client (from a guarded session) with the session policy.
+
+    A profile's role_session_name is kept: trust policies may require it (e.g. for audit).
+    """
     params = {
         "RoleArn": role_arn,
-        "RoleSessionName": SESSION_NAME,
+        "RoleSessionName": session_name or SESSION_NAME,
         "DurationSeconds": 3600,
         "Policy": json.dumps(policy),
         **extra,
@@ -92,7 +109,14 @@ def assume_admin(config: Config, sts) -> boto3.Session:
     """A guarded, Describe-only session in the admin account. `sts` comes from source()."""
     profile = _profiles()[config.admin.profile]
     extra = {"ExternalId": profile["external_id"]} if profile.get("external_id") else {}
-    admin = _assume(sts, profile["role_arn"], SESSION_POLICY, config.regions[0], **extra)
+    admin = _assume(
+        sts,
+        profile["role_arn"],
+        SESSION_POLICY,
+        config.regions[0],
+        profile.get("role_session_name", ""),
+        **extra,
+    )
     guard.install(admin)
     return admin
 
@@ -103,6 +127,20 @@ def assume_member(config: Config, account_id: str, sts) -> boto3.Session:
     `sts` is one client made from source() and shared by parallel hops: boto3 Sessions aren't
     thread-safe, clients are.
     """
+    account = config.accounts.get(account_id)
+    if account and account.profile:  # checked at startup: same account, same source login
+        profile = _profiles()[account.profile]
+        extra = {"ExternalId": profile["external_id"]} if profile.get("external_id") else {}
+        member = _assume(
+            sts,
+            profile["role_arn"],
+            SESSION_POLICY,
+            config.regions[0],
+            profile.get("role_session_name", ""),
+            **extra,
+        )
+        guard.install(member)
+        return member
     role_arn = f"arn:aws:iam::{account_id}:role/{config.role_for(account_id)}"
     member = _assume(sts, role_arn, SESSION_POLICY, config.regions[0])
     guard.install(member)

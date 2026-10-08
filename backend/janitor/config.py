@@ -36,6 +36,7 @@ class Admin(_Strict):
 class AccountName(_Strict):
     name: str
     role: str = ""  # overrides member_role for this account
+    profile: str = ""  # an AWS profile for this account: its role_arn and role_session_name win
 
     @field_validator("role")
     @classmethod

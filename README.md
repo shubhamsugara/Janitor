@@ -30,8 +30,9 @@ Get before it is sent.
 
 1. Copy `config/janitor.example.yaml` to `config/janitor.yaml` (gitignored). Set `admin` (account
    ID, display name, profile, regions) and `member_role`. `accounts` is optional: display names,
-   a per-account `role` when it differs from `member_role`, and accounts to scan even if no AMI is
-   shared with them.
+   a per-account `profile` (Janitor uses that AWS profile's `role_arn` and `role_session_name`;
+   it must use the same source login as the admin profile) or `role` when it differs from
+   `member_role`, and accounts to scan even if no AMI is shared with them.
 2. The admin profile in your AWS config needs `role_arn` and `source_profile`. Each account's
    role must trust that source login, as your per-account profiles already rely on.
 3. Refresh your MFA session for the source profile as usual.
