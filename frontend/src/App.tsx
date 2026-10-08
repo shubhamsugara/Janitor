@@ -7,6 +7,7 @@ import TopBar from "./components/TopBar";
 import { DetailContext, type DetailApi } from "./detail";
 import { TYPE_PAGES } from "./nav";
 import Audit from "./pages/Audit";
+import Deployments from "./pages/Deployments";
 import HowItWorks from "./pages/HowItWorks";
 import Overview from "./pages/Overview";
 import Resources from "./pages/Resources";
@@ -19,6 +20,7 @@ import { useToast } from "./ui/toast";
 const TITLES: Record<string, string> = {
   "/": "Overview",
   "/audit": "Audit",
+  "/deployments": "Deployments",
   "/how-it-works": "How Janitor decides",
   ...Object.fromEntries(TYPE_PAGES.map((p) => [p.path, p.title])),
 };
@@ -108,6 +110,7 @@ export default function App() {
         {TYPE_PAGES.map((p) => (
           <Route key={p.type} path={p.path} element={<Resources key={p.type} meta={meta} notify={notify} type={p.type} title={p.title} />} />
         ))}
+        <Route path="/deployments" element={<Deployments meta={meta} notify={notify} />} />
         <Route path="/audit" element={<Audit meta={meta} notify={notify} />} />
         <Route path="/how-it-works" element={<HowItWorks meta={meta} notify={notify} />} />
         <Route path="*" element={<p className="text-muted">This page doesn't exist. Choose a page from the navigation.</p>} />

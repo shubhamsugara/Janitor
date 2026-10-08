@@ -10,6 +10,7 @@ const KIND_LABELS: Record<string, string> = {
   rds_snapshot: "RDS snapshots",
   database: "databases",
   usage: "what uses AMIs",
+  ecs: "ECS services",
 };
 
 /** One line per account and message, so an expired session for one account reads once. */

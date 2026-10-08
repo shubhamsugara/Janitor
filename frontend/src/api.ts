@@ -259,6 +259,39 @@ export interface ExportData {
   provider: string;
 }
 
+export type DeploymentState = "deploying" | "deployed" | "undeploying" | "undeployed" | "failed";
+
+/** An ASG a deploy tool tagged, or an ECS service. Shown as found; never judged. */
+export interface Deployment {
+  kind: "ec2" | "ecs";
+  account: string;
+  account_name: string;
+  region: string;
+  env: string;
+  app: string;
+  version: string;
+  state: DeploymentState;
+  resource_id: string;
+  name: string;
+  created_at: string;
+  desired: number;
+  running: number;
+  deployment_id: string;
+  launch_template: string;
+  launch_template_version: string;
+  ami_id: string | null;
+  ami: { id: string; name: string; status: Status } | null;
+  cluster: string;
+  task_definition: string;
+  image: string;
+}
+
+export interface DeploymentsData {
+  scan_id: number | null;
+  items: Deployment[];
+  failed: FailedCheck[];
+}
+
 export interface AuditEntry {
   id: number;
   ts: string;
@@ -293,6 +326,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ plan_id: planId, confirmation }),
     }),
+  deployments: () => request<DeploymentsData>("/api/deployments"),
   audit: (page: number) => request<{ items: AuditEntry[]; total: number }>(`/api/audit?page=${page}&page_size=25`),
 };
 
