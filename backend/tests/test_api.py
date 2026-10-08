@@ -623,3 +623,9 @@ def test_meta_lists_accounts_discovered_during_the_scan(tmp_path):
     assert accounts["111111111111"]["name"] == "tools"  # the admin comes first
     assert list(accounts)[0] == "111111111111"
     assert "owns" not in accounts["111111111111"]
+
+
+def test_meta_says_which_accounts_have_each_type(client):
+    by_type = client.get("/api/meta").json()["accounts_by_type"]
+    assert by_type["ami"] == ["111111111111"]  # only the admin owns AMIs
+    assert "222222222222" in by_type["volume"] and len(by_type["volume"]) > 1

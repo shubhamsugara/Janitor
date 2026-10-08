@@ -171,6 +171,9 @@ def create_app(
                 }
                 for account_id in known_accounts()
             ],
+            "accounts_by_type": store.accounts_by_type(shown["id"])
+            if (shown := store.latest_scan())
+            else {},
             "policy": {
                 "orphan_after_days": config.policy.orphan_after_days,
                 "min_age_days": config.policy.min_age_days,

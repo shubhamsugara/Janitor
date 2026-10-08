@@ -138,7 +138,7 @@ export default function Resources({ meta, notify, type, title }: Props) {
 
       <Card>
         <div className="border-b border-line p-4">
-          <FilterBar meta={meta} filters={filters} onChange={setFilters} total={data?.total ?? null} />
+          <FilterBar meta={meta} type={type} filters={filters} onChange={setFilters} total={data?.total ?? null} />
         </div>
         <ResourceTable
           meta={meta}

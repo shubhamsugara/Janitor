@@ -104,6 +104,8 @@ export interface Meta {
   policy: { orphan_after_days: number; min_age_days: number; typed_confirm_min_items: number };
   prices: { source_date: string | null; fallback: boolean };
   accounts: { id: string; name: string; regions: string[] }[];
+  /** Accounts that have each type in the shown scan; filters offer only these. */
+  accounts_by_type?: Partial<Record<ResourceType, string[]>>;
   definitions: {
     statuses: Record<Status, StatusDefinition>;
     by_type: Record<ResourceType, Partial<Record<Status, string>>>;

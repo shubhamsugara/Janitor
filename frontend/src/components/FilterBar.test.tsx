@@ -50,4 +50,34 @@ describe("FilterBar", () => {
       vi.useRealTimers();
     }
   });
+
+  const byType = {
+    ...meta,
+    accounts: [...meta.accounts, { id: "222222222222", name: "dev", regions: ["us-east-1"] }],
+    accounts_by_type: { ami: ["111111111111"], volume: ["222222222222", "333333333333"] },
+  } as unknown as Meta;
+
+  it("hides the account filter when one account owns every resource of the type", () => {
+    render(<FilterBar meta={byType} type="ami" filters={EMPTY} onChange={() => {}} total={5} />);
+    expect(screen.queryByRole("button", { name: /Account/ })).toBeNull();
+  });
+
+  it("offers only the accounts that have the type", () => {
+    render(<FilterBar meta={byType} type="volume" filters={EMPTY} onChange={() => {}} total={5} />);
+    fireEvent.click(screen.getByRole("button", { name: /Account/ }));
+    expect(screen.getByLabelText("dev")).toBeTruthy();
+    expect(screen.getByLabelText("prd")).toBeTruthy();
+    expect(screen.queryByLabelText("tools")).toBeNull();
+  });
+
+  it("shows an unnamed account's ID once", () => {
+    const unnamed = {
+      ...meta,
+      accounts: [...meta.accounts, { id: "444444444444", name: "444444444444", regions: ["us-east-1"] }],
+    } as unknown as Meta;
+    render(<FilterBar meta={unnamed} filters={EMPTY} onChange={() => {}} total={5} />);
+    fireEvent.click(screen.getByRole("button", { name: /Account/ }));
+    expect(screen.getAllByText("444444444444")).toHaveLength(1);
+  });
 });
+

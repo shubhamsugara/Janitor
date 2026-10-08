@@ -394,6 +394,16 @@ class Store:
             for r in rows
         ]
 
+    def accounts_by_type(self, scan_id: int) -> dict[str, list[str]]:
+        """{type: accounts that have any of it}, so filters only offer accounts that can match."""
+        out: dict[str, list[str]] = defaultdict(list)
+        for row in self._q(
+            "SELECT DISTINCT type, account FROM resources WHERE scan_id = ? ORDER BY type, account",
+            (scan_id,),
+        ):
+            out[row["type"]].append(row["account"])
+        return dict(out)
+
     def get_resources(self, scan_id: int, ids: list[str]) -> list[Resource]:
         found = {}
         for chunk in _chunks(list(ids)):

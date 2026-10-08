@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Search, Tag, X } from "lucide-react";
-import type { Meta, Status } from "../api";
+import type { Meta, ResourceType, Status } from "../api";
 import { EMPTY, hasFilters, type Filters } from "../filters";
 import { Button } from "../ui/button";
 import { cn } from "../ui/cn";
@@ -14,9 +14,18 @@ const STATUSES: Status[] = ["in_use", "managed", "unknown", "orphaned", "idle"];
 
 interface Props {
   meta: Meta;
+  type?: ResourceType; // narrows the account choices to accounts that have this type
   filters: Filters;
   onChange: (f: Filters) => void;
   total: number | null;
+}
+
+/** Accounts that have this type in the scan, plus any already selected (so they can be cleared). */
+function accountsFor(meta: Meta, type: ResourceType | undefined, selected: string[]) {
+  const present = type ? meta.accounts_by_type?.[type] : undefined;
+  if (!present) return meta.accounts;
+  const keep = new Set([...present, ...selected]);
+  return meta.accounts.filter((a) => keep.has(a.id));
 }
 
 function TagFilter({ value, onApply }: { value: string; onApply: (tag: string) => void }) {
@@ -73,7 +82,7 @@ function TagFilter({ value, onApply }: { value: string; onApply: (tag: string) =
 }
 
 /** Search plus filter pills. Every change goes back to page 1 (the URL holds the state). */
-export default function FilterBar({ meta, filters, onChange, total }: Props) {
+export default function FilterBar({ meta, type, filters, onChange, total }: Props) {
   // `typed` is what the user is typing; null means "show the filter as it is" (e.g. after Reset).
   const [typed, setTyped] = useState<string | null>(null);
   const q = typed ?? filters.q;
@@ -89,8 +98,13 @@ export default function FilterBar({ meta, filters, onChange, total }: Props) {
   }, [typed, filters, onChange]);
 
   const accountOptions: Option[] = useMemo(
-    () => meta.accounts.map((a) => ({ value: a.id, text: a.name, label: <span><span className="font-medium">{a.name}</span> <span className="text-muted">{a.id}</span></span> })),
-    [meta],
+    () => accountsFor(meta, type, filters.account).map((a) => ({ value: a.id, text: a.name, label: (
+        <span>
+          <span className="font-medium">{a.name}</span>
+          {a.name !== a.id && <span className="text-muted"> {a.id}</span>}
+        </span>
+      ) })),
+    [meta, type, filters.account],
   );
   const regionOptions: Option[] = useMemo(() => {
     const regions = [...new Set([...meta.owner.regions, ...meta.accounts.flatMap((a) => a.regions)])].sort();
@@ -115,7 +129,9 @@ export default function FilterBar({ meta, filters, onChange, total }: Props) {
           </button>
         )}
       </div>
-      <MultiSelect label="Account" options={accountOptions} value={filters.account} onChange={(account) => set({ account })} />
+      {accountOptions.length > 1 && (
+        <MultiSelect label="Account" options={accountOptions} value={filters.account} onChange={(account) => set({ account })} />
+      )}
       <MultiSelect label="Status" options={statusOptions} value={filters.status} onChange={(status) => set({ status })} />
       <MultiSelect label="Region" options={regionOptions} value={filters.region} onChange={(region) => set({ region })} />
       <TagFilter value={filters.tag} onApply={(tag) => set({ tag })} />
