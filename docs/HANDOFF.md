@@ -26,7 +26,7 @@ Read this first, then the spec.
   [`docs/superpowers/plans/2026-10-08-phase-3-hub-and-usage.md`](superpowers/plans/2026-10-08-phase-3-hub-and-usage.md),
   after the first real scan: config is now `admin` + `member_role` + optional `accounts` names
   (the old `owner`/`owns` layout is rejected with a migration message); accounts are discovered
-  from launch permissions and reached through the admin hub; only instances make an AMI in use
+  from launch permissions and reached from the same source login as the admin (per-account `role` override); only instances make an AMI in use
   (templates, ASGs, launch configs add warning W6 "Referenced"); the diagram shows an AMI's own
   links, with usage grouped under accounts.
 - Run it: `make setup` once, then `make run` → http://127.0.0.1:8080 (mock data), or

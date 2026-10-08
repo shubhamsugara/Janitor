@@ -18,7 +18,7 @@ class _Strict(BaseModel):
 
 
 class Admin(_Strict):
-    """The account that owns the AMIs; Janitor reaches every other account from it."""
+    """The account that owns the AMIs and shares them with the other accounts."""
 
     account: str
     name: str = "admin"
@@ -35,6 +35,14 @@ class Admin(_Strict):
 
 class AccountName(_Strict):
     name: str
+    role: str = ""  # overrides member_role for this account
+
+    @field_validator("role")
+    @classmethod
+    def _role_name(cls, role: str) -> str:
+        if role and not ROLE_NAME.match(role):
+            raise ValueError(f"role {role!r} isn't a valid IAM role name")
+        return role
 
 
 class Policy(_Strict):
@@ -83,7 +91,7 @@ OLD_LAYOUT = (
 class Config(_Strict):
     provider: Literal["mock", "aws"] = "mock"
     admin: Admin
-    member_role: str = ""  # one role name in every account, assumed from the admin session
+    member_role: str = ""  # the role assumed in every other account, from the same source login
     accounts: dict[str, AccountName] = Field(default_factory=dict)  # display names; always scanned
     policy: Policy = Field(default_factory=Policy)
     pricing: Pricing = Field(default_factory=Pricing)
@@ -115,6 +123,11 @@ class Config(_Strict):
     def regions(self) -> list[str]:
         """Every account is scanned in the admin's regions."""
         return self.admin.regions
+
+    def role_for(self, account_id: str) -> str:
+        """The role Janitor assumes in an account: its own override, else member_role."""
+        account = self.accounts.get(account_id)
+        return (account.role if account else "") or self.member_role
 
     def account_name(self, account_id: str) -> str:
         if account_id == self.admin.account:

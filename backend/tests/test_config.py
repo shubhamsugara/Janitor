@@ -105,3 +105,16 @@ def test_scan_concurrency_defaults_and_bounds(tmp_path):
         path = _variant(tmp_path, lambda d, bad=bad: d.update(scan={"concurrency": bad}))
         with pytest.raises(ValidationError):
             load_config(path)
+
+
+def test_an_account_can_override_the_member_role(tmp_path):
+    def change(d):
+        d["accounts"]["555555555555"]["role"] = "example-other-read"
+
+    config = load_config(_variant(tmp_path, change))
+    assert config.role_for("555555555555") == "example-other-read"
+    assert config.role_for("222222222222") == "example-janitor-read"  # the default
+    assert config.role_for("444444444444") == "example-janitor-read"  # discovered, unnamed
+    bad = _variant(tmp_path, lambda d: d["accounts"]["555555555555"].update(role="bad role!"))
+    with pytest.raises(ValidationError, match="role"):
+        load_config(bad)

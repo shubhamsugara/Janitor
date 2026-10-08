@@ -41,10 +41,10 @@ def deny_member(monkeypatch, account: str) -> None:
 
     real = session.assume_member
 
-    def assume_member(config, admin, account_id, **kwargs):
+    def assume_member(config, account_id, sts):
         if account_id == account:
             raise ClientError({"Error": {"Code": "AccessDenied", "Message": "no"}}, "AssumeRole")
-        return real(config, admin, account_id, **kwargs)
+        return real(config, account_id, sts)
 
     monkeypatch.setattr(session, "assume_member", assume_member)
 
@@ -313,7 +313,7 @@ def test_a_check_that_fails_while_reporting_still_reports_as_failed(aws, monkeyp
     def unreachable(config):
         raise RuntimeError("no")
 
-    monkeypatch.setattr(aws_module.session, "assume_admin", unreachable)
+    monkeypatch.setattr(aws_module.session, "source", unreachable)
     inventory = AwsProvider(make_config(), clock=lambda: NOW).list_inventory()
     # tools: ami, snapshot, volume, usage; dev (listed): five kinds; two regions each
     assert len(inventory.segments) == 2 * 4 + 2 * 5
@@ -330,20 +330,41 @@ def test_an_account_found_only_in_launch_permissions_is_scanned_through_the_hub(
     assert world["dev_volume"] in {r.id for r in inventory.resources}
 
 
-def test_member_hops_share_one_sts_client_from_the_admin_session(aws):
+def test_all_hops_share_one_sts_client_from_the_source_login(aws, monkeypatch):
     # boto3 Sessions aren't thread-safe; clients are. Parallel hops must not each build a client.
     from janitor.providers import session
 
-    admin = session.assume_admin(make_config())
     made = []
-    real_client = admin.client
+    real_source = session.source
 
-    def counting_client(service, *args, **kwargs):
-        made.append(service)
-        return real_client(service, *args, **kwargs)
+    def counting_source(config):
+        src = real_source(config)
+        real_client = src.client
 
-    admin.client = counting_client
+        def client(service, *args, **kwargs):
+            made.append(service)
+            return real_client(service, *args, **kwargs)
+
+        src.client = client
+        return src
+
+    monkeypatch.setattr(session, "source", counting_source)
     members = ["222222222222", "333333333333", "555555555555", "666666666666", "777777777777"]
-    sessions = AwsProvider(make_config(), clock=lambda: NOW)._sessions(members, admin=admin)
+    sessions = AwsProvider(make_config(), clock=lambda: NOW)._sessions(members)
     assert made.count("sts") == 1
-    assert all(not isinstance(sessions[m], Exception) for m in members)
+    assert all(not isinstance(s, Exception) for s in sessions.values())
+
+
+def test_members_are_reached_even_when_the_admin_role_is_denied(aws, monkeypatch):
+    # Every role trusts the source login, so one account's denial doesn't block the others.
+    from botocore.exceptions import ClientError
+
+    from janitor.providers import session
+
+    def denied(config, sts):
+        raise ClientError({"Error": {"Code": "AccessDenied", "Message": "no"}}, "AssumeRole")
+
+    monkeypatch.setattr(session, "assume_admin", denied)
+    sessions = AwsProvider(make_config(), clock=lambda: NOW)._sessions([DEV])
+    assert isinstance(sessions[TOOLS], Exception)
+    assert not isinstance(sessions[DEV], Exception)

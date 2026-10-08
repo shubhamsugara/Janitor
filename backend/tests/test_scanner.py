@@ -174,7 +174,7 @@ def test_segment_messages(config):
     assert msg("expired") == "AWS session expired. Refresh your MFA session, then Scan now."
     assert msg("denied", "sts:AssumeRole") == (
         "Janitor can't assume example-janitor-read in dev. Check that the role exists there and "
-        "trusts the admin account, then Scan now."
+        "trusts your source login, then Scan now."
     )
     assert msg("denied", "ec2:DescribeInstances") == (
         "Janitor isn't allowed to call ec2:DescribeInstances in dev · us-east-1. "

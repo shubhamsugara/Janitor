@@ -298,32 +298,35 @@ class AwsProvider:
     ) -> dict[str, boto3.Session | Exception]:
         """The admin session (assumed unless given) and one session per member account.
 
-        A failure is kept in place of the session, so every check of that account reports it;
-        if the admin can't be reached, neither can any member.
+        Every hop starts from the source login, so accounts fail independently. A failure is kept
+        in place of the session, so every check of that account reports it.
         """
         config = self._config
-        if admin is None:
-            try:
-                admin = session.assume_admin(config)
-            except Exception as exc:
-                admin = exc
+        try:
+            with self._client_lock:  # one client, made once; every hop below shares it
+                sts = session.source(config).client("sts", config=session.CLIENT_CONFIG)
+        except Exception as exc:  # no source credentials: nothing can be reached
+            sts = exc
 
-        sts = None
-        if not isinstance(admin, Exception) and members:
-            with self._client_lock:  # one client, made once; the hops below share it
-                sts = admin.client("sts", config=session.CLIENT_CONFIG)
-
-        def member(account: str) -> boto3.Session | Exception:
-            if isinstance(admin, Exception):
-                return admin
+        def hop(assume: Callable[[], boto3.Session]) -> boto3.Session | Exception:
+            if isinstance(sts, Exception):
+                return sts
             try:
-                return session.assume_member(config, admin, account, sts=sts)
+                return assume()
             except Exception as exc:
                 return exc
 
+        if admin is None:
+            admin = hop(lambda: session.assume_admin(config, sts))
         workers = min(len(members), config.scan.concurrency) or 1
         with ThreadPoolExecutor(workers) as pool:
-            found = dict(zip(members, pool.map(member, members), strict=True))
+            found = dict(
+                zip(
+                    members,
+                    pool.map(lambda a: hop(lambda: session.assume_member(config, a, sts)), members),
+                    strict=True,
+                )
+            )
         return {config.admin.account: admin, **found}
 
     def _client(self, sess: boto3.Session, service: str, region: str):

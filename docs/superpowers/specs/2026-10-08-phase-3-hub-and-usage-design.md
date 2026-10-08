@@ -5,6 +5,16 @@ questions and said "let's try this first" (no further issues for this round). Bu
 [`2026-10-08-phase-3-aws-provider-design.md`](2026-10-08-phase-3-aws-provider-design.md); where
 the two disagree, this document wins.
 
+## Revision (2026-10-08, after checking the user's AWS config)
+
+The user's profiles assume every account's role directly from one source login; none chain
+through admin, so member roles trust that login, not the admin role. Decided: **every hop starts
+from the admin profile's source_profile** (admin role and member roles side by side, no
+chaining), every session gets the Describe-only `SESSION_POLICY` (the admin no longer needs
+`sts:AssumeRole`), and `accounts.<id>.role` overrides `member_role` per account. Accounts fail
+independently: a denied admin hop no longer blocks the members. Sections below that say "from
+admin" read as "from the source login".
+
 ## What went wrong in the first real scan
 
 1. **Diagram floods.** Selecting an AMI walks two hops both ways: up to the AMI it was copied

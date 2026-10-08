@@ -20,18 +20,20 @@ Without `config/janitor.yaml`, Janitor uses `config/janitor.example.yaml` in moc
 
 ## Run it against AWS (read-only)
 
-Janitor needs one AWS profile: the admin account's, which owns the AMIs. From there it assumes one
-role name (`member_role`) in every other account. It finds those accounts in the AMIs' launch
-permissions, plus any you list. Every hop carries a session policy that allows only
-`ec2:Describe*`, `autoscaling:Describe*`, and `rds:Describe*`; the admin hop may also assume
-`member_role`, and nothing else. A runtime guard stops any call that isn't a Describe, List, or Get
-before it is sent.
+Janitor needs one AWS profile: the admin account's, which owns the AMIs. Like your own AWS
+config, it starts every hop from that profile's source login (your MFA session): the admin role,
+and `member_role` in every other account (an account can name its own `role`). It finds those
+accounts in the AMIs' launch permissions, plus any you list. Every session carries a policy that
+allows only `ec2:Describe*`, `autoscaling:Describe*`, and `rds:Describe*`, so no Janitor session
+can assume anything further, and a runtime guard stops any call that isn't a Describe, List, or
+Get before it is sent.
 
 1. Copy `config/janitor.example.yaml` to `config/janitor.yaml` (gitignored). Set `admin` (account
    ID, display name, profile, regions) and `member_role`. `accounts` is optional: display names,
-   and accounts to scan even if no AMI is shared with them.
-2. The admin profile in your AWS config needs `role_arn` and `source_profile`. `member_role` must
-   exist in each account and trust the admin role.
+   a per-account `role` when it differs from `member_role`, and accounts to scan even if no AMI is
+   shared with them.
+2. The admin profile in your AWS config needs `role_arn` and `source_profile`. Each account's
+   role must trust that source login, as your per-account profiles already rely on.
 3. Refresh your MFA session for the source profile as usual.
 4. `make run-aws`. The first scan runs in the background. An account whose role can't be assumed
    shows as a failed check, and AMIs shared with it show as Unknown.

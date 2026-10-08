@@ -11,12 +11,12 @@ from moto import mock_aws
 from janitor.config import load_config
 from janitor.providers.guard import ReadOnlyViolation
 from janitor.providers.session import (
-    ADMIN_POLICY,
     SESSION_POLICY,
     ProfileError,
     assume_admin,
     assume_member,
     check_profiles,
+    source,
 )
 
 
@@ -37,16 +37,6 @@ def test_member_session_policy_allows_only_describe():
     assert statement["Action"] == ["ec2:Describe*", "autoscaling:Describe*", "rds:Describe*"]
 
 
-def test_admin_policy_adds_only_assuming_the_member_role():
-    describe, hop = ADMIN_POLICY(MEMBER_ROLE)["Statement"]
-    assert describe["Action"] == ["ec2:Describe*", "autoscaling:Describe*", "rds:Describe*"]
-    assert hop == {
-        "Effect": "Allow",
-        "Action": "sts:AssumeRole",
-        "Resource": f"arn:aws:iam::*:role/{MEMBER_ROLE}",
-    }
-
-
 def test_check_profiles_names_the_admin_profile_and_member_role(tmp_path, monkeypatch, config):
     write_aws_config(tmp_path, monkeypatch)
     path = tmp_path / "aws-config"
@@ -61,32 +51,53 @@ def test_check_profiles_passes(profiles, config):
     check_profiles(config)
 
 
+def hops(config):
+    sts = source(config).client("sts")
+    return sts, assume_admin(config, sts)
+
+
 @mock_aws
-def test_admin_then_member_each_get_their_policy(profiles, config, monkeypatch):
+def test_admin_and_member_hops_both_come_from_the_source_login(profiles, config, monkeypatch):
     calls = record_calls(monkeypatch)
-    admin = assume_admin(config)
-    assume_member(config, admin, DEV)
+    sts, _ = hops(config)
+    assume_member(config, DEV, sts)
     first, second = [p for op, p in calls if op == "AssumeRole"]
     assert first["RoleArn"] == f"arn:aws:iam::{TOOLS}:role/example-admin-read"
-    assert json.loads(first["Policy"]) == ADMIN_POLICY(MEMBER_ROLE)
     assert second["RoleArn"] == f"arn:aws:iam::{DEV}:role/{MEMBER_ROLE}"
-    assert json.loads(second["Policy"]) == SESSION_POLICY
+    # Neither session may assume anything further: both carry the Describe-only policy.
+    assert json.loads(first["Policy"]) == json.loads(second["Policy"]) == SESSION_POLICY
     assert {p["RoleSessionName"] for p in (first, second)} == {"janitor-readonly"}
     assert {p["DurationSeconds"] for p in (first, second)} == {3600}
 
 
 @mock_aws
+def test_an_account_can_name_its_own_role(profiles, config, monkeypatch):
+    from janitor.config import AccountName
+
+    custom = config.model_copy(
+        update={"accounts": {DEV: AccountName(name="dev", role="example-other-read")}}
+    )
+    calls = record_calls(monkeypatch)
+    sts, _ = hops(custom)
+    assume_member(custom, DEV, sts)
+    assert [p["RoleArn"] for op, p in calls if op == "AssumeRole"][-1] == (
+        f"arn:aws:iam::{DEV}:role/example-other-read"
+    )
+
+
+@mock_aws
 def test_member_session_lands_in_the_member_account(profiles, config):
-    member = assume_member(config, assume_admin(config), DEV)
+    sts, _ = hops(config)
+    member = assume_member(config, DEV, sts)
     assert member.client("sts").get_caller_identity()["Account"] == DEV
 
 
 @mock_aws
-def test_guard_stops_mutating_calls_on_admin_and_member_sessions(profiles, config):
-    admin = assume_admin(config)
-    for session in (admin, assume_member(config, admin, DEV)):
+def test_guard_stops_mutating_calls_on_every_session(profiles, config):
+    sts, admin = hops(config)
+    for session in (source(config), admin, assume_member(config, DEV, sts)):
         ec2 = session.client("ec2", region_name="us-east-1")
-        raw = _raw_client(session)
+        raw = _raw_client(admin)
         vol = raw.create_volume(AvailabilityZone="us-east-1a", Size=1)
         snap = raw.create_snapshot(VolumeId=vol["VolumeId"])
         with pytest.raises(ReadOnlyViolation, match="DeleteSnapshot"):

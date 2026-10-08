@@ -37,11 +37,11 @@ def segment_message(seg: Segment, config: Config) -> str:
             "role_arn in your AWS config). Check the role's trust policy and your MFA session, "
             "then Scan now."
         )
-    if seg.error == "sts:AssumeRole":  # the hop from admin into this account, for every region
+    if seg.error == "sts:AssumeRole":  # the hop into this account, for every region
         return (
-            f"Janitor can't assume {config.member_role or 'the member role'} in "
-            f"{config.account_name(seg.account)}. Check that the role exists there and trusts the "
-            "admin account, then Scan now."
+            f"Janitor can't assume {config.role_for(seg.account) or 'the member role'} in "
+            f"{config.account_name(seg.account)}. Check that the role exists there and trusts "
+            "your source login, then Scan now."
         )
     if seg.error_kind == "denied":
         return f"Janitor isn't allowed to call {seg.error} in {where}. Ask for read access, then Scan now."

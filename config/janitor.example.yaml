@@ -1,13 +1,13 @@
 # Example configuration with fake account IDs. Copy to config/janitor.yaml for real settings.
 provider: mock            # mock | aws (overridable by JANITOR_PROVIDER)
-admin:                    # owns the AMIs; Janitor reaches every other account from here
+admin:                    # owns the AMIs and shares them with the other accounts
   account: "111111111111"
   name: tools
   profile: example-tools  # needs role_arn and source_profile in your AWS config
   regions: [us-east-1, us-west-2, eu-west-1]   # every account is scanned in these
-member_role: example-janitor-read   # the same role name in every account, assumed from admin
+member_role: example-janitor-read   # the role assumed in every other account, from the same login
 accounts:                 # optional display names; accounts in AMI launch permissions are found anyway
-  "555555555555": { name: sbx }
+  "555555555555": { name: sbx, role: example-sbx-read }   # role: overrides member_role here
   "222222222222": { name: dev }
   "666666666666": { name: uat }
   "777777777777": { name: qas }
