@@ -52,3 +52,11 @@ def test_usage_is_also_checked_where_an_ami_is_shared_with_the_account():
 def test_admin_usage_runs_in_every_admin_region():
     plan = second_phase(config(), [], [], [])
     assert plan == [(TOOLS, r, "usage") for r in ("us-east-1", "us-west-2", "eu-west-1")]
+
+
+def test_ignored_accounts_are_never_contacted():
+    from janitor.providers.base import member_accounts
+
+    c = Config.model_validate(config().model_dump() | {"ignore_accounts": ["444444444444"]})
+    shares = [Share("ami-x", "account", "444444444444"), Share("ami-x", "account", PROD)]
+    assert member_accounts(c, shares) == sorted([DEV, PROD])

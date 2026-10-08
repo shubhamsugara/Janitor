@@ -13,6 +13,9 @@ accounts:                 # optional display names; accounts in AMI launch permi
   "666666666666": { name: uat }
   "777777777777": { name: qas }                         # or { name: qas, role: example-qas-read }
   "333333333333": { name: prd, regions: [us-east-1, us-west-2] }   # only where it has resources
+# ignore_accounts: ["444444444444"]   # never contacted; AMIs shared only with these can be
+#                                     # deleted (warning W7, type to confirm). Only list accounts
+#                                     # you are sure don't need the AMIs.
 policy:
   orphan_after_days: 90
   min_age_days: 30

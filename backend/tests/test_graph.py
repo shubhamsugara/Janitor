@@ -289,3 +289,16 @@ def test_a_template_reference_doesnt_hide_an_account_janitor_couldnt_check(tmp_p
         "No instance uses it. Named by 1 launch template in uat. "
         "Janitor couldn't check 444444444444, so it may be used there."
     )
+
+
+def test_ignored_accounts_collapse_and_raise_no_blind_spot(tmp_path, config):
+    ignoring = config.model_copy(update={"ignore_accounts": ["444444444444"]})
+    store = Store(tmp_path / "ign.db")
+    scan_id = Scanner(
+        store, MockProvider(SEED, clock=lambda: NOW, config=ignoring), ignoring, clock=lambda: NOW
+    ).run()
+    partner = named(store, scan_id, f"partner-export-{stamp(250)}", type="ami")
+    g = build_graph(store, ignoring, scan_id, partner.id)
+    labels = {n["label"] for n in g["nodes"] if n["kind"] == "account"}
+    assert labels == {"1 ignored account"}
+    assert g["used_by"]["summary"] == "Nothing uses it."

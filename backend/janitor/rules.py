@@ -50,6 +50,13 @@ RULES = [
         "No instance runs it, but a launch template, Auto Scaling group, or launch configuration "
         "still names it. Deleting it makes their next launch fail.",
     ),
+    Rule(
+        "W7",
+        "Shared with ignored accounts",
+        "warn",
+        "It is shared with accounts janitor.yaml ignores, so Janitor didn't check them. Anyone "
+        "there loses access to it.",
+    ),
 ]
 RULES_BY_ID = {rule.id: rule for rule in RULES}
 
@@ -95,6 +102,12 @@ def evaluate(
         hit("W4", "It has no owner tag.")
     if r.referenced_by:
         hit("W6", r.referenced_by)
+    if r.ignored_shares:
+        hit(
+            "W7",
+            f"Shared with {r.ignored_shares}, which Janitor is set to ignore. "
+            "Anyone there loses access to it.",
+        )
     return hits
 
 

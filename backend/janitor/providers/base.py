@@ -38,9 +38,10 @@ def first_phase(config: Config) -> list[tuple[str, str, str]]:
 
 
 def member_accounts(config: Config, shares: list[Share]) -> list[str]:
-    """Every account an AMI is shared with, plus every listed account; never the admin."""
+    """Every account an AMI is shared with, plus every listed account; never the admin, and never
+    an ignored account."""
     found = {s.principal for s in shares if s.principal_type == "account"} | set(config.accounts)
-    return sorted(found - {config.admin.account})
+    return sorted(found - {config.admin.account} - set(config.ignore_accounts))
 
 
 def second_phase(

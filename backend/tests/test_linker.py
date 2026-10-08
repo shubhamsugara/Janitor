@@ -247,3 +247,28 @@ def test_references_outside_permissions_or_region_dont_count():
         Usage("ami-1", TOOLS, "eu-west-1", "launch_config", "lc-1", "y"),  # another region
     ]
     assert references(Inventory([res("ami-1", "ami")], [], named, []), CTX) == {}
+
+
+# Ignored accounts (janitor.yaml ignore_accounts): they don't count against an AMI, and W7 says so.
+
+
+def test_an_ami_shared_only_with_an_ignored_account_can_be_orphaned():
+    from janitor.linker import ignored_shares
+
+    ctx = LinkContext(**FAILED_CTX, scanned={(TOOLS, "us-east-1")}, ignored={UNSCANNED})
+    ami = res("ami-1", "ami")
+    shared = [Share("ami-1", "account", UNSCANNED)]
+    statuses, _ = status([ami], shared, ctx=ctx)
+    assert statuses["ami-1"] == "orphaned"
+    assert ignored_shares(Inventory([ami], shared, [], []), ctx) == {"ami-1": UNSCANNED}
+
+
+def test_ignoring_one_account_doesnt_excuse_another_that_couldnt_be_checked():
+    ctx = LinkContext(
+        **FAILED_CTX,
+        scanned={(TOOLS, "us-east-1"), (DEV, "us-east-1")},
+        failed={(DEV, "us-east-1", "usage")},
+        ignored={UNSCANNED},
+    )
+    shared = [Share("ami-1", "account", UNSCANNED), Share("ami-1", "account", DEV)]
+    assert status([res("ami-1", "ami")], shared, ctx=ctx)[0]["ami-1"] == "unknown"

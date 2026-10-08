@@ -73,7 +73,7 @@ def test_explanations_use_live_config_values(config):
     defs = build(config)
     assert "older than 90 days" in defs["statuses"]["orphaned"]["meaning"]
     assert set(defs["by_type"]) == {"ami", "snapshot", "volume", "rds_snapshot"}
-    assert [r["id"] for r in defs["rules"]] == ["R1", "R2", "R3", "R4", "R5", "W4", "W6"]
+    assert [r["id"] for r in defs["rules"]] == ["R1", "R2", "R3", "R4", "R5", "W4", "W6", "W7"]
 
 
 def test_r4_protected_tag_key_is_case_insensitive():
@@ -99,3 +99,13 @@ def test_w6_referenced_warns_with_what_names_it():
     assert ("W6", "warn") in {(h.rule_id, h.outcome) for h in hits}
     assert next(h.message for h in hits if h.rule_id == "W6") == text
     assert ("W6", "warn") not in ids(res(type="ami"))
+
+
+def test_w7_warns_when_an_ami_is_shared_with_ignored_accounts():
+    ami = res(type="ami", ignored_shares="444444444444")
+    hits = {h.rule_id: h for h in evaluate(ami, POLICY, NOW)}
+    assert hits["W7"].outcome == "warn"
+    assert hits["W7"].message == (
+        "Shared with 444444444444, which Janitor is set to ignore. Anyone there loses access to it."
+    )
+    assert "W7" not in {h.rule_id for h in evaluate(res(type="ami"), POLICY, NOW)}

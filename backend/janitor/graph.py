@@ -36,12 +36,15 @@ class Edge:
 class Coverage:
     """Which (account, region) pairs had a successful usage check in this scan."""
 
-    def __init__(self, store: Store, scan_id: int):
+    def __init__(self, store: Store, scan_id: int, ignored: frozenset[str] = frozenset()):
         segments = [s for s in store.segments(scan_id) if s["kind"] == "usage"]
         self.has_checks = bool(segments)  # scans without segments (tests) count as complete
         self.checked = {(s["account"], s["region"]) for s in segments if s["ok"]}
+        self.ignored = ignored  # the user vouched for these: not a gap in the proof
 
     def couldnt_check(self, account_id: str, region: str) -> bool:
+        if account_id in self.ignored:
+            return False
         return self.has_checks and (account_id, region) not in self.checked
 
 
@@ -155,7 +158,7 @@ def used_by(store: Store, config: Config, scan_id: int, r: Resource) -> dict:
 
 def _blind_spot(store: Store, config: Config, scan_id: int, amis: list[Resource]) -> str | None:
     """Why "nothing uses it" can't be proven: the AMI reaches accounts Janitor couldn't check."""
-    coverage = Coverage(store, scan_id)
+    coverage = Coverage(store, scan_id, frozenset(config.ignore_accounts))
     shares = [(ami, s) for ami in amis for s in store.shares_for(scan_id, ami.id)]
     if any(s.principal_type == "group" and s.principal == "all" for _, s in shares):
         return "It is public, so other AWS accounts may."
@@ -179,7 +182,7 @@ class _Walker:
     def __init__(self, store: Store, config: Config, scan_id: int):
         self.store, self.config, self.scan_id = store, config, scan_id
         self.resources: dict[str, Resource] = {}
-        self.coverage = Coverage(store, scan_id)
+        self.coverage = Coverage(store, scan_id, frozenset(config.ignore_accounts))
         self.account_links: dict[str, list[tuple[dict, Edge]]] = {}  # account node -> its usage
 
     def resource_node(self, r: Resource) -> dict:
@@ -225,8 +228,11 @@ class _Walker:
             by_account[u.account].append(u)
         shares = self.store.shares_for(self.scan_id, ami.id)
         accounts = [ami.account] + [s.principal for s in shares if s.principal_type == "account"]
-        out, unused = [], []
+        out, unused, ignored = [], [], []
         for account in dict.fromkeys(accounts):
+            if account in self.coverage.ignored:
+                ignored.append(account)
+                continue
             refs = by_account.get(account, [])
             unchecked = self.coverage.couldnt_check(account, ami.region)
             if not refs and not unchecked:
@@ -261,6 +267,12 @@ class _Walker:
             n = len(unused)
             node_id = f"unused:{ami.id}"
             label = f"{n} account{'s' if n != 1 else ''} · not used"
+            node = self.context_node(node_id, "account", label, "", ami.region)
+            out.append((node, Edge(ami.id, node_id, "shared_with")))
+        if ignored:
+            n = len(ignored)
+            node_id = f"ignored:{ami.id}"
+            label = f"{n} ignored account{'s' if n != 1 else ''}"
             node = self.context_node(node_id, "account", label, "", ami.region)
             out.append((node, Edge(ami.id, node_id, "shared_with")))
         for share in shares:

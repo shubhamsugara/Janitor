@@ -136,3 +136,16 @@ def test_an_account_can_list_its_own_regions(tmp_path):
     empty = _variant(tmp_path, lambda d: d["accounts"]["333333333333"].update(regions=[]))
     with pytest.raises(ValidationError, match="regions"):
         load_config(empty)
+
+
+def test_ignore_accounts(tmp_path):
+    config = load_config(_variant(tmp_path, lambda d: d.update(ignore_accounts=["444444444444"])))
+    assert config.ignore_accounts == ["444444444444"]
+    for bad, message in (
+        (["12345"], "12 digits"),
+        (["111111111111"], "admin"),
+        (["222222222222"], "both listed and ignored"),
+    ):
+        path = _variant(tmp_path, lambda d, bad=bad: d.update(ignore_accounts=bad))
+        with pytest.raises(ValidationError, match=message):
+            load_config(path)

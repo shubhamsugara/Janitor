@@ -208,3 +208,19 @@ def test_a_failed_admin_hop_points_at_the_admin_profile(config):
         "Janitor can't assume the admin role from profile example-tools (its role_arn in your "
         "AWS config). Check the role's trust policy and your MFA session, then Scan now."
     )
+
+
+def test_ignoring_the_unreachable_demo_account_makes_its_ami_deletable_with_a_warning(
+    tmp_path, config
+):
+    ignoring = config.model_copy(update={"ignore_accounts": ["444444444444"]})
+    store = Store(tmp_path / "janitor.db")
+    scan_id = Scanner(
+        store, MockProvider(SEED, clock=lambda: NOW, config=ignoring), ignoring, clock=lambda: NOW
+    ).run()
+    assert store.latest_scan()["status"] == "ok"  # the ignored account is never contacted
+    partner = by_name(store, scan_id, f"partner-export-{stamp(250)}", type="ami")
+    assert partner.status == "orphaned" and partner.ignored_shares == "444444444444"
+    assert "W7" in rules_of(store, scan_id, partner) and "R2" not in rules_of(
+        store, scan_id, partner
+    )

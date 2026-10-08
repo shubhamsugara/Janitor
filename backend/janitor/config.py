@@ -97,6 +97,8 @@ class Config(_Strict):
     admin: Admin
     member_role: str = ""  # the role assumed in every other account, from the same source login
     accounts: dict[str, AccountName] = Field(default_factory=dict)  # display names; always scanned
+    # Never contacted, and AMIs shared with them aren't held back by them (rule W7 warns instead).
+    ignore_accounts: list[str] = Field(default_factory=list)
     policy: Policy = Field(default_factory=Policy)
     pricing: Pricing = Field(default_factory=Pricing)
     scan: Scan = Field(default_factory=Scan)
@@ -122,6 +124,26 @@ class Config(_Strict):
             if not ACCOUNT_ID.match(account_id):
                 raise ValueError(f"account ID {account_id!r} must be 12 digits")
         return accounts
+
+    @field_validator("ignore_accounts")
+    @classmethod
+    def _ignored_ids(cls, ignored: list[str]) -> list[str]:
+        for account_id in ignored:
+            if not ACCOUNT_ID.match(account_id):
+                raise ValueError(f"ignored account ID {account_id!r} must be 12 digits")
+        return ignored
+
+    @model_validator(mode="after")
+    def _ignore_is_consistent(self) -> "Config":
+        for account_id in self.ignore_accounts:
+            if account_id == self.admin.account:
+                raise ValueError("the admin account can't be ignored")
+            if account_id in self.accounts:
+                raise ValueError(
+                    f"account {self.accounts[account_id].name} is both listed and ignored; "
+                    "remove it from one"
+                )
+        return self
 
     @property
     def regions(self) -> list[str]:

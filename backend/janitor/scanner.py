@@ -7,7 +7,7 @@ from dataclasses import asdict
 from datetime import UTC, datetime
 
 from janitor.config import Config
-from janitor.linker import LinkContext, link, references
+from janitor.linker import LinkContext, ignored_shares, link, references
 from janitor.models import Segment
 from janitor.pricing import PriceTable, apply_costs
 from janitor.providers.base import CloudProvider
@@ -124,9 +124,11 @@ class Scanner:
             ctx = LinkContext.from_config(self._config, now, inventory.segments)
             statuses = link(inventory, ctx)
             named = references(inventory, ctx)
+            ignored = ignored_shares(inventory, ctx)
             for r in inventory.resources:
                 r.status, r.status_reason = statuses[r.id]
                 r.referenced_by = named.get(r.id) if r.status != "in_use" else None
+                r.ignored_shares = ignored.get(r.id)
             apply_costs(inventory.resources, self._prices)
             self._store.save_inventory(
                 scan_id, inventory.resources, inventory.shares, inventory.usage, inventory.databases

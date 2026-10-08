@@ -31,6 +31,7 @@ class LinkContext:
     now: datetime
     failed: set[tuple[str, str, str]] = field(default_factory=set)  # (account, region, kind)
     scanned: set[tuple[str, str]] | None = None  # (account, region); None means everywhere
+    ignored: set[str] = field(default_factory=set)  # never checked, and never held against an AMI
 
     @classmethod
     def from_config(
@@ -45,6 +46,7 @@ class LinkContext:
             failed={(s.account, s.region, s.kind) for s in segments if not s.ok},
             # Accounts are discovered during the scan, so "scanned" means a usage check ran there.
             scanned={(s.account, s.region) for s in segments if s.kind == "usage"} or None,
+            ignored=set(config.ignore_accounts),
         )
 
     def name(self, account_id: str) -> str:
@@ -133,12 +135,22 @@ def references(inventory: Inventory, ctx: LinkContext) -> dict[str, str]:
     return out
 
 
+def ignored_shares(inventory: Inventory, ctx: LinkContext) -> dict[str, str]:
+    """{ami_id: "id, id"} for AMIs shared with accounts the config ignores (W7)."""
+    found: dict[str, list[str]] = defaultdict(list)
+    for share in inventory.shares:
+        if share.principal_type == "account" and share.principal in ctx.ignored:
+            found[share.image_id].append(share.principal)
+    return {ami_id: ", ".join(sorted(set(ids))) for ami_id, ids in found.items()}
+
+
 def _managed(r: Resource) -> tuple[str, str]:
     return "managed", MANAGED_REASONS.get(r.managed_by, "Created by an AWS-managed service.")
 
 
 def _ami(r: Resource, shares: list[Share], usage: list[Usage], ctx: LinkContext) -> tuple[str, str]:
     # Launch permissions are region-scoped, so only usage in the AMI's own region counts.
+    shares = [s for s in shares if s.principal not in ctx.ignored]  # the user vouched for these
     permitted = {r.account} | {s.principal for s in shares if s.principal_type == "account"}
     refs = [u for u in usage if u.account in permitted and u.ref_type == "instance"]
     if refs:

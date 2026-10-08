@@ -15,7 +15,7 @@ from pathlib import Path
 
 from janitor.models import Database, Resource, RuleResult, Segment, Share, Usage, format_ts
 
-SCHEMA_VERSION = 4  # bump when a scan table changes shape; old scan data is dropped
+SCHEMA_VERSION = 5  # bump when a scan table changes shape; old scan data is dropped
 RESOURCE_FIELDS = [f.name for f in fields(Resource)]
 JSON_FIELDS = {"tags", "snapshot_ids", "cost_breakdown"}
 SORTABLE = {
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS resources (
   linked_ami_id TEXT, source_volume_id TEXT, attached_instance TEXT, volume_type TEXT,
   source_db_id TEXT, db_kind TEXT, managed_by TEXT, iops INTEGER, throughput INTEGER,
   encrypted INTEGER, storage_tier TEXT, est_monthly_cost REAL, cost_breakdown TEXT,
-  status TEXT NOT NULL, status_reason TEXT NOT NULL, referenced_by TEXT,
+  status TEXT NOT NULL, status_reason TEXT NOT NULL, referenced_by TEXT, ignored_shares TEXT,
   PRIMARY KEY (scan_id, id));
 CREATE INDEX IF NOT EXISTS resources_type_status ON resources (scan_id, type, status);
 CREATE TABLE IF NOT EXISTS shares (

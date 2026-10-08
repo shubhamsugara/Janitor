@@ -41,6 +41,10 @@ Get before it is sent.
 4. `make run-aws`. The first scan runs in the background. An account whose role can't be assumed
    shows as a failed check, and AMIs shared with it show as Unknown.
 
+An account you can't reach (no role, or someone else's) keeps the AMIs shared with it Unknown.
+If you're sure nobody there needs them, list it under `ignore_accounts`: Janitor stops contacting
+it, and those AMIs get warning W7 instead of being held back.
+
 An AMI is **in use** only when an instance (running or stopped) was launched from it. A launch
 template, Auto Scaling group, or launch configuration that only names it adds a **Referenced**
 warning, and deleting it then requires typing `delete`.

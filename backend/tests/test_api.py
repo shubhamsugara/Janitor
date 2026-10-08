@@ -95,7 +95,7 @@ def test_resource_detail(client):
     ami = find(client, "ami", f"base-linux-{stamp(20)}")
     body = client.get(f"/api/resources/{ami['id']}").json()
     assert body["resource"]["status"] == "in_use"
-    assert [r["id"] for r in body["rules"]] == ["R1", "R2", "R3", "R4", "R5", "W4", "W6"]
+    assert [r["id"] for r in body["rules"]] == ["R1", "R2", "R3", "R4", "R5", "W4", "W6", "W7"]
     assert next(r for r in body["rules"] if r["id"] == "R1")["outcome"] == "block"
     assert {u["ref_name"] for u in body["related"]["usage"]} == {
         "dev-api-1",
