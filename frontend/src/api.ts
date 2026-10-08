@@ -328,6 +328,12 @@ export const api = {
   latestScan: () => request<ScanProgress>("/api/scans/latest"),
   plan: (type: ResourceType, ids: string[]) =>
     request<Plan>("/api/actions/plan", { method: "POST", body: JSON.stringify({ type, ids }) }),
+  /** Every resource the filters match, minus `exclude`: resolved on the server, never a list of IDs. */
+  planMatching: (type: ResourceType, filter: Record<string, string>, exclude: string[]) =>
+    request<Plan>("/api/actions/plan", {
+      method: "POST",
+      body: JSON.stringify({ type, selection: { filter, exclude } }),
+    }),
   simulate: (planId: string, confirmation: string) =>
     request<SimulateResult>("/api/actions/simulate", {
       method: "POST",

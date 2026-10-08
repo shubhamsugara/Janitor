@@ -8,7 +8,7 @@ import ResourceTable from "../components/ResourceTable";
 import StatsHeader from "../components/StatsHeader";
 import { useDetail } from "../detail";
 import { buildReport, downloadPdf } from "../export/pdfReport";
-import { EMPTY, hasFilters, parseFilters, toApiParams, toSearch, type Filters } from "../filters";
+import { EMPTY, filtersToApi, hasFilters, parseFilters, toApiParams, toSearch, type Filters } from "../filters";
 import { formatGiB, formatUsd, simulationSummary } from "../format";
 import type { PageProps } from "../nav";
 import { sequencer } from "../sequencer";
@@ -29,7 +29,9 @@ export default function Resources({ meta, notify, type, title }: Props) {
   const setFilters = useCallback((next: Filters) => setSearch(toSearch(next), { replace: true }), [setSearch]);
   const [data, setData] = useState<ResourcePage | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<Resource[]>([]);
+  const [picked, setPicked] = useState<Resource[]>([]);
+  // "Select all N matching": every match except the rows unchecked since; null = only `picked`.
+  const [all, setAll] = useState<{ total: number; exclude: Set<string> } | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [planning, setPlanning] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -53,6 +55,29 @@ export default function Resources({ meta, notify, type, title }: Props) {
       });
   }, [type, filters, notify, nextRequest]);
   useEffect(load, [load]);
+  // All-matching means "these filters", so any filter or sort change ends it. Paging doesn't.
+  const query = JSON.stringify({ ...filters, page: 0 });
+  useEffect(() => setAll(null), [query]);
+
+  const items = data?.items ?? [];
+  const selected = all ? items.filter((r) => !all.exclude.has(r.id)) : picked;
+  const count = all ? all.total - all.exclude.size : picked.length;
+  const select = (next: Resource[]) => {
+    if (!all) return setPicked(next);
+    const keep = new Set(next.map((r) => r.id));
+    const exclude = new Set(all.exclude);
+    for (const r of items) {
+      if (keep.has(r.id)) exclude.delete(r.id);
+      else exclude.add(r.id);
+    }
+    setAll({ ...all, exclude });
+  };
+  const clearSelection = () => {
+    setAll(null);
+    setPicked([]);
+  };
+  const pageSelected = items.length > 0 && items.every((r) => picked.some((p) => p.id === r.id));
+  const canSelectAll = !all && pageSelected && (data?.total ?? 0) > items.length;
 
   const filtered = hasFilters(filters);
   const reset = () => setFilters({ ...EMPTY, sort: filters.sort });
@@ -61,7 +86,11 @@ export default function Resources({ meta, notify, type, title }: Props) {
   async function planDelete() {
     setPlanning(true);
     try {
-      setPlan(await api.plan(type, selected.map((r) => r.id)));
+      setPlan(
+        all
+          ? await api.planMatching(type, filtersToApi(type, filters), [...all.exclude])
+          : await api.plan(type, picked.map((r) => r.id)),
+      );
     } catch (e) {
       notify("error", (e as Error).message);
     } finally {
@@ -128,8 +157,8 @@ export default function Resources({ meta, notify, type, title }: Props) {
               { id: "pdf", label: "PDF report", description: "Up to 5,000 rows" },
             ]}
           />
-          <Button variant="primary" disabled={selected.length === 0} loading={planning} onClick={planDelete}>
-            {selected.length ? `Plan delete (${selected.length})` : "Plan delete"}
+          <Button variant="primary" disabled={count === 0} loading={planning} onClick={planDelete}>
+            {count ? `Plan delete (${count.toLocaleString()})` : "Plan delete"}
           </Button>
         </div>
       </div>
@@ -143,12 +172,12 @@ export default function Resources({ meta, notify, type, title }: Props) {
         <ResourceTable
           meta={meta}
           type={type}
-          items={data?.items ?? []}
+          items={items}
           loading={loading}
           sort={filters.sort}
           onSort={(sort) => setFilters({ ...filters, sort, page: 1 })}
           selected={selected}
-          onSelect={setSelected}
+          onSelect={select}
           onOpen={open}
           empty={empty}
         />
@@ -167,10 +196,21 @@ export default function Resources({ meta, notify, type, title }: Props) {
         </div>
       </Card>
 
-      {selected.length > 0 && (
+      {count > 0 && (
         <div className="animate-pop-in fixed bottom-6 left-1/2 z-20 flex -translate-x-1/2 items-center gap-3 rounded-2xl border border-line bg-card py-2 pr-2 pl-4 shadow-2xl">
-          <span className="text-sm font-medium">{selected.length.toLocaleString()} selected</span>
-          <Button size="sm" variant="ghost" onClick={() => setSelected([])}>
+          <span className="text-sm font-medium">
+            {!all
+              ? `${count.toLocaleString()} selected`
+              : all.exclude.size
+                ? `${count.toLocaleString()} of ${all.total.toLocaleString()} matching selected`
+                : `All ${all.total.toLocaleString()} matching selected`}
+          </span>
+          {canSelectAll && (
+            <Button size="sm" variant="secondary" onClick={() => setAll({ total: data!.total, exclude: new Set() })}>
+              {`Select all ${data!.total.toLocaleString()} matching`}
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" onClick={clearSelection}>
             <X className="size-3.5" aria-hidden />
             Clear
           </Button>
@@ -188,7 +228,7 @@ export default function Resources({ meta, notify, type, title }: Props) {
           onClose={() => setPlan(null)}
           onSimulated={(result) => {
             setPlan(null);
-            setSelected([]);
+            clearSelection();
             notify("success", simulationSummary(result));
           }}
         />
