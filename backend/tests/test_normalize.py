@@ -537,7 +537,7 @@ def test_ecs_version_falls_back_to_the_image_tag_and_env_to_the_service_tag():
 @pytest.mark.parametrize(
     ("svc", "state"),
     [
-        (service(desired=0, running=0), "undeployed"),
+        (service(desired=0, running=0), "deployed"),  # stopped, not an earlier version
         (service(status="DRAINING"), "undeploying"),
         (service(rollout="IN_PROGRESS"), "deploying"),
         (service(rollout="FAILED"), "failed"),

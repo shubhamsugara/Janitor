@@ -34,7 +34,7 @@ scope: showing them needs `events:List*` as well.
 | `env` | first of `tags.env` on the ASG, else the account's name | first of `tags.env` on the service or task definition, else the account's name |
 | `app` | first of `tags.app` on the ASG, else the ASG name | first of `tags.app` on the task definition or service, else the service name |
 | `version` | first of `tags.version` | first of `tags.version` on the task definition, else the first container's image tag |
-| `state` | the `tags.state` value | `undeployed` if desired is 0; `undeploying` if draining; `failed`/`deploying` from the primary deployment's rollout state; else `deployed` |
+| `state` | the `tags.state` value | `undeploying` if draining; `failed`/`deploying` from the primary deployment's rollout state; else `deployed` (a service at 0 too: its run status says Stopped) |
 | `resource_id`, `name` | ASG name | service ARN, service name |
 | `created_at` | ASG creation time | service creation time |
 | `desired`, `running` | desired capacity, in-service instances | desired count, running count |
@@ -96,7 +96,11 @@ deployments:
   are not columns: a deploy tool may tag every prod account's ASGs `env=prd` while ECS services
   carry no env tag, which split one account across two columns in the first real scan. The env
   tag is shown in the drawer.
-- A cell shows the live version. "Live" means any state except `undeployed`, newest first. Two
+- A cell shows the live version: every row except earlier versions, newest first. **Earlier**
+  is an ASG tagged `undeployed`, or an ECS service at 0 beside a running service for the same
+  app (blue/green standby). A lone ECS service at 0 is current and Stopped; the first real scan
+  had 123 such cells wrongly shown as history. ECS rolling deploys have no earlier versions here
+  (old task definition revisions aren't read). Two
   live rows (a switch in progress) show `old → new`. In-progress and failed cells get a colored
   badge. A cell with only undeployed rows shows "Not running" and its last version.
 - Every cell shows how many instances or tasks run ("2 instances", "6 tasks"), summed across
@@ -114,6 +118,8 @@ deployments:
   launch template + version, AMI (name, status, link to the AMI page). For ECS: cluster,
   service, task definition, image, counts. Earlier versions (undeployed rows) come last.
 - A banner lists failed checks that affect the page.
+- How Janitor decides has a Deployments glossary (term → technical definition, with the
+  configured tag names), served from `definitions.py`.
 - Copy follows the existing rules (sentence case, no "successfully", "please", or `!`).
 
 ## Mock data

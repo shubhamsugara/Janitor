@@ -13,9 +13,10 @@ const meta = {
     notes: [],
     deployments: {
       summary: "A grid of apps by account and region.",
-      sources: [{ title: "Auto Scaling groups", text: "Groups tagged with `deploy-state`." }],
-      run: [{ label: "Stopped", meaning: "Scaled to 0." }],
-      notes: ["Columns are accounts, not env tags."],
+      terms: [
+        { term: "Column", definition: "An AWS account and region." },
+        { term: "EC2 deployment", definition: "An Auto Scaling group with the `deploy-state` tag." },
+      ],
     },
   },
 } as unknown as Meta;
@@ -28,9 +29,8 @@ describe("HowItWorks", () => {
       </MemoryRouter>,
     );
     expect(screen.getByText("A grid of apps by account and region.")).toBeTruthy();
-    expect(screen.getByText("Auto Scaling groups")).toBeTruthy();
+    expect(screen.getByText("Column")).toBeTruthy();
+    expect(screen.getByText("An AWS account and region.")).toBeTruthy();
     expect(screen.getByText("deploy-state").tagName).toBe("CODE");
-    expect(screen.getByText("Scaled to 0.")).toBeTruthy();
-    expect(screen.getByText("Columns are accounts, not env tags.")).toBeTruthy();
   });
 });

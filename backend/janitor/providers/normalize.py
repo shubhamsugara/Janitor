@@ -423,10 +423,10 @@ def _ecs_tags(raw: dict | None) -> dict[str, str]:
 
 
 def _ecs_state(service: dict) -> str:
+    """ECS has no deploy-state tag. A service scaled to 0 is still deployed (its run status says
+    Stopped); the UI makes it an earlier version only beside a running service for the same app."""
     if service.get("status") == "DRAINING":
         return "undeploying"
-    if not service.get("desiredCount"):
-        return "undeployed"  # scaled to 0, like the standby side of a blue/green pair
     deployments = service.get("deployments") or []
     primary = next((d for d in deployments if d.get("status") == "PRIMARY"), {})
     rollout = primary.get("rolloutState")

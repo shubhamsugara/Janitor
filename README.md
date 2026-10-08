@@ -59,7 +59,8 @@ The Deployments page is a grid of apps by env and region, from the same scan:
   version, and deployment ID tags, the launch template version they pin, and its AMI. Other
   groups are ignored. Instances in no Auto Scaling group are listed too, marked standalone.
 - **ECS apps** are services, with the version from their task definition's tags (or the image
-  tag). A service scaled to 0, like the standby side of a blue/green pair, is an earlier version.
+  tag). A service scaled to 0 is shown Stopped; beside a running service for the same app (the
+  idle side of a blue/green pair) it is an earlier version.
 
 The tag names are set under `deployments.tags` in `janitor.yaml`. For ECS, each role Janitor
 assumes needs `ecs:ListClusters`, `ecs:ListServices`, `ecs:DescribeServices`, and

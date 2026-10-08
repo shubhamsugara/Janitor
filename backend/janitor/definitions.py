@@ -12,56 +12,69 @@ def _tags(keys: list[str]) -> str:
 
 
 def deployments(config: Config) -> dict:
-    """What the Deployments page reads, with the configured tag names."""
+    """What the Deployments page shows, as terms engineers can use with each other."""
     tags = config.deployments.tags
+    state = f"`{tags.state}`"
+    terms = [
+        ("Column", "An AWS account and region, labeled with the account's name from janitor.yaml."),
+        (
+            "Row (app)",
+            f"The first of {_tags(tags.app)} on the ASG, instance, or task definition; else the "
+            "ASG name, Name tag, or service name.",
+        ),
+        (
+            "EC2 deployment",
+            f"An Auto Scaling group with the {state} tag. Blue/green and destroy-before-create make "
+            "one ASG per deploy; Janitor reads its pinned launch template version and that "
+            "version's AMI. ASGs without the tag are skipped.",
+        ),
+        (
+            "Standalone instance",
+            "An EC2 instance without the `aws:autoscaling:groupName` tag: bastions, hand-built "
+            "servers, a DR server kept stopped. One row per instance.",
+        ),
+        (
+            "ECS deployment",
+            f"An ECS service. Version is the task definition's {_tags(tags.version)} tag, else the "
+            "container image tag.",
+        ),
+        (
+            "Deploy state",
+            f"EC2: the {state} tag (deploying, deployed, undeploying, undeployed). ECS: the primary "
+            "deployment's rolloutState (IN_PROGRESS is deploying, FAILED is failed), and a "
+            "DRAINING service is undeploying.",
+        ),
+        (
+            "Run status",
+            "Desired against running: ASG DesiredCapacity vs InService instances, ECS desiredCount "
+            "vs runningCount, an instance's running or stopped state. Stopped: desired 0. No "
+            "instances/tasks running: desired above 0, none running. N of M running: partly up. "
+            "Stopping: desired 0, some still running.",
+        ),
+        ("Count", "Running instances or tasks, summed across everything in the cell."),
+        (
+            "Live version",
+            "Every row in the cell except earlier versions. Two rows during a switch show as "
+            "old → new; versions running side by side are listed.",
+        ),
+        (
+            "Earlier version",
+            f"An ASG tagged {state}=undeployed (scaled to 0, kept until someone prunes it), or the "
+            "idle side of an ECS blue/green pair (desiredCount 0 beside a running service). ECS "
+            "rolling deploys replace the task definition in place, so they have none here.",
+        ),
+        (
+            "Drift",
+            "An app runs different versions across columns. Amber cells are behind its highest "
+            "version.",
+        ),
+    ]
     return {
         "summary": (
-            "A grid of apps by account and region, from the same read-only scan: which version "
-            "runs where, and whether it is actually running. Nothing here is judged or deleted."
+            "Which version of each app runs in each account and region, and whether it is "
+            "running. From the same read-only scan; nothing here is judged or deleted."
         ),
-        "sources": [
-            {
-                "title": "Auto Scaling groups",
-                "text": (
-                    f"Groups your deploy tool tagged with `{tags.state}` (deploying, deployed, "
-                    f"undeploying, undeployed). App from {_tags(tags.app)}, version from "
-                    f"{_tags(tags.version)}, plus the launch template version the group pins and "
-                    "its AMI. Untagged groups are skipped. Undeployed groups are earlier versions "
-                    "kept at zero until someone removes them."
-                ),
-            },
-            {
-                "title": "Standalone instances",
-                "text": (
-                    "Instances in no Auto Scaling group, such as bastions, hand-built servers, or "
-                    f"a DR server kept stopped. App from {_tags(tags.app)}, else the Name tag."
-                ),
-            },
-            {
-                "title": "ECS services",
-                "text": (
-                    "Every service in every cluster, with the version from its task definition's "
-                    f"{_tags(tags.version)} tag, else the image tag. A service scaled to 0, like "
-                    "the standby side of a blue/green pair, is an earlier version."
-                ),
-            },
-        ],
-        "run": [
-            {"label": "Stopped", "meaning": "Scaled to 0: nothing is meant to run."},
-            {
-                "label": "No instances or tasks running",
-                "meaning": "It should run but nothing does, for example tasks that keep failing.",
-            },
-            {"label": "N of M running", "meaning": "Partly up: fewer running than desired."},
-            {"label": "Stopping", "meaning": "Scaled to 0, but some still run."},
-        ],
-        "notes": [
-            "Columns are accounts, not env tags: ECS services rarely carry an env tag, so the "
-            "account is what every row shares. The env tag shows in the details.",
-            "The deploy state is the deploy tool's label; the run status comes from desired and "
-            "running counts, so a deployed group scaled to 0 shows Stopped.",
-            "Amber versions are behind the newest version of that app elsewhere.",
-        ],
+        "terms": [{"term": term, "definition": text} for term, text in terms],
     }
 
 

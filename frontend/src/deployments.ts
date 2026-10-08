@@ -14,8 +14,8 @@ export interface Column {
 }
 
 export interface Cell {
-  live: Deployment[]; // every state but undeployed, newest first
-  history: Deployment[]; // undeployed, newest first
+  live: Deployment[]; // newest first
+  history: Deployment[]; // earlier versions (see isEarlier), newest first
 }
 
 export interface AppRow {
@@ -63,6 +63,13 @@ export function columnsOf(items: Deployment[]): Column[] {
   );
 }
 
+/** An ASG tagged undeployed, or the idle side of an ECS blue/green pair: a service scaled to 0
+ * beside a running service for the same app. A lone ECS service at 0 is current, just stopped. */
+function isEarlier(d: Deployment, here: Deployment[]): boolean {
+  if (d.state === "undeployed") return true;
+  return d.unit === "service" && d.desired === 0 && d.running === 0 && here.some((o) => o.unit === "service" && o.desired > 0);
+}
+
 const newestFirst = (a: Deployment, b: Deployment) => b.created_at.localeCompare(a.created_at);
 
 export function rowsOf(items: Deployment[]): AppRow[] {
@@ -71,10 +78,12 @@ export function rowsOf(items: Deployment[]): AppRow[] {
   return [...byApp.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([app, rows]) => {
+      const byCell = new Map<string, Deployment[]>();
+      for (const d of rows) byCell.set(columnKey(d), [...(byCell.get(columnKey(d)) ?? []), d]);
       const cells: Record<string, Cell> = {};
-      for (const d of rows) {
-        const cell = (cells[columnKey(d)] ??= { live: [], history: [] });
-        (d.state === "undeployed" ? cell.history : cell.live).push(d);
+      for (const [key, here] of byCell) {
+        const cell: Cell = (cells[key] = { live: [], history: [] });
+        for (const d of here) (isEarlier(d, here) ? cell.history : cell.live).push(d);
       }
       for (const cell of Object.values(cells)) {
         cell.live.sort(newestFirst);

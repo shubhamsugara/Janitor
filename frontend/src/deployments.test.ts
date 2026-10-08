@@ -159,3 +159,25 @@ describe("cellSummary", () => {
     expect(cellSummary(Object.values(one.cells)[0])).toMatchObject({ count: "1 instance", standalone: 1 });
   });
 });
+
+describe("ECS services scaled to 0", () => {
+  const ecs = (over: Partial<Deployment>) => dep({ kind: "ecs", unit: "service", ...over });
+
+  it("is the current version, stopped, when it is the app's only service there", () => {
+    const [row] = rowsOf([ecs({ name: "reports", version: "0.9.2", desired: 0, running: 0 })]);
+    const cell = Object.values(row.cells)[0];
+    expect(cell.live.map((d) => d.name)).toEqual(["reports"]);
+    expect(cell.history).toEqual([]);
+    expect(cellSummary(cell).run.key).toBe("stopped");
+  });
+
+  it("is the earlier version when another service for the app runs there (blue/green standby)", () => {
+    const [row] = rowsOf([
+      ecs({ name: "billing-blue", version: "5.0.1", desired: 4, running: 4 }),
+      ecs({ name: "billing-green", version: "5.0.0", desired: 0, running: 0 }),
+    ]);
+    const cell = Object.values(row.cells)[0];
+    expect(cell.live.map((d) => d.name)).toEqual(["billing-blue"]);
+    expect(cell.history.map((d) => d.name)).toEqual(["billing-green"]);
+  });
+});

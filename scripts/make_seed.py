@@ -633,7 +633,7 @@ def deployments(s: Seed, base: str, web: str, west_base: str) -> None:
         "prd",
         "billing-svc",
         "5.0.0",
-        "undeployed",
+        "deployed",
         25,
         desired=0,
         name="billing-svc-green",

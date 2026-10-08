@@ -132,7 +132,7 @@ export default function DeploymentPanel({ cell, meta }: { cell: Cell; meta: Meta
       {cell.history.length > 0 && (
         <section className="space-y-3">
           <h3 className="text-[15px] font-semibold tracking-tight">Earlier versions</h3>
-          <p className="text-[13px] text-muted">Scaled to zero and kept until someone removes them.</p>
+          <p className="text-[13px] text-muted">Old Auto Scaling groups kept at zero until someone prunes them, or the idle side of an ECS blue/green pair.</p>
           {cell.history.map((d) => (
             <Details key={d.resource_id} d={d} meta={meta} />
           ))}

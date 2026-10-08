@@ -3471,7 +3471,7 @@
    "env": "prd",
    "app": "billing-svc",
    "version": "5.0.0",
-   "state": "undeployed",
+   "state": "deployed",
    "resource_id": "arn:aws:ecs:us-east-1:333333333333:service/apps/billing-svc-green",
    "name": "billing-svc-green",
    "created_at": "2026-09-06T00:00:00Z",

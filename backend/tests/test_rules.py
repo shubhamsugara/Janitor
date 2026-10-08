@@ -111,31 +111,28 @@ def test_w7_warns_when_an_ami_is_shared_with_ignored_accounts():
     assert "W7" not in {h.rule_id for h in evaluate(res(type="ami"), POLICY, NOW)}
 
 
-def test_deployment_help_names_the_configured_tags():
+def test_deployment_help_is_a_glossary_with_the_configured_tags():
     from janitor.config import Config, DeploymentTags
 
     config = load_config(EXAMPLE)
     help = build(config)["deployments"]
-    text = " ".join(
-        [
-            help["summary"],
-            *(s["text"] for s in help["sources"]),
-            *(r["meaning"] for r in help["run"]),
-        ]
-    )
-    assert "deploy-state" in text and "role" in text
-    assert [s["title"] for s in help["sources"]] == [
-        "Auto Scaling groups",
-        "Standalone instances",
-        "ECS services",
+    terms = [t["term"] for t in help["terms"]]
+    assert terms == [
+        "Column",
+        "Row (app)",
+        "EC2 deployment",
+        "Standalone instance",
+        "ECS deployment",
+        "Deploy state",
+        "Run status",
+        "Count",
+        "Live version",
+        "Earlier version",
+        "Drift",
     ]
-    assert [r["label"] for r in help["run"]] == [
-        "Stopped",
-        "No instances or tasks running",
-        "N of M running",
-        "Stopping",
-    ]
+    text = " ".join(t["definition"] for t in help["terms"])
+    assert "`deploy-state`" in text and "`role`" in text and "rolloutState" in text
     renamed = Config.model_validate(
         config.model_dump() | {"deployments": {"tags": DeploymentTags(state="stage").model_dump()}}
     )
-    assert "stage" in " ".join(s["text"] for s in build(renamed)["deployments"]["sources"])
+    assert "`stage`" in " ".join(t["definition"] for t in build(renamed)["deployments"]["terms"])

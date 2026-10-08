@@ -114,9 +114,7 @@ export interface Meta {
     notes: string[];
     deployments: {
       summary: string;
-      sources: { title: string; text: string }[];
-      run: { label: string; meaning: string }[];
-      notes: string[];
+      terms: { term: string; definition: string }[];
     };
   };
 }
