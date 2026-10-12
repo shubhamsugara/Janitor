@@ -10,13 +10,21 @@ export interface AppFilters {
   q: string;
 }
 
-export interface Series {
+export interface Leaf {
+  name: string; // the treemap labels by name
   app: string;
-  key: string; // "s0".."s7": app names can hold dots, which chart libraries read as paths
-  slot: number; // palette slot, fixed per app
+  env: string;
+  running: number;
+  slot: number | null;
 }
 
-export type Point = { label: string } & Record<string, number | string>;
+export interface Group {
+  name: string;
+  env: string;
+  running: number;
+  slot: number | null; // palette slot; null past the palette (drawn neutral)
+  children: Leaf[];
+}
 
 export function filterApps(items: Deployment[], f: AppFilters): Deployment[] {
   const q = f.q.trim().toLowerCase();
@@ -28,33 +36,31 @@ export function filterApps(items: Deployment[], f: AppFilters): Deployment[] {
   );
 }
 
-/** Apps by running instances and tasks, biggest first. */
-function rank(items: Deployment[]): string[] {
-  const running = new Map<string, number>();
-  for (const d of items) running.set(d.app, (running.get(d.app) ?? 0) + d.running);
-  return [...running.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([app]) => app);
-}
-
-/** A stacked area per app over env columns. Colors follow the app, not its rank in the current
- * filter: the biggest apps overall keep their slots, and others take the slots left free. */
-export function chartOf(shown: Deployment[], all: Deployment[]): { points: Point[]; series: Series[]; other: boolean } {
-  const visible = rank(shown);
-  const top = visible.slice(0, MAX_SERIES);
-  const fixed = new Map(rank(all).slice(0, MAX_SERIES).map((app, slot) => [app, slot]));
-  const free = [...Array(MAX_SERIES).keys()].filter((slot) => ![...fixed.entries()].some(([app, s]) => s === slot && top.includes(app)));
-  const series = top.map((app, i) => ({ app, key: `s${i}`, slot: fixed.get(app) ?? (free.shift() as number) }));
-  const keyOf = new Map(series.map((s) => [s.app, s.key]));
-  const points = columnsOf(shown).map((c) => {
-    const point: Point = { label: `${c.name} · ${c.region}`, other: 0 };
-    for (const s of series) point[s.key] = 0;
-    for (const d of shown) {
-      if (d.account !== c.account || d.region !== c.region) continue;
-      const key = keyOf.get(d.app) ?? "other";
-      point[key] = (point[key] as number) + d.running;
-    }
-    return point;
-  });
-  return { points, series, other: visible.length > MAX_SERIES };
+/** A treemap: one block per env (account name, regions combined), one rectangle per app sized by
+ * running instances and tasks. Colors follow the env, not its rank: slots come from the env order
+ * of all deployments, so a filter never repaints the envs that remain. */
+export function treemapOf(shown: Deployment[], all: Deployment[]): Group[] {
+  const order = [...new Set(columnsOf(all).map((c) => c.name))];
+  const slotOf = (env: string) => {
+    const i = order.indexOf(env);
+    return i >= 0 && i < MAX_SERIES ? i : null;
+  };
+  const byEnv = new Map<string, Map<string, number>>();
+  for (const d of shown) {
+    if (d.running <= 0) continue;
+    const apps = byEnv.get(d.account_name) ?? new Map<string, number>();
+    apps.set(d.app, (apps.get(d.app) ?? 0) + d.running);
+    byEnv.set(d.account_name, apps);
+  }
+  return [...byEnv.entries()]
+    .map(([env, apps]) => {
+      const slot = slotOf(env);
+      const children = [...apps.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .map(([app, running]) => ({ name: app, app, env, running, slot }));
+      return { name: env, env, slot, running: children.reduce((n, c) => n + c.running, 0), children };
+    })
+    .sort((a, b) => b.running - a.running || order.indexOf(a.env) - order.indexOf(b.env));
 }
 
 export interface AppDetail {

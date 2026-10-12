@@ -146,11 +146,11 @@ matching `asg` usage row, so no AMI status changes.
 row now also carries its `tags` (ASG and instance tags without `aws:*`; ECS task definition tags,
 then service tags on top). `SCHEMA_VERSION` 9.
 
-- A stacked area chart: x is env · region (the Deployments column order), y is running instances
-  and tasks, one area per app. At most 8 apps get a color (the validated categorical palette, in
-  fixed order); the rest fold into Other. Colors follow the app: the 8 biggest apps overall keep
-  their slots when a filter hides others. Straight segments, since the x-axis is categories.
-- A legend above the chart and an "All apps" list (both clickable) name every color.
+- A **treemap**: one block per env (account name, regions combined), one rectangle per app
+  sized by its running instances and tasks, labeled `app, N`; the env's first tile names the env.
+  Envs take the validated categorical palette in the Deployments column order, so colors follow
+  the env across filters; envs past 8 are neutral gray. Apps with nothing running take no space.
+- An env legend under the treemap, and an "All apps" list (clickable, including apps with nothing running).
 - Clicking an app opens a drawer: every resource (ASG, standalone instance, ECS service) with
   place, version, deploy and run status, launch template and AMI or task definition and image;
   then every tag key with its values and how many resources carry each.

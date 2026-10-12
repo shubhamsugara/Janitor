@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Deployment } from "./api";
-import { appDetail, chartOf, filterApps, MAX_SERIES } from "./apps";
+import { appDetail, filterApps, MAX_SERIES, treemapOf } from "./apps";
 
 function dep(over: Partial<Deployment>): Deployment {
   return {
@@ -46,37 +46,33 @@ describe("filterApps", () => {
   });
 });
 
-describe("chartOf", () => {
-  it("stacks running counts per app over env columns, biggest apps first", () => {
+describe("treemapOf", () => {
+  it("groups apps under envs, sized by running, biggest first", () => {
     const items = [
       dep({ app: "api", running: 2 }),
+      dep({ app: "web", running: 5 }),
       dep({ app: "api", ...PRD, running: 6 }),
-      dep({ app: "web", ...PRD, running: 1 }),
+      dep({ app: "api", ...PRD, region: "us-west-2", running: 1 }),
+      dep({ app: "idle", ...PRD, running: 0 }),
     ];
-    const chart = chartOf(items, items);
-    expect(chart.series.map((s) => [s.app, s.slot])).toEqual([
-      ["api", 0],
-      ["web", 1],
+    const groups = treemapOf(items, items);
+    expect(groups.map((g) => [g.env, g.running, g.slot])).toEqual([
+      ["dev", 7, 0], // a tie keeps the Deployments column order
+      ["prd-us", 7, 1],
     ]);
-    expect(chart.points.map((p) => p.label)).toEqual(["dev · us-east-1", "prd-us · us-east-1"]);
-    expect(chart.points[1]).toMatchObject({ s0: 6, s1: 1 });
-    expect(chart.points[0]).toMatchObject({ s0: 2, s1: 0 });
-    expect(chart.other).toBe(false);
+    expect(groups[1].children).toEqual([{ name: "api", app: "api", env: "prd-us", running: 7, slot: 1 }]); // regions combine; idle apps take no space
+    expect(groups[0].children.map((c) => c.app)).toEqual(["web", "api"]);
   });
 
-  it("folds apps past the palette into Other", () => {
-    const items = Array.from({ length: MAX_SERIES + 3 }, (_, i) => dep({ app: `app-${String(i).padStart(2, "0")}`, running: 100 - i }));
-    const chart = chartOf(items, items);
-    expect(chart.series).toHaveLength(MAX_SERIES);
-    expect(chart.other).toBe(true);
-    expect(chart.points[0].other).toBe(92 + 91 + 90); // apps 8, 9, and 10
+  it("keeps an env's color when a filter hides other envs", () => {
+    const all = [dep({ app: "api" }), dep({ app: "api", ...PRD })];
+    const [only] = treemapOf(all.filter((d) => d.account_name === "prd-us"), all);
+    expect([only.env, only.slot]).toEqual(["prd-us", 1]);
   });
 
-  it("keeps an app's color when a filter hides bigger apps", () => {
-    const all = [dep({ app: "big", running: 9 }), dep({ app: "mid", running: 5 }), dep({ app: "small", running: 1 })];
-    const shown = all.filter((d) => d.app !== "big");
-    const slots = Object.fromEntries(chartOf(shown, all).series.map((s) => [s.app, s.slot]));
-    expect(slots).toEqual({ mid: 1, small: 2 });
+  it("leaves envs past the palette uncolored", () => {
+    const all = Array.from({ length: MAX_SERIES + 1 }, (_, i) => dep({ account: `${i}`.repeat(12).slice(0, 12), account_name: `env-${i}` }));
+    expect(treemapOf(all, all).filter((g) => g.slot === null)).toHaveLength(1);
   });
 });
 

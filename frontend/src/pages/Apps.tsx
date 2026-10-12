@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { ResponsiveContainer, Tooltip, Treemap } from "recharts";
 import { api, type DeploymentsData } from "../api";
-import { appDetail, chartOf, filterApps, type AppFilters } from "../apps";
+import { appDetail, filterApps, treemapOf, type AppFilters, type Leaf } from "../apps";
 import AppPanel from "../components/AppPanel";
 import MultiSelect from "../components/MultiSelect";
 import { OTHER_COLOR, SERIES_DARK, SERIES_LIGHT } from "../colors";
@@ -29,6 +29,49 @@ function toSearch(f: AppFilters): URLSearchParams {
   return s;
 }
 
+/** Near-black or white text, whichever reads on the tile's fill. */
+function inkFor(hex: string): string {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.3 ? "#0b0b0b" : "#ffffff";
+}
+
+interface TileProps {
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  depth?: number;
+  index?: number;
+  name?: string;
+  env?: string;
+  running?: number;
+  slot?: number | null;
+  palette: string[];
+}
+
+/** One app's rectangle, filled with its env's color. The env's first tile also names the env, top left. */
+function Tile({ x = 0, y = 0, width = 0, height = 0, depth, index, name, env, running, slot, palette }: TileProps) {
+  if (depth !== 2) return null; // the env blocks are the union of their tiles
+  const fill = slot == null ? OTHER_COLOR : palette[slot];
+  const ink = inkFor(fill);
+  const roomy = width > 64 && height > 34;
+  return (
+    <g className="cursor-pointer">
+      <rect x={x} y={y} width={width} height={height} fill={fill} stroke="var(--card)" strokeWidth={2} />
+      {index === 0 && width > 48 && height > 20 && (
+        <text x={x + 6} y={y + 15} fill={ink} fontSize={11} fontWeight={600}>
+          {env}
+        </text>
+      )}
+      {roomy && (
+        <text x={x + 6} y={y + height - 8} fill={ink} fontSize={11}>
+          {name}, {running}
+        </text>
+      )}
+    </g>
+  );
+}
+
 const options = (values: string[]) => values.map((v) => ({ value: v, label: v, text: v }));
 
 export default function Apps({ meta, notify }: PageProps) {
@@ -48,8 +91,7 @@ export default function Apps({ meta, notify }: PageProps) {
   const envOptions = useMemo(() => options([...new Set(columnsOf(all).map((c) => c.name))]), [all]);
   const regionOptions = useMemo(() => options([...new Set(all.map((d) => d.region))].sort()), [all]);
   const shown = useMemo(() => filterApps(all, filters), [all, filters]);
-  const chart = useMemo(() => chartOf(shown, all), [shown, all]);
-  const colorOf = useMemo(() => new Map(chart.series.map((s) => [s.app, palette[s.slot]])), [chart, palette]);
+  const groups = useMemo(() => treemapOf(shown, all), [shown, all]);
   const apps = useMemo(() => {
     const byApp = new Map<string, { running: number; places: Set<string> }>();
     for (const d of shown) {
@@ -92,67 +134,59 @@ export default function Apps({ meta, notify }: PageProps) {
           <Card>
             <CardHeader
               title="Running by env"
-              description={
-                chart.other
-                  ? `The ${chart.series.length} biggest apps by running count; the rest are in Other. Click an area to open its app.`
-                  : "Click an area to open its app."
-              }
+              description="Each block is an env; each rectangle inside is an app, sized by its running instances and tasks. Click an app to open it."
             />
             <CardBody className="pt-2">
-              <ul aria-label="Legend" className="mb-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs">
-                {chart.series.map((s) => (
-                  <li key={s.key}>
-                    <button type="button" onClick={() => setOpen(s.app)} className="inline-flex items-center gap-1.5 hover:text-accent">
-                      <span className="size-2.5 rounded-sm" style={{ background: palette[s.slot] }} aria-hidden />
-                      {s.app}
-                    </button>
-                  </li>
-                ))}
-                {chart.other && (
-                  <li className="inline-flex items-center gap-1.5 text-muted">
-                    <span className="size-2.5 rounded-sm" style={{ background: OTHER_COLOR }} aria-hidden />
-                    Other
-                  </li>
-                )}
-              </ul>
-              <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chart.points} margin={{ top: 8, right: 56, left: 0, bottom: 8 }}>
-                    <CartesianGrid vertical={false} stroke="var(--border)" />
-                    <XAxis dataKey="label" tick={{ fill: "var(--muted)", fontSize: 11 }} tickLine={false} axisLine={{ stroke: "var(--border)" }} interval={0} />
-                    <YAxis allowDecimals={false} tick={{ fill: "var(--muted)", fontSize: 11 }} tickLine={false} axisLine={false} width={40} />
-                    <Tooltip
-                      contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, color: "var(--ink)", fontSize: 12 }}
-                      itemStyle={{ color: "var(--ink)" }}
-                      cursor={{ stroke: "var(--muted)", strokeWidth: 1 }}
-                    />
-                    {chart.series.map((s) => (
-                      <Area
-                        key={s.key}
-                        dataKey={s.key}
-                        name={s.app}
-                        stackId="apps"
-                        type="linear"
-                        fill={palette[s.slot]}
-                        fillOpacity={0.85}
-                        stroke="var(--card)"
-                        strokeWidth={2}
+              {groups.length === 0 ? (
+                <p className="py-10 text-center text-[13px] text-muted">Nothing is running in these envs.</p>
+              ) : (
+                <>
+                  <div className="h-[28rem]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <Treemap
+                        data={groups as unknown as Record<string, unknown>[]}
+                        dataKey="running"
+                        nameKey="name"
+                        aspectRatio={4 / 3}
                         isAnimationActive={false}
-                        className="cursor-pointer"
-                        onClick={() => setOpen(s.app)}
-                      />
+                        content={<Tile palette={palette} />}
+                        onClick={(node) => {
+                          const leaf = node as unknown as Partial<Leaf>;
+                          if (leaf.app) setOpen(leaf.app);
+                        }}
+                      >
+                        <Tooltip
+                          content={({ payload }) => {
+                            const leaf = payload?.[0]?.payload as Partial<Leaf> | undefined;
+                            if (!leaf?.app) return null;
+                            return (
+                              <div className="rounded-[10px] border border-line bg-card px-3 py-2 text-xs text-ink shadow-card">
+                                <div className="font-medium">{leaf.app}</div>
+                                <div className="text-muted">
+                                  {leaf.env}: {leaf.running} running
+                                </div>
+                              </div>
+                            );
+                          }}
+                        />
+                      </Treemap>
+                    </ResponsiveContainer>
+                  </div>
+                  <ul aria-label="Legend" className="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-1.5 text-xs">
+                    {groups.map((g) => (
+                      <li key={g.env} className="inline-flex items-center gap-1.5">
+                        <span className="size-2.5 rounded-sm" style={{ background: g.slot == null ? OTHER_COLOR : palette[g.slot] }} aria-hidden />
+                        {g.env} <span className="text-muted">{g.running}</span>
+                      </li>
                     ))}
-                    {chart.other && (
-                      <Area dataKey="other" name="Other" stackId="apps" type="linear" fill={OTHER_COLOR} fillOpacity={0.6} stroke="var(--card)" strokeWidth={2} isAnimationActive={false} />
-                    )}
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
+                  </ul>
+                </>
+              )}
             </CardBody>
           </Card>
 
           <Card>
-            <CardHeader title="All apps" description="Biggest first. Colored apps are in the chart." />
+            <CardHeader title="All apps" description="Biggest first, including apps with nothing running." />
             <CardBody className="pt-3">
               <ul aria-label="Apps" className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {apps.map(([app, info]) => (
@@ -165,7 +199,6 @@ export default function Apps({ meta, notify }: PageProps) {
                         "focus-visible:ring-4 focus-visible:ring-ring focus-visible:outline-none",
                       )}
                     >
-                      <span className="mt-1 size-2.5 shrink-0 rounded-full" style={{ background: colorOf.get(app) ?? OTHER_COLOR }} aria-hidden />
                       <span className="min-w-0">
                         <span className="block font-medium break-words">{app}</span>
                         <span className="block text-xs text-muted">
