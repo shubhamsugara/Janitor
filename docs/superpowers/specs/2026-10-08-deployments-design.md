@@ -139,3 +139,19 @@ matching `asg` usage row, so no AMI status changes.
   A guard test covers that every sent operation is in `OPERATIONS`.
 - Store round-trip and pruning; the API shape; mock segments include `ecs`.
 - vitest: column order, cell grouping, version comparison, drift.
+
+## Apps page (2026-10-12)
+
+`/apps`, below Deployments in the sidebar. Same data (`GET /api/deployments`); each deployment
+row now also carries its `tags` (ASG and instance tags without `aws:*`; ECS task definition tags,
+then service tags on top). `SCHEMA_VERSION` 9.
+
+- A stacked area chart: x is env · region (the Deployments column order), y is running instances
+  and tasks, one area per app. At most 8 apps get a color (the validated categorical palette, in
+  fixed order); the rest fold into Other. Colors follow the app: the 8 biggest apps overall keep
+  their slots when a filter hides others. Straight segments, since the x-axis is categories.
+- A legend above the chart and an "All apps" list (both clickable) name every color.
+- Clicking an app opens a drawer: every resource (ASG, standalone instance, ECS service) with
+  place, version, deploy and run status, launch template and AMI or task definition and image;
+  then every tag key with its values and how many resources carry each.
+- Filters, in the URL: Env (account name), Region, and app search.

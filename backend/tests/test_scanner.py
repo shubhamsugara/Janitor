@@ -261,8 +261,16 @@ def test_recompute_uses_cross_resource_context(tmp_path, config):
     store = Store(tmp_path / "janitor.db")
     scan_id = store.start_scan("mock")
     amis = [
-        Resource(f"ami-{n}", "ami", "111111111111", "us-east-1", f"web-{n}", days_ago(40 + n),
-                 tags={"owner": "me"}, status="idle")
+        Resource(
+            f"ami-{n}",
+            "ami",
+            "111111111111",
+            "us-east-1",
+            f"web-{n}",
+            days_ago(40 + n),
+            tags={"owner": "me"},
+            status="idle",
+        )
         for n in range(4)
     ]
     store.save_inventory(scan_id, amis, [], [], [])

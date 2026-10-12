@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 export type Theme = "light" | "dark";
 const KEY = "janitor:theme";
 
@@ -17,4 +19,15 @@ export function applyTheme(theme: Theme): void {
   } catch {
     // the choice just isn't remembered
   }
+}
+
+/** Whether the dark theme is on, following the class on <html> as it changes. */
+export function useDark(): boolean {
+  const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
+  useEffect(() => {
+    const observer = new MutationObserver(() => setDark(document.documentElement.classList.contains("dark")));
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
+  return dark;
 }

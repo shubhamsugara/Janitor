@@ -606,3 +606,22 @@ def test_restore_accounts_reads_restore_attribute():
     ]
     assert n.restore_accounts(attrs) == ["222222222222", "all"]
     assert n.restore_accounts([]) == []
+
+
+def test_deployments_keep_their_tags():
+    groups = [tagged("g", role="web", deploy_state="deployed", team="payments")]
+    [asg] = n.asg_deployments(groups, TEMPLATES, VERSIONS, {}, DEV, "us-east-1", TAGS, "dev")
+    assert asg.tags["team"] == "payments" and asg.tags["deploy-state"] == "deployed"
+    lone = instance("i-9", role="bastion", owner="ops")
+    [d] = n.standalone_instances([{"Instances": [lone]}], [], TOOLS, "us-east-1", TAGS, "admin")
+    assert d.tags == {"role": "bastion", "owner": "ops"}
+    # ECS: task definition tags, then the service's own tags on top
+    ecs = n.ecs_deployment(
+        service(tags={"env": "qas", "team": "svc"}),
+        taskdef(app="orders", team="td"),
+        DEV,
+        "us-east-1",
+        TAGS,
+        "dev",
+    )
+    assert ecs.tags == {"app": "orders", "team": "svc", "env": "qas"}

@@ -74,7 +74,20 @@ def test_explanations_use_live_config_values(config):
     assert "older than 90 days" in defs["statuses"]["orphaned"]["meaning"]
     assert set(defs["by_type"]) == {"ami", "snapshot", "volume", "rds_snapshot"}
     assert [r["id"] for r in defs["rules"]] == [
-        "R1", "R2", "R3", "R4", "R5", "R6", "R7", "W1", "W2", "W3", "W4", "W5", "W6", "W7"
+        "R1",
+        "R2",
+        "R3",
+        "R4",
+        "R5",
+        "R6",
+        "R7",
+        "W1",
+        "W2",
+        "W3",
+        "W4",
+        "W5",
+        "W6",
+        "W7",
     ]
 
 
@@ -147,8 +160,9 @@ from janitor.rules import context, outcome  # noqa: E402
 
 
 def ami(id, name, age, region="us-east-1", account="111111111111", **kw):
-    return res(id=id, type="ami", name=name, created_at=days_ago(age), region=region,
-               account=account, **kw)
+    return res(
+        id=id, type="ami", name=name, created_at=days_ago(age), region=region, account=account, **kw
+    )
 
 
 def hits(resource, resources, databases=(), policy=POLICY):
@@ -221,8 +235,15 @@ def test_w1_blocks_when_configured():
 
 
 def rds(id, age, db="orders-db", **kw):
-    return res(id=id, type="rds_snapshot", name=id, created_at=days_ago(age), source_db_id=db,
-               db_kind="instance", **kw)
+    return res(
+        id=id,
+        type="rds_snapshot",
+        name=id,
+        created_at=days_ago(age),
+        source_db_id=db,
+        db_kind="instance",
+        **kw,
+    )
 
 
 def test_w2_newest_snapshot_of_gone_db_only():

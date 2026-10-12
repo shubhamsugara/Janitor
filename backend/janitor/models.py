@@ -125,6 +125,7 @@ class Deployment:
     task_definition: str = ""  # ecs: family:revision
     image: str = ""  # ecs: the first container's image
     unit: str = ""  # "asg", "instance" (in no ASG), or "service"
+    tags: dict[str, str] = field(default_factory=dict)  # ecs: task definition's, then service's
 
 
 @dataclass

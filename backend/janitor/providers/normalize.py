@@ -377,6 +377,7 @@ def asg_deployments(
                 launch_template_version="" if number is None else str(number),
                 ami_id=None if not image_id or image_id.startswith(SSM) else image_id,
                 unit="asg",
+                tags=tags,
             )
         )
     return found
@@ -421,6 +422,7 @@ def standalone_instances(
                     launch_template_version=tags.get("aws:ec2launchtemplate:version", ""),
                     ami_id=raw.get("ImageId"),
                     unit="instance",
+                    tags={k: v for k, v in tags.items() if not k.startswith("aws:")},
                 )
             )
     return found
@@ -479,6 +481,7 @@ def ecs_deployment(
         task_definition=f"{family.partition(':')[0]}:{revision}" if revision else family,
         image=image,
         unit="service",
+        tags=def_tags | svc_tags,
     )
 
 

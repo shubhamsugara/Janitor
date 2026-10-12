@@ -1,4 +1,4 @@
-import { BookOpen, Camera, Database, Disc3, HardDrive, LayoutDashboard, PanelLeftClose, PanelLeftOpen, Rocket, ScrollText, Sparkles, type LucideIcon } from "lucide-react";
+import { BookOpen, Boxes, Camera, Database, Disc3, HardDrive, LayoutDashboard, PanelLeftClose, PanelLeftOpen, Rocket, ScrollText, Sparkles, type LucideIcon } from "lucide-react";
 import { NavLink } from "react-router";
 import type { ResourceType } from "../api";
 import { TYPE_PAGES } from "../nav";
@@ -50,6 +50,7 @@ export default function Sidebar({ collapsed, onToggle }: { collapsed: boolean; o
         </div>
         <Section label="Deployments" collapsed={collapsed} />
         <Item to="/deployments" icon={Rocket} label="Deployments" collapsed={collapsed} />
+        <Item to="/apps" icon={Boxes} label="Apps" collapsed={collapsed} />
         <Section label="Activity" collapsed={collapsed} />
         <Item to="/audit" icon={ScrollText} label="Audit" collapsed={collapsed} />
         <Item to="/how-it-works" icon={BookOpen} label="How Janitor decides" collapsed={collapsed} />

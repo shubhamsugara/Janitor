@@ -85,7 +85,11 @@ def venv_python(root: Path) -> Path:
 def check_python(root: Path, run=run) -> list[Result]:
     py = venv_python(root)
     if not py.exists():
-        return [Result("fail", "There is no Python environment in .venv.", "Run make setup.")]
+        return [
+            Result(
+                "fail", "There is no Python environment in .venv.", "Run make setup."
+            )
+        ]
     _, out = run(str(py), "--version")
     version = parse_version(out)
     if version[:2] != (3, 12):
@@ -157,7 +161,9 @@ def check_node(root: Path, run=run) -> list[Result]:
         json.loads(installed.read_text()),
     )
     if stale:
-        names = ", ".join(stale[:3]) + (f" and {len(stale) - 3} more" if len(stale) > 3 else "")
+        names = ", ".join(stale[:3]) + (
+            f" and {len(stale) - 3} more" if len(stale) > 3 else ""
+        )
         return [
             Result(
                 "fail",
@@ -235,7 +241,9 @@ def listening(port: int) -> bool:
 
 def janitor_running() -> bool:
     try:
-        with urllib.request.urlopen("http://127.0.0.1:8080/health", timeout=2) as response:
+        with urllib.request.urlopen(
+            "http://127.0.0.1:8080/health", timeout=2
+        ) as response:
             return json.load(response).get("status") == "ok"
     except (OSError, ValueError):
         return False

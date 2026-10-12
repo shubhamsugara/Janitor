@@ -53,6 +53,9 @@ Read this first, then the spec.
   context; manual RDS snapshot shares; name pattern, source AMI, and source DB filters;
   "Select all N matching" resolved on the server (up to 5,000); a help panel with Info links; and
   a six-step first-run walkthrough (ending on Deployments), replayable from the Help menu.
+- **Apps** on branch `apps`: a page below Deployments with a stacked area chart of running
+  instances/tasks per app across envs, and a drawer of each app's resources and tags. See the
+  Deployments spec's Apps section.
 - Run it: `make setup` once, then `make run` → http://127.0.0.1:8080 (mock data), or
   `make run-aws` with a real `config/janitor.yaml` (see README).
 

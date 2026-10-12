@@ -35,6 +35,7 @@ function dep(over: Partial<Deployment>): Deployment {
     task_definition: "",
     image: "",
     unit: "asg",
+    tags: {},
     ...over,
   };
 }

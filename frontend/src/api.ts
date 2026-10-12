@@ -291,6 +291,7 @@ export interface Deployment {
   task_definition: string;
   image: string;
   unit: "asg" | "instance" | "service"; // instance: an EC2 instance in no Auto Scaling group
+  tags: Record<string, string>; // ECS: the task definition's, then the service's
 }
 
 export interface DeploymentsData {

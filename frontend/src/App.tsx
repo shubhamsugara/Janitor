@@ -9,6 +9,7 @@ import Tour from "./components/Tour";
 import { DetailContext, type DetailApi } from "./detail";
 import { HelpContext, type HelpApi, type HelpTopic } from "./help";
 import { TYPE_PAGES } from "./nav";
+import Apps from "./pages/Apps";
 import Audit from "./pages/Audit";
 import Deployments from "./pages/Deployments";
 import HowItWorks from "./pages/HowItWorks";
@@ -25,6 +26,7 @@ const TITLES: Record<string, string> = {
   "/": "Overview",
   "/audit": "Audit",
   "/deployments": "Deployments",
+  "/apps": "Apps",
   "/how-it-works": "How Janitor decides",
   ...Object.fromEntries(TYPE_PAGES.map((p) => [p.path, p.title])),
 };
@@ -128,6 +130,7 @@ export default function App() {
           <Route key={p.type} path={p.path} element={<Resources key={p.type} meta={meta} notify={notify} type={p.type} title={p.title} />} />
         ))}
         <Route path="/deployments" element={<Deployments meta={meta} notify={notify} />} />
+        <Route path="/apps" element={<Apps meta={meta} notify={notify} />} />
         <Route path="/audit" element={<Audit meta={meta} notify={notify} />} />
         <Route path="/how-it-works" element={<HowItWorks meta={meta} notify={notify} />} />
         <Route path="*" element={<p className="text-muted">This page doesn't exist. Choose a page from the navigation.</p>} />

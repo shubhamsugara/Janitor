@@ -367,3 +367,11 @@ def test_source_db_matches_rds_snapshots(tmp_path):
     )
     items, _ = store.query_resources(scan_id, {"source_db": "orders"})
     assert [r.id for r in items] == ["arn:1"]
+
+
+def test_deployment_tags_round_trip(tmp_path):
+    store = Store(tmp_path / "janitor.db")
+    scan = store.start_scan("mock")
+    row = dep("g", tags={"team": "payments", "env": "dev"})
+    store.save_deployments(scan, [row])
+    assert store.deployments(scan) == [row]

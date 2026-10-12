@@ -25,6 +25,12 @@ TOOLS, DEV, PRD, UNSCANNED = (
 SBX, UAT, QAS = "555555555555", "666666666666", "777777777777"
 ENVS = [SBX, DEV, UAT, QAS, PRD]
 EAST, WEST, EU = "us-east-1", "us-west-2", "eu-west-1"
+TEAMS = {
+    "api": "core",
+    "web": "web",
+    "orders-api": "commerce",
+    "billing-svc": "billing",
+}
 OUT = Path(__file__).resolve().parents[1] / "fixtures" / "seed.json"
 
 
@@ -245,6 +251,14 @@ class Seed:
                 "launch_template_version": str(n),
                 "ami_id": ami,
                 "unit": "asg",
+                "tags": {
+                    "role": app,
+                    "env": env,
+                    "version": version,
+                    "deploy-state": state,
+                    "deployment-id": str(n),
+                    "owner": TEAMS.get(app, "platform"),
+                },
             }
         )
         self.use(ami, account, region, "asg", name, "active" if desired else "inactive")
@@ -269,6 +283,13 @@ class Seed:
                 "running": int(running),
                 "ami_id": use["image_id"],
                 "unit": "instance",
+                "tags": {
+                    "Name": ref_name,
+                    "role": app,
+                    "env": env,
+                    "owner": TEAMS.get(app, "platform"),
+                }
+                | ({"version": version} if version else {}),
             }
         )
 
@@ -296,6 +317,11 @@ class Seed:
                 "task_definition": f"{app}:{revision}",
                 "image": f"registry.example/{app}:{version}",
                 "unit": "service",
+                "tags": {
+                    "app": app,
+                    "version": version,
+                    "owner": TEAMS.get(app, "platform"),
+                },
             }
         )
 
@@ -334,7 +360,9 @@ def build() -> dict:
         EAST, f"base-linux-{stamp(120)}", 120, shared_with=ENVS
     )  # orphaned, deletable
     s.ami(EAST, f"base-linux-{stamp(60)}", 60, shared_with=ENVS)  # idle
-    s.ami(EAST, f"base-linux-{stamp(35)}", 35, shared_with=ENVS)  # idle; R6 keeps 20, 35, 60
+    s.ami(
+        EAST, f"base-linux-{stamp(35)}", 35, shared_with=ENVS
+    )  # idle; R6 keeps 20, 35, 60
     base_20 = s.ami(EAST, f"base-linux-{stamp(20)}", 20, shared_with=ENVS)
     s.use(base_20, DEV, EAST, "instance", "dev-api-1", "running")
     s.use(base_20, PRD, EAST, "asg", "prd-api-asg", "active")

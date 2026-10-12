@@ -26,7 +26,7 @@ from janitor.models import (
     format_ts,
 )
 
-SCHEMA_VERSION = 8  # bump when a scan table changes shape; old scan data is dropped
+SCHEMA_VERSION = 9  # bump when a scan table changes shape; old scan data is dropped
 RESOURCE_FIELDS = [f.name for f in fields(Resource)]
 DEPLOYMENT_FIELDS = [f.name for f in fields(Deployment)]
 JSON_FIELDS = {"tags", "snapshot_ids", "cost_breakdown", "shared_with"}
@@ -91,7 +91,8 @@ CREATE TABLE IF NOT EXISTS deployments (
   resource_id TEXT NOT NULL, name TEXT NOT NULL, created_at TEXT NOT NULL,
   desired INTEGER NOT NULL, running INTEGER NOT NULL, deployment_id TEXT NOT NULL,
   launch_template TEXT NOT NULL, launch_template_version TEXT NOT NULL, ami_id TEXT,
-  cluster TEXT NOT NULL, task_definition TEXT NOT NULL, image TEXT NOT NULL, unit TEXT NOT NULL);
+  cluster TEXT NOT NULL, task_definition TEXT NOT NULL, image TEXT NOT NULL, unit TEXT NOT NULL,
+  tags TEXT NOT NULL DEFAULT '{}');
 CREATE TABLE IF NOT EXISTS policy_results (
   scan_id INTEGER NOT NULL, resource_id TEXT NOT NULL, rule_id TEXT NOT NULL,
   outcome TEXT NOT NULL, message TEXT NOT NULL);
@@ -132,6 +133,11 @@ def _row(scan_id: int, r: Resource) -> tuple:
         scan_id,
         *(json.dumps(data[f]) if f in JSON_FIELDS else data[f] for f in RESOURCE_FIELDS),
     )
+
+
+def _deployment_value(d: Deployment, name: str):
+    value = getattr(d, name)
+    return json.dumps(value) if name == "tags" else value
 
 
 def _resource(row: sqlite3.Row) -> Resource:
@@ -599,7 +605,10 @@ class Store:
         with self._lock, self._db:
             self._db.executemany(
                 f"INSERT INTO deployments ({cols}) VALUES ({marks})",
-                [(scan_id, *(getattr(d, f) for f in DEPLOYMENT_FIELDS)) for d in deployments],
+                [
+                    (scan_id, *(_deployment_value(d, f) for f in DEPLOYMENT_FIELDS))
+                    for d in deployments
+                ],
             )
 
     def deployments(self, scan_id: int) -> list[Deployment]:
@@ -607,7 +616,12 @@ class Store:
             "SELECT * FROM deployments WHERE scan_id = ? ORDER BY app, env, region, created_at",
             (scan_id,),
         )
-        return [Deployment(**{f: row[f] for f in DEPLOYMENT_FIELDS}) for row in rows]
+        return [
+            Deployment(
+                **{f: json.loads(row[f]) if f == "tags" else row[f] for f in DEPLOYMENT_FIELDS}
+            )
+            for row in rows
+        ]
 
     def save_rule_results(self, scan_id: int, results: list[RuleResult]) -> None:
         with self._lock, self._db:
