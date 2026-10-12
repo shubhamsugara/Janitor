@@ -1,17 +1,41 @@
-import { useMemo } from "react";
-import { Background, Controls, Handle, MarkerType, Position, ReactFlow, type Edge, type Node, type NodeProps } from "@xyflow/react";
+import { useMemo, useState } from "react";
+import { Background, Controls, Handle, MarkerType, NodeToolbar, Position, ReactFlow, type Edge, type Node, type NodeProps } from "@xyflow/react";
 import type { Graph, GraphNode, Meta } from "../api";
-import { RELATION_LABELS, diagramHeight, layoutGraph } from "../graphLayout";
+import { RELATION_LABELS, diagramHeight, layoutGraph, nodeDetails } from "../graphLayout";
 import AwsIcon from "./AwsIcon";
 import "./diagram.css";
 
 const RESOURCE_KINDS = new Set(["ami", "snapshot", "volume", "rds_snapshot"]);
 
-type NodeData = { node: GraphNode; isRoot: boolean; statusLabel: string };
+type NodeData = { node: GraphNode; isRoot: boolean; statusLabel: string; lane: number; upper: boolean };
 type JanitorNode = Node<NodeData, "janitor">;
+
+/** Rendered above the canvas (a portal), so a neighbouring node never covers it. */
+function HoverCard({ data, visible }: { data: NodeData; visible: boolean }) {
+  const { kind, title, rows } = nodeDetails(data.node, data.statusLabel);
+  // Open toward the middle of the canvas, so the card isn't clipped at its edges.
+  const align = data.lane > 0 ? "end" : data.lane < 0 ? "start" : "center";
+  return (
+    <NodeToolbar isVisible={visible} position={data.upper ? Position.Bottom : Position.Top} align={align} offset={10}>
+      <div className="janitor-hovercard" role="tooltip">
+        <div className="janitor-hovercard-kind">{kind}</div>
+        <div className="janitor-hovercard-title">{title}</div>
+        <dl>
+          {rows.map(([k, v]) => (
+            <div key={k}>
+              <dt>{k}</dt>
+              <dd>{v}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </NodeToolbar>
+  );
+}
 
 function JanitorNodeView({ data }: NodeProps<JanitorNode>) {
   const { node, isRoot, statusLabel } = data;
+  const [hover, setHover] = useState(false);
   const classes = [
     "janitor-node",
     `status-${node.status ?? "none"}`,
@@ -22,7 +46,8 @@ function JanitorNodeView({ data }: NodeProps<JanitorNode>) {
   ].join(" ");
   const meta = [statusLabel, node.account_name, node.region].filter(Boolean).join(" · ");
   return (
-    <div className={classes} title={node.id}>
+    <div className={classes} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+      {node.kind !== "more" && <HoverCard data={data} visible={hover} />}
       <Handle type="target" position={Position.Left} />
       {node.kind !== "more" && <AwsIcon kind={node.kind} size={28} />}
       <div className="janitor-node-text">
@@ -47,10 +72,11 @@ interface Props {
   meta: Meta;
   dark: boolean;
   onSelect: (id: string) => void;
+  height?: string; // a CSS height; default: tall enough for the fullest lane
 }
 
 /** Where a resource comes from (left) and what depends on it (right). Click a resource to re-center. */
-export default function LinkageDiagram({ graph, meta, dark, onSelect }: Props) {
+export default function LinkageDiagram({ graph, meta, dark, onSelect, height }: Props) {
   const { nodes, edges } = useMemo(() => {
     const active = new Set(graph.nodes.filter((n) => n.active).map((n) => n.id));
     const nodes: JanitorNode[] = layoutGraph(graph).map(({ node, x, y, isRoot }) => ({
@@ -59,7 +85,13 @@ export default function LinkageDiagram({ graph, meta, dark, onSelect }: Props) {
       position: { x, y },
       draggable: false,
       connectable: false,
-      data: { node, isRoot, statusLabel: node.status ? meta.definitions.statuses[node.status].label : "" },
+      data: {
+        node,
+        isRoot,
+        statusLabel: node.status ? meta.definitions.statuses[node.status].label : "",
+        lane: node.depth,
+        upper: y < 0,
+      },
     }));
     const edges: Edge[] = graph.edges.map((e) => ({
       id: `${e.source}->${e.target}:${e.relation}`,
@@ -74,7 +106,7 @@ export default function LinkageDiagram({ graph, meta, dark, onSelect }: Props) {
   }, [graph, meta]);
 
   return (
-    <div className="janitor-diagram" style={{ height: diagramHeight(graph) }}>
+    <div className="janitor-diagram" style={{ height: height ?? diagramHeight(graph) }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}

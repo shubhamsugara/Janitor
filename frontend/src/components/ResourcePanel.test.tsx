@@ -1,11 +1,11 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import { api, type Meta, type ResourceDetail } from "../api";
 import ResourcePanel from "./ResourcePanel";
 
 vi.mock("../api", () => ({ api: { resource: vi.fn(), graph: vi.fn() } }));
-vi.mock("./LinkageDiagram", () => ({ default: () => null }));
+vi.mock("./LinkageDiagram", () => ({ default: ({ height }: { height?: string }) => <div data-testid="diagram" data-height={height ?? ""} /> }));
 
 const meta = {
   accounts: [],
@@ -48,5 +48,16 @@ describe("ResourcePanel links to filtered lists", () => {
     show(detail({ id: "arn:1", type: "rds_snapshot", source_db_id: "orders-db" }));
     const link = await screen.findByRole("link", { name: "See all snapshots of this database" });
     expect(link.getAttribute("href")).toBe("/rds-snapshots?source_db=orders-db");
+  });
+});
+
+describe("ResourcePanel diagram", () => {
+  it("enlarges the diagram in a dialog", async () => {
+    show(detail({ id: "ami-0000aaaa" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Enlarge diagram" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog.textContent).toContain("x");
+    const diagrams = screen.getAllByTestId("diagram");
+    expect(diagrams.some((d) => d.dataset.height === "72vh")).toBe(true);
   });
 });

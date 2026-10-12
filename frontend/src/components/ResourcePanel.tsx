@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router";
-import { CircleCheck, Info } from "lucide-react";
+import { CircleCheck, Info, Maximize2 } from "lucide-react";
 import { api, type Graph, type Meta, type ResourceDetail } from "../api";
 import { accountName, formatDate, formatGiB, formatUsd } from "../format";
+import { Dialog } from "../ui/dialog";
 import { Spinner } from "../ui/spinner";
 import { Table, TBody, Td, Th, THead, Tr } from "../ui/table";
 import { Tabs } from "../ui/tabs";
@@ -65,6 +66,7 @@ export default function ResourcePanel({ id, meta, dark, onSelect }: Props) {
   const [graph, setGraph] = useState<Graph | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState("diagram");
+  const [enlarged, setEnlarged] = useState(false);
   const { close } = useDetail();
 
   useEffect(() => {
@@ -92,6 +94,15 @@ export default function ResourcePanel({ id, meta, dark, onSelect }: Props) {
   const r = detail.resource;
   const tags = Object.entries(r.tags);
   const active = (graph.used_by.active ?? 0) > 0;
+  const legend = (
+    <div className="janitor-legend">
+      {LEGEND.map(([label, color, style]) => (
+        <span key={label} className={style} style={{ ["--legend-color" as string]: color }}>
+          {label}
+        </span>
+      ))}
+    </div>
+  );
 
   return (
     <div className="space-y-5">
@@ -134,16 +145,20 @@ export default function ResourcePanel({ id, meta, dark, onSelect }: Props) {
             label: "Diagram",
             content: (
               <div className="space-y-3">
-                <LinkageDiagram graph={graph} meta={meta} dark={dark} onSelect={onSelect} />
-                <div className="janitor-legend">
-                  {LEGEND.map(([label, color, style]) => (
-                    <span key={label} className={style} style={{ ["--legend-color" as string]: color }}>
-                      {label}
-                    </span>
-                  ))}
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setEnlarged(true)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs font-medium text-ink shadow-sm hover:bg-subtle"
+                  >
+                    <Maximize2 className="size-3.5" aria-hidden />
+                    Enlarge diagram
+                  </button>
                 </div>
+                <LinkageDiagram graph={graph} meta={meta} dark={dark} onSelect={onSelect} />
+                {legend}
                 <p className="text-xs text-muted">
-                  Click a resource to center the diagram on it. Scroll to zoom, drag to pan.
+                  Hover a resource to see what it is. Click one to center the diagram on it. Scroll to zoom, drag to pan.
                   {graph.truncated && " Some links are collapsed into \"+N more\" nodes."}
                 </p>
               </div>
@@ -223,6 +238,12 @@ export default function ResourcePanel({ id, meta, dark, onSelect }: Props) {
           },
         ]}
       />
+      <Dialog open={enlarged} onClose={() => setEnlarged(false)} title={r.name || r.id} size="full">
+        <div className="space-y-3">
+          <LinkageDiagram graph={graph} meta={meta} dark={dark} onSelect={onSelect} height="72vh" />
+          {legend}
+        </div>
+      </Dialog>
     </div>
   );
 }

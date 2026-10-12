@@ -9,7 +9,7 @@ interface Props {
   title: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
-  size?: "md" | "lg";
+  size?: "md" | "lg" | "full";
 }
 
 /** A centered dialog. Focus is trapped inside; Esc and the overlay close it. */
@@ -23,7 +23,7 @@ export function Dialog({ open, onClose, title, children, footer, size = "md" }: 
           className={cn(
             "animate-pop-in fixed top-1/2 left-1/2 z-50 flex max-h-[88vh] w-[94vw] -translate-x-1/2 -translate-y-1/2 flex-col",
             "rounded-2xl border border-line bg-card text-ink shadow-2xl",
-            size === "lg" ? "max-w-3xl" : "max-w-lg",
+            size === "full" ? "max-w-[96vw]" : size === "lg" ? "max-w-3xl" : "max-w-lg",
           )}
         >
           <div className="flex items-center justify-between border-b border-line px-6 py-4">

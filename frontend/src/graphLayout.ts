@@ -1,7 +1,8 @@
 import type { Graph, GraphNode, NodeKind } from "./api";
 
-export const LANE_WIDTH = 300;
-export const ROW_HEIGHT = 92;
+export const NODE_WIDTH = 236; // matches .janitor-node in diagram.css
+export const LANE_WIDTH = 400; // node plus room for an edge and its label
+export const ROW_HEIGHT = 116;
 const KIND_ORDER: NodeKind[] = [
   "ami",
   "snapshot",
@@ -26,6 +27,42 @@ export const RELATION_LABELS: Record<string, string> = {
   snapshot_of: "snapshot",
   snapshot_of_db: "snapshot",
 };
+
+const KIND_LABELS: Record<NodeKind, string> = {
+  ami: "AMI",
+  snapshot: "EBS snapshot",
+  volume: "EBS volume",
+  rds_snapshot: "RDS snapshot",
+  database: "RDS database",
+  instance: "EC2 instance",
+  asg: "Auto Scaling group",
+  launch_template: "Launch template",
+  launch_config: "Launch configuration",
+  account: "AWS account",
+  more: "More links",
+};
+
+const RESOURCE_KINDS = new Set<NodeKind>(["ami", "snapshot", "volume", "rds_snapshot"]);
+
+/** A resource's node ID is its AWS ID; other nodes use "kind:...:awsId" keys. Accounts and "more" have none. */
+function awsId(node: GraphNode): string {
+  if (RESOURCE_KINDS.has(node.kind)) return node.id;
+  if (node.kind === "account" || node.kind === "more") return "";
+  return node.id.slice(node.id.lastIndexOf(":") + 1);
+}
+
+/** What the hover card on a diagram node shows: what it is, then where it lives. Empty fields are left out. */
+export function nodeDetails(node: GraphNode, statusLabel: string): { kind: string; title: string; rows: [string, string][] } {
+  const id = awsId(node);
+  const rows: [string, string][] = [
+    ["ID", id === node.label ? "" : id],
+    ["Status", statusLabel],
+    ["State", node.status === null ? node.state : ""],
+    ["Account", node.account_name],
+    ["Region", node.region],
+  ];
+  return { kind: KIND_LABELS[node.kind] ?? node.kind, title: node.label, rows: rows.filter(([, v]) => v) };
+}
 
 export interface Placed {
   node: GraphNode;
